@@ -121,7 +121,7 @@
             @submit.prevent="submitProof"
           >
             <label class="upload-dropzone" :class="{ 'has-preview': proofPreviewUrl }">
-              <input type="file" accept="image/*" @change="handleProofUpload">
+              <input ref="proofFileInput" type="file" accept="image/*" @change="handleProofUpload">
               <template v-if="proofPreviewUrl">
                 <img :src="proofPreviewUrl" :alt="`${task.name}凭证预览`">
                 <span class="replace-proof">更换图片</span>
@@ -170,8 +170,20 @@
               ></textarea>
             </label>
 
-            <button class="submit-proof" type="submit" :disabled="!canSubmitProof">
-              提交凭证
+            <button
+              class="submit-proof"
+              type="submit"
+              :class="{ 'is-confirming': isProofSubmitConfirming }"
+              :disabled="!canSubmitProof"
+            >
+              <Transition name="submit-proof-label" mode="out-in">
+                <span
+                  :key="submitProofButtonText"
+                  class="submit-proof-label"
+                >
+                  {{ submitProofButtonText }}
+                </span>
+              </Transition>
             </button>
           </form>
         </aside>
@@ -181,8 +193,8 @@
     <button
       class="upload-fab"
       type="button"
-      :disabled="!isLocked"
-      :aria-label="isLocked ? '上传每日凭证' : '锁定运动后才能上传凭证'"
+      :disabled="!canOpenUploadPanel"
+      :aria-label="uploadButtonAriaLabel"
       @click="openUploadPanel"
     >
       +
@@ -457,6 +469,8 @@ export default {
       lockConfirmTimer: null,
       lockConfettiBursts: [],
       lockConfettiTimers: [],
+      isProofSubmitConfirming: false,
+      proofSubmitConfirmTimer: null,
       uploadTouchStartX: 0,
       uploadTouchStartY: 0
     }
@@ -530,8 +544,25 @@ export default {
     proofNotePlaceholder() {
       return this.uploadConfig.notePlaceholder
     },
+    canOpenUploadPanel() {
+      return this.isLocked && Boolean(this.selectedChallengeLevel)
+    },
+    uploadButtonAriaLabel() {
+      if (!this.isLocked) {
+        return '锁定运动后才能上传凭证'
+      }
+
+      if (!this.selectedChallengeLevel) {
+        return '确定挑战等级后才能上传凭证'
+      }
+
+      return '上传每日凭证'
+    },
     canSubmitProof() {
       return Boolean(this.selectedProofName) && (!this.isWeightChallenge || Boolean(this.proofBmi))
+    },
+    submitProofButtonText() {
+      return this.isProofSubmitConfirming ? '确认提交' : '提交凭证'
     }
   },
   methods: {
@@ -600,7 +631,7 @@ export default {
       this.lockConfettiTimers = [...this.lockConfettiTimers, timer]
     },
     openUploadPanel() {
-      if (!this.isLocked) {
+      if (!this.canOpenUploadPanel) {
         return
       }
 
@@ -608,6 +639,7 @@ export default {
     },
     closeUploadPanel() {
       this.isUploadOpen = false
+      this.resetProofSubmitConfirm()
     },
     handleProofUpload(event) {
       const [file] = event.target.files || []
@@ -622,9 +654,15 @@ export default {
 
       this.selectedProofName = file.name
       this.proofPreviewUrl = URL.createObjectURL(file)
+      this.resetProofSubmitConfirm()
     },
     submitProof() {
       if (!this.canSubmitProof) {
+        return
+      }
+
+      if (!this.isProofSubmitConfirming) {
+        this.startProofSubmitConfirm()
         return
       }
 
@@ -635,7 +673,44 @@ export default {
         bmi: this.isWeightChallenge ? this.proofBmi : '',
         note: this.proofNote
       })
+      this.resetProofForm()
       this.closeUploadPanel()
+    },
+    startProofSubmitConfirm() {
+      this.isProofSubmitConfirming = true
+
+      if (this.proofSubmitConfirmTimer) {
+        window.clearTimeout(this.proofSubmitConfirmTimer)
+      }
+
+      this.proofSubmitConfirmTimer = window.setTimeout(() => {
+        this.isProofSubmitConfirming = false
+        this.proofSubmitConfirmTimer = null
+      }, 1800)
+    },
+    resetProofSubmitConfirm() {
+      this.isProofSubmitConfirming = false
+
+      if (this.proofSubmitConfirmTimer) {
+        window.clearTimeout(this.proofSubmitConfirmTimer)
+        this.proofSubmitConfirmTimer = null
+      }
+    },
+    resetProofForm() {
+      if (this.proofPreviewUrl) {
+        URL.revokeObjectURL(this.proofPreviewUrl)
+      }
+
+      this.proofNote = ''
+      this.proofRecordType = 'month-start'
+      this.proofBmi = ''
+      this.proofPreviewUrl = ''
+      this.selectedProofName = ''
+      this.resetProofSubmitConfirm()
+
+      if (this.$refs.proofFileInput) {
+        this.$refs.proofFileInput.value = ''
+      }
     },
     startUploadSwipe(event) {
       const [touch] = event.changedTouches
@@ -669,6 +744,10 @@ export default {
 
     if (this.lockConfirmTimer) {
       window.clearTimeout(this.lockConfirmTimer)
+    }
+
+    if (this.proofSubmitConfirmTimer) {
+      window.clearTimeout(this.proofSubmitConfirmTimer)
     }
 
     this.lockConfettiTimers.forEach(timer => window.clearTimeout(timer))
@@ -1196,9 +1275,11 @@ export default {
 }
 
 .upload-overlay {
+  --upload-safe-top: 92px;
+
   position: fixed;
   z-index: 20;
-  top: 0;
+  top: var(--upload-safe-top);
   bottom: 0;
   left: 50%;
   width: min(100vw, 430px);
@@ -1209,7 +1290,7 @@ export default {
 
 .upload-panel {
   position: absolute;
-  top: 72px;
+  top: 16px;
   right: 16px;
   bottom: 88px;
   width: min(330px, calc(100% - 58px));
@@ -1504,6 +1585,67 @@ export default {
   cursor: pointer;
   font-size: 14px;
   font-weight: 950;
+  transform: translateY(0) scale(1);
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease,
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.submit-proof:not(:disabled):hover {
+  filter: brightness(1.03);
+  transform: translateY(-2px) scale(1.01);
+}
+
+.submit-proof:not(:disabled):active {
+  box-shadow:
+    0 6px 12px color-mix(in srgb, var(--accent), transparent 76%),
+    inset 0 3px 8px rgba(23, 33, 27, 0.2);
+  filter: brightness(0.96);
+  transform: translateY(2px) scale(0.96);
+  transition-duration: 0.08s;
+}
+
+.submit-proof.is-confirming {
+  background: linear-gradient(135deg, #ffb84d, #ff7a45);
+  box-shadow:
+    0 12px 24px rgba(255, 122, 69, 0.26),
+    0 0 0 4px rgba(255, 184, 77, 0.18);
+  animation: submit-proof-confirm-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes submit-proof-confirm-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+
+  50% {
+    filter: brightness(1.08);
+  }
+}
+
+.submit-proof-label {
+  display: inline-block;
+  min-width: 58px;
+}
+
+.submit-proof-label-enter-active,
+.submit-proof-label-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.submit-proof-label-enter-from {
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
+}
+
+.submit-proof-label-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.96);
 }
 
 .submit-proof:disabled {
@@ -1511,6 +1653,7 @@ export default {
   box-shadow: none;
   color: rgba(23, 33, 27, 0.38);
   cursor: not-allowed;
+  transform: none;
 }
 
 .upload-panel-enter-active,
@@ -1537,8 +1680,12 @@ export default {
 }
 
 @media (max-height: 640px) {
+  .upload-overlay {
+    --upload-safe-top: 84px;
+  }
+
   .upload-panel {
-    top: 56px;
+    top: 10px;
     bottom: 70px;
     gap: 9px;
     padding: 14px;
