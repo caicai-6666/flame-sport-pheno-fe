@@ -37,6 +37,38 @@ export const appState = reactive({
   lockedTaskNames: [],
   maxLockedTasks: 3,
   selectedChallengeLevel: '',
+  pastSeasonReviewRecords: [
+    {
+      id: 'archive-20260630-run',
+      seasonName: '2026 夏季赛 · 06月',
+      taskName: '跑步/快走',
+      fileName: 'run-june-summary.pdf',
+      note: '累计里程与配速记录符合本赛季预订目标。',
+      result: 'approved',
+      accent: '#ff9f45',
+      reviewedAt: '2026-06-30T18:30:00+08:00'
+    },
+    {
+      id: 'archive-20260630-steps',
+      seasonName: '2026 夏季赛 · 06月',
+      taskName: '日常步数',
+      fileName: 'steps-june.zip',
+      note: '达标天数已完成审核并归档。',
+      result: 'approved',
+      accent: '#68d65c',
+      reviewedAt: '2026-06-30T18:24:00+08:00'
+    },
+    {
+      id: 'archive-20260531-fitness',
+      seasonName: '2026 春季赛 · 05月',
+      taskName: '健身打卡',
+      fileName: 'fitness-may.png',
+      note: '部分记录缺少单次时长信息，未计入完成次数。',
+      result: 'rejected',
+      accent: '#7b8cff',
+      reviewedAt: '2026-05-31T19:10:00+08:00'
+    }
+  ],
   uploadRecords: [
     {
       id: 'mock-20260715-run',

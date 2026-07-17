@@ -6,7 +6,6 @@
     :remaining-lock-slots="remainingLockSlots"
     :selected-challenge-level="selectedChallengeLevel"
     @lock-task="lockTask"
-    @submit-proof="addUploadRecord"
   />
 
   <section v-else class="module-page">
@@ -21,7 +20,7 @@
 
 <script>
 import ProjectDetail from '../components/ProjectDetail.vue'
-import { addUploadRecord, appState, findTaskByName, isTaskLocked, lockTask, remainingLockSlots } from '../state/appState'
+import { appState, findTaskByName, isTaskLocked, lockTask, remainingLockSlots } from '../state/appState'
 
 export default {
   name: 'ProjectDetailView',
@@ -43,8 +42,7 @@ export default {
     }
   },
   methods: {
-    lockTask,
-    addUploadRecord
+    lockTask
   }
 }
 </script>

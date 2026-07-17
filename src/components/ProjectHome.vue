@@ -4,34 +4,28 @@
       <span class="eyebrow">{{ seasonLabel }}</span>
       <h1>当前赛季可选任务</h1>
       <p>围绕日常、训练、团队和户外场景，把健康行为拆成可完成的挑战。</p>
-      <div class="selection-status" :class="{ 'is-full': remainingLockSlots === 0 }">
-        <span>已锁定 {{ lockedTaskNames.length }}/{{ maxLockedTasks }}</span>
-        <strong>{{ remainingLockSlots > 0 ? `还能选择 ${remainingLockSlots} 个运动` : '已达到选择上限' }}</strong>
-      </div>
 
       <Transition name="hero-guidance" mode="out-in">
         <div v-if="isSeasonSetupComplete" key="target" class="season-target-card">
-          <span>当前赛季预订目标 -- {{ selectedChallengeLevel }}</span>
-          <strong>三项运动都将按该等级参与挑战</strong>
+          <span>当前赛季的预订目标等级 -- {{ selectedChallengeLevel }}</span>
         </div>
 
         <div v-else key="guide" class="setup-guide">
-          <ol class="setup-steps" aria-label="赛季目标预订步骤">
-            <li :class="{ 'is-complete': isSportSelectionComplete }">
-              <strong>1</strong>
+          <ol class="signup-progress" aria-label="赛季报名进度">
+            <li
+              v-for="step in signupSteps"
+              :key="step.key"
+              :class="`is-${step.status}`"
+            >
+              <strong>{{ step.index }}</strong>
               <div>
-                <span>先选择3项运动</span>
-                <small>当前已选择 {{ lockedTaskNames.length }}/{{ maxLockedTasks }} 项</small>
-              </div>
-            </li>
-            <li :class="{ 'is-ready': isSportSelectionComplete }">
-              <strong>2</strong>
-              <div>
-                <span>然后选择相应的挑战等级</span>
-                <small>三项挑战都属于该等级</small>
+                <span>{{ step.title }}</span>
+                <small>{{ step.description }}</small>
               </div>
             </li>
           </ol>
+
+          <p class="setup-caution">三项运动使用同一挑战等级，请谨慎选择。</p>
 
           <div v-if="isSportSelectionComplete" class="level-picker" role="group" aria-label="选择挑战等级">
             <button
@@ -71,23 +65,59 @@
         @keydown.space.prevent="selectWithKeyboard(task)"
         @transitionend="finishRecovery(task, $event)"
       >
+        <span class="task-card-header">
+          <span class="task-name">{{ task.name }}</span>
+          <span class="task-illustration" aria-hidden="true">
+            <img :src="taskIcon(task)" :alt="`${task.name}图标`">
+          </span>
+        </span>
         <span v-if="isTaskLocked(task)" class="locked-badge">已锁定</span>
-        <span class="task-name">{{ task.name }}</span>
-        <span class="task-description">{{ task.description }}</span>
-        <span class="task-link">{{ isTaskDisabled(task) ? '选择已满' : '查看挑战 →' }}</span>
+        <span class="task-description">{{ taskDescription(task) }}</span>
+        <span class="task-link">{{ taskActionText(task) }}</span>
       </button>
     </div>
+
+    <Transition name="upload-panel">
+      <UploadProofPanel
+        v-if="activeUploadTask"
+        :task="activeUploadTask"
+        @close="closeUploadPanel"
+        @submit-proof="$emit('submit-proof', $event)"
+      />
+    </Transition>
   </section>
 </template>
 
 <script>
+import UploadProofPanel from './UploadProofPanel.vue'
+import companySportIcon from '../assets/公司运动.png'
+import dailyStepsIcon from '../assets/日常步数.png'
+import fitnessIcon from '../assets/健身打卡.png'
+import hikingIcon from '../assets/登山.png'
+import runningIcon from '../assets/跑步.png'
+import weightLossIcon from '../assets/减重.png'
+import { findChallengeRule } from '../state/challengeConfig'
+
+const taskIconMap = {
+  日常步数: dailyStepsIcon,
+  '跑步/快走': runningIcon,
+  健身打卡: fitnessIcon,
+  公司运动: companySportIcon,
+  户外登山: hikingIcon,
+  减重挑战: weightLossIcon
+}
+
 export default {
   name: 'ProjectHome',
+  components: {
+    UploadProofPanel
+  },
   data() {
     return {
       pressedTask: '',
       recoveringTask: '',
       pendingTask: null,
+      activeUploadTask: null,
       challengeLevels: ['青铜', '白银', '黄金']
     }
   },
@@ -128,6 +158,31 @@ export default {
     },
     isSeasonSetupComplete() {
       return this.isSportSelectionComplete && Boolean(this.selectedChallengeLevel)
+    },
+    signupSteps() {
+      return [
+        {
+          key: 'tasks',
+          index: 1,
+          title: '选择三个项目',
+          description: `已选择 ${this.lockedTaskNames.length}/${this.maxLockedTasks}`,
+          status: this.isSportSelectionComplete ? 'complete' : 'current'
+        },
+        {
+          key: 'level',
+          index: 2,
+          title: '选择挑战等级',
+          description: this.selectedChallengeLevel || '三项挑战共用等级',
+          status: this.selectedChallengeLevel ? 'complete' : this.isSportSelectionComplete ? 'current' : 'upcoming'
+        },
+        {
+          key: 'success',
+          index: 3,
+          title: '报名成功',
+          description: '生成赛季目标',
+          status: this.isSeasonSetupComplete ? 'complete' : 'upcoming'
+        }
+      ]
     }
   },
   methods: {
@@ -136,6 +191,33 @@ export default {
     },
     isTaskDisabled(task) {
       return !this.isTaskLocked(task) && this.remainingLockSlots <= 0
+    },
+    taskIcon(task) {
+      return task.iconUrl || task.icon || taskIconMap[task.name] || dailyStepsIcon
+    },
+    taskDescription(task) {
+      if (!this.isSeasonSetupComplete || !this.isTaskLocked(task)) {
+        return task.description
+      }
+
+      const challenge = findChallengeRule(task.name, this.selectedChallengeLevel)
+
+      if (!challenge) {
+        return task.description
+      }
+
+      return challenge.metrics.map(metric => `${metric.label} ${metric.value}`).join(' · ')
+    },
+    taskActionText(task) {
+      if (this.isTaskDisabled(task)) {
+        return '选择已满'
+      }
+
+      if (this.isSeasonSetupComplete && this.isTaskLocked(task)) {
+        return '上传凭证 →'
+      }
+
+      return '查看挑战 →'
     },
     pressTask(task) {
       if (this.isTaskDisabled(task)) {
@@ -179,10 +261,22 @@ export default {
       const selectedTask = this.pendingTask || task
       this.recoveringTask = ''
       this.pendingTask = null
+
+      if (this.isSeasonSetupComplete && this.isTaskLocked(selectedTask)) {
+        this.openUploadPanel(selectedTask)
+        return
+      }
+
       this.$emit('select-task', selectedTask)
+    },
+    openUploadPanel(task) {
+      this.activeUploadTask = task
+    },
+    closeUploadPanel() {
+      this.activeUploadTask = null
     }
   },
-  emits: ['select-task', 'select-level']
+  emits: ['select-task', 'select-level', 'submit-proof']
 }
 </script>
 
@@ -240,63 +334,53 @@ export default {
   line-height: 1.7;
 }
 
-.selection-status {
-  position: relative;
-  z-index: 1;
-  width: fit-content;
-  margin-top: 18px;
-  padding: 9px 12px;
-  border: 1px solid rgba(47, 143, 50, 0.14);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.62);
-  color: #2f8f32;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 850;
-}
-
-.selection-status strong {
-  color: #17211b;
-  font-weight: 900;
-}
-
-.selection-status.is-full {
-  border-color: rgba(255, 111, 145, 0.2);
-  color: #c54266;
-}
-
 .setup-guide,
 .season-target-card {
   position: relative;
   z-index: 1;
-  margin-top: 14px;
+  margin-top: 18px;
 }
 
-.setup-steps {
+.signup-progress {
+  --progress-line: rgba(23, 33, 27, 0.13);
   margin: 0;
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
 }
 
-.setup-steps li {
-  padding: 10px 12px;
-  border: 1px solid rgba(23, 33, 27, 0.08);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.56);
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
+.signup-progress li {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  text-align: center;
 }
 
-.setup-steps li > strong {
-  width: 28px;
-  height: 28px;
-  border-radius: 12px;
+.signup-progress li:not(:last-child)::after {
+  position: absolute;
+  z-index: 0;
+  top: 15px;
+  left: calc(50% + 15px);
+  width: calc(100% - 30px);
+  height: 1px;
+  background: var(--progress-line);
+  content: '';
+}
+
+.signup-progress li.is-complete:not(:last-child)::after {
+  background: rgba(57, 181, 74, 0.54);
+}
+
+.signup-progress li > strong {
+  position: relative;
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   background: rgba(23, 33, 27, 0.08);
   color: #5d6961;
   display: grid;
@@ -305,32 +389,65 @@ export default {
   font-weight: 950;
 }
 
-.setup-steps li.is-complete > strong,
-.setup-steps li.is-ready > strong {
+.signup-progress li.is-current > strong {
+  background: linear-gradient(135deg, #ff7a90, #e03d58);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(224, 61, 88, 0.24);
+}
+
+.signup-progress li.is-complete > strong {
   background: linear-gradient(135deg, #70dd4d, #39b54a);
   color: #fff;
   box-shadow: 0 8px 18px rgba(58, 181, 74, 0.24);
 }
 
-.setup-steps span {
+.signup-progress div {
+  width: 100%;
+  min-width: 0;
+  margin-top: 8px;
+}
+
+.signup-progress span {
   display: block;
   color: #17211b;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 950;
   line-height: 1.2;
 }
 
-.setup-steps small {
+.signup-progress small {
   display: block;
   margin-top: 4px;
   color: #68766d;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 750;
   line-height: 1.35;
 }
 
+.signup-progress li.is-current span {
+  color: #c54266;
+}
+
+.signup-progress li.is-complete span {
+  color: #2f8f32;
+}
+
+.signup-progress li.is-upcoming {
+  opacity: 0.5;
+}
+
+.setup-caution {
+  margin: 12px 0 0;
+  color: #8a4a5b;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.45;
+  transform: translateY(6px);
+  white-space: nowrap;
+}
+
 .level-picker {
-  margin-top: 10px;
+  margin-top: 24px;
   padding: 6px;
   border: 1px solid rgba(47, 143, 50, 0.12);
   border-radius: 20px;
@@ -442,6 +559,34 @@ export default {
   touch-action: manipulation;
 }
 
+.task-card-header {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.task-illustration {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(23, 33, 27, 0.05);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.task-illustration img {
+  width: 38px;
+  height: 38px;
+  display: block;
+  object-fit: contain;
+}
+
 .task-card:disabled {
   font: inherit;
 }
@@ -493,7 +638,7 @@ export default {
 
 .locked-badge {
   align-self: flex-start;
-  margin-bottom: 10px;
+  margin-top: 8px;
   padding: 5px 8px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent), #fff 72%);
@@ -503,13 +648,14 @@ export default {
 }
 
 .task-name {
+  min-width: 0;
   font-size: 16px;
   font-weight: 850;
   line-height: 1.2;
 }
 
 .task-description {
-  margin-top: 8px;
+  margin-top: 10px;
   color: #717d75;
   font-size: 12px;
   line-height: 1.55;

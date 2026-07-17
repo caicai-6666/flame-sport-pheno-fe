@@ -1,8 +1,8 @@
 <template>
-  <section class="rank-page" aria-label="积分排行榜">
+  <section class="rank-page" aria-label="打卡上传排行榜">
     <div class="rank-hero">
-      <span class="rank-eyebrow">SEASON SCORE</span>
-      <h1>总积分排行榜</h1>
+      <span class="rank-eyebrow">SEASON CHECK-IN</span>
+      <h1>打卡上传排行榜</h1>
     </div>
 
     <div class="my-rank-card" :class="{ 'is-outside-top': !isCurrentInTopList }">
@@ -11,8 +11,12 @@
         <strong>第 {{ currentRank }} 名</strong>
       </div>
       <div>
-        <span>当前积分</span>
-        <strong>{{ currentEmployee.score }} 分</strong>
+        <span>上传次数</span>
+        <strong>{{ currentEmployee.uploadCount }} 次</strong>
+      </div>
+      <div>
+        <span>挑战等级</span>
+        <strong>{{ selectedChallengeLevel || '未选择' }}</strong>
       </div>
     </div>
 
@@ -20,7 +24,8 @@
       <div class="rank-board-header">
         <span>排名</span>
         <span>员工</span>
-        <span>积分进度</span>
+        <span>等级</span>
+        <span>上传进度</span>
       </div>
 
       <div class="rank-list">
@@ -45,10 +50,11 @@
               <strong>{{ row.employee.name }}</strong>
               <small>{{ row.employee.team }}</small>
             </div>
+            <span class="challenge-level-pill">{{ row.employee.challengeLevel || '未选择' }}</span>
             <div class="score-track" aria-hidden="true">
               <span class="score-bar"></span>
             </div>
-            <strong class="score-value">{{ row.employee.score }}分</strong>
+            <strong class="score-value">{{ row.employee.uploadCount }}次</strong>
           </article>
         </template>
       </div>
@@ -58,28 +64,38 @@
 
 <script>
 const employees = [
-  { id: 'james', name: 'james', team: '产品体验', score: 98 },
-  { id: 'amy', name: 'amy', team: '市场增长', score: 92 },
-  { id: 'jason', name: 'jason', team: '研发一组', score: 88 },
-  { id: 'sophia', name: 'sophia', team: '运营中心', score: 84 },
-  { id: 'leo', name: 'leo', team: '研发二组', score: 81 },
-  { id: 'mia', name: 'mia', team: '设计团队', score: 79 },
-  { id: 'owen', name: 'owen', team: '销售团队', score: 76 },
-  { id: 'nina', name: 'nina', team: '人力行政', score: 74 },
-  { id: 'ethan', name: 'ethan', team: '数据平台', score: 71 },
-  { id: 'zoe', name: 'zoe', team: '客户成功', score: 69 },
-  { id: 'chris', name: 'chris', team: '财务团队', score: 67 },
-  { id: 'lily', name: 'lily', team: '研发三组', score: 65 },
-  { id: 'tony', name: 'tony', team: '业务支持', score: 64 },
-  { id: 'grace', name: 'grace', team: '品牌团队', score: 62 },
-  { id: 'kevin', name: 'kevin', team: '测试团队', score: 60 },
-  { id: 'mark', name: 'mark', team: '供应链', score: 58 },
-  { id: 'iris', name: 'iris', team: '法务合规', score: 55 },
-  { id: 'me', name: '我', team: '研发一组', score: 51 }
+  { id: 'james', name: 'james', team: '产品体验', uploadCount: 18, challengeLevel: '黄金' },
+  { id: 'amy', name: 'amy', team: '市场增长', uploadCount: 17, challengeLevel: '黄金' },
+  { id: 'jason', name: 'jason', team: '研发一组', uploadCount: 16, challengeLevel: '白银' },
+  { id: 'sophia', name: 'sophia', team: '运营中心', uploadCount: 15, challengeLevel: '黄金' },
+  { id: 'leo', name: 'leo', team: '研发二组', uploadCount: 14, challengeLevel: '白银' },
+  { id: 'mia', name: 'mia', team: '设计团队', uploadCount: 13, challengeLevel: '黄金' },
+  { id: 'owen', name: 'owen', team: '销售团队', uploadCount: 12, challengeLevel: '白银' },
+  { id: 'nina', name: 'nina', team: '人力行政', uploadCount: 11, challengeLevel: '青铜' },
+  { id: 'ethan', name: 'ethan', team: '数据平台', uploadCount: 10, challengeLevel: '白银' },
+  { id: 'zoe', name: 'zoe', team: '客户成功', uploadCount: 9, challengeLevel: '青铜' },
+  { id: 'chris', name: 'chris', team: '财务团队', uploadCount: 8, challengeLevel: '白银' },
+  { id: 'lily', name: 'lily', team: '研发三组', uploadCount: 7, challengeLevel: '青铜' },
+  { id: 'tony', name: 'tony', team: '业务支持', uploadCount: 6, challengeLevel: '青铜' },
+  { id: 'grace', name: 'grace', team: '品牌团队', uploadCount: 5, challengeLevel: '白银' },
+  { id: 'kevin', name: 'kevin', team: '测试团队', uploadCount: 4, challengeLevel: '青铜' },
+  { id: 'mark', name: 'mark', team: '供应链', uploadCount: 3, challengeLevel: '青铜' },
+  { id: 'iris', name: 'iris', team: '法务合规', uploadCount: 2, challengeLevel: '青铜' },
+  { id: 'me', name: '我', team: '研发一组', uploadCount: 0, challengeLevel: '' }
 ]
 
 export default {
   name: 'RankPage',
+  props: {
+    records: {
+      type: Array,
+      default: () => []
+    },
+    selectedChallengeLevel: {
+      type: String,
+      default: ''
+    }
+  },
   data() {
     return {
       currentEmployeeId: 'me',
@@ -87,11 +103,27 @@ export default {
     }
   },
   computed: {
+    seasonUploadCount() {
+      return this.records.length
+    },
+    rankedSourceEmployees() {
+      return this.employees.map(employee => {
+        if (employee.id !== this.currentEmployeeId) {
+          return employee
+        }
+
+        return {
+          ...employee,
+          uploadCount: this.seasonUploadCount,
+          challengeLevel: this.selectedChallengeLevel
+        }
+      })
+    },
     rankedEmployees() {
-      return [...this.employees].sort((a, b) => b.score - a.score)
+      return [...this.rankedSourceEmployees].sort((a, b) => b.uploadCount - a.uploadCount)
     },
     maxScore() {
-      return this.rankedEmployees[0]?.score || 1
+      return this.rankedEmployees[0]?.uploadCount || 1
     },
     currentRank() {
       return this.rankedEmployees.findIndex(employee => employee.id === this.currentEmployeeId) + 1
@@ -123,7 +155,7 @@ export default {
         type: 'employee',
         employee,
         rank,
-        percent: Math.max((employee.score / this.maxScore) * 100, 8).toFixed(2)
+        percent: Math.max((employee.uploadCount / this.maxScore) * 100, 8).toFixed(2)
       }
     }
   }
@@ -200,7 +232,7 @@ export default {
   box-shadow: 0 18px 36px rgba(23, 33, 27, 0.14);
   color: #fff;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -220,9 +252,12 @@ export default {
 .my-rank-card strong {
   display: block;
   margin-top: 4px;
-  font-size: 18px;
+  overflow: hidden;
+  font-size: 16px;
   font-weight: 950;
   line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rank-board {
@@ -242,10 +277,14 @@ export default {
   padding: 0 4px 10px;
   color: #758078;
   display: grid;
-  grid-template-columns: 34px 74px 1fr;
+  grid-template-columns: 34px 72px 42px 1fr;
   gap: 8px;
   font-size: 11px;
   font-weight: 900;
+}
+
+.rank-board-header span:nth-child(3) {
+  text-align: center;
 }
 
 .rank-list {
@@ -278,7 +317,7 @@ export default {
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 245, 0.72)),
     #fff;
   display: grid;
-  grid-template-columns: 28px 72px minmax(0, 1fr) 44px;
+  grid-template-columns: 28px 72px 42px minmax(0, 1fr) 34px;
   align-items: center;
   gap: 8px;
 }
@@ -335,6 +374,25 @@ export default {
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.challenge-level-pill {
+  min-width: 0;
+  padding: 5px 6px;
+  border-radius: 999px;
+  background: rgba(23, 33, 27, 0.06);
+  color: #4f5d55;
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  justify-self: center;
+}
+
+.rank-row.is-current .challenge-level-pill {
+  background: rgba(114, 216, 79, 0.18);
+  color: #2f8f32;
 }
 
 .score-track {

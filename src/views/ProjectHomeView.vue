@@ -6,12 +6,13 @@
     :selected-challenge-level="selectedChallengeLevel"
     @select-task="openTask"
     @select-level="selectChallengeLevel"
+    @submit-proof="addUploadRecord"
   />
 </template>
 
 <script>
 import ProjectHome from '../components/ProjectHome.vue'
-import { appState, tasks } from '../state/appState'
+import { addUploadRecord, appState, tasks } from '../state/appState'
 
 export default {
   name: 'ProjectHomeView',
@@ -41,7 +42,8 @@ export default {
     },
     selectChallengeLevel(level) {
       appState.selectedChallengeLevel = level
-    }
+    },
+    addUploadRecord
   }
 }
 </script>

@@ -3,6 +3,7 @@ import ProjectHomeView from '../views/ProjectHomeView.vue'
 import ProjectDetailView from '../views/ProjectDetailView.vue'
 import RankView from '../views/RankView.vue'
 import HistoryView from '../views/HistoryView.vue'
+import PastSeasonReviewView from '../views/PastSeasonReviewView.vue'
 import ShopView from '../views/ShopView.vue'
 
 const routes = [
@@ -44,6 +45,15 @@ const routes = [
     meta: {
       navKey: 'history',
       title: '历史'
+    }
+  },
+  {
+    path: '/history/season-reviews',
+    name: 'season-review-history',
+    component: PastSeasonReviewView,
+    meta: {
+      navKey: 'history',
+      title: '过往审核'
     }
   },
   {

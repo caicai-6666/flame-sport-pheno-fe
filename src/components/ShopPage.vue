@@ -18,7 +18,7 @@
           </em>
         </div>
         <button class="exchange-history" type="button" @click="isRecordView = !isRecordView">
-          {{ isRecordView ? '返回商城' : '兑换记录' }}
+          {{ isRecordView ? '返回商城' : '积分变动' }}
         </button>
       </div>
     </div>
@@ -26,37 +26,40 @@
     <div v-if="isRecordView" class="exchange-records">
       <div class="records-heading">
         <div>
-          <span>EXCHANGE LOG</span>
-          <h2>兑换记录</h2>
+          <span>POINTS LOG</span>
+          <h2>积分变动</h2>
         </div>
-        <strong>{{ sortedExchangeRecords.length }} 条</strong>
+        <strong>{{ sortedPointRecords.length }} 条</strong>
       </div>
 
-      <div v-if="sortedExchangeRecords.length" class="record-list">
+      <div v-if="sortedPointRecords.length" class="record-list">
         <article
-          v-for="record in sortedExchangeRecords"
+          v-for="record in sortedPointRecords"
           :key="record.id"
           class="exchange-record-card"
+          :class="`is-${record.type}`"
         >
           <div class="record-date-badge">
-            <strong>{{ formatDay(record.redeemedAt) }}</strong>
-            <span>{{ formatMonth(record.redeemedAt) }}</span>
+            <strong>{{ formatDay(record.occurredAt) }}</strong>
+            <span>{{ formatMonth(record.occurredAt) }}</span>
           </div>
 
           <div class="exchange-record-body">
             <div class="exchange-record-main">
-              <strong :title="record.rewardName">{{ record.rewardName }}</strong>
-              <span>{{ formatDate(record.redeemedAt) }}</span>
+              <strong :title="record.title">{{ record.title }}</strong>
+              <span>{{ record.description }} · {{ formatDate(record.occurredAt) }}</span>
             </div>
 
             <div class="exchange-record-meta">
               <div>
-                <span>奖品价值</span>
-                <strong>{{ record.points }} 分</strong>
+                <span>变动积分</span>
+                <strong :class="record.amount > 0 ? 'is-income' : 'is-expense'">
+                  {{ formatPointAmount(record.amount) }} 分
+                </strong>
               </div>
               <div>
-                <span>兑换后剩余</span>
-                <strong>{{ record.remainingPoints }} 分</strong>
+                <span>变动后余额</span>
+                <strong>{{ record.balanceAfter }} 分</strong>
               </div>
             </div>
           </div>
@@ -64,8 +67,8 @@
       </div>
 
       <div v-else class="empty-records">
-        <span>暂无兑换记录</span>
-        <p>完成兑换后，记录会按时间倒序展示在这里。</p>
+        <span>暂无积分变动</span>
+        <p>赛季奖励发放和商城兑换记录会按时间倒序展示在这里。</p>
       </div>
     </div>
 
@@ -200,27 +203,42 @@ const rewardTiers = [
   }
 ]
 
-const exchangeRecords = [
+const pointRecords = [
+  {
+    id: 'points-20260701-season-reward',
+    type: 'income',
+    occurredAt: '2026-07-01T09:00:00+08:00',
+    title: '2026 夏季赛积分奖励',
+    description: '赛季审核通过后发放',
+    amount: 158,
+    balanceAfter: 158
+  },
   {
     id: 'exchange-20260714-cup',
-    redeemedAt: '2026-07-14T18:32:00+08:00',
-    rewardName: '运动水杯',
-    points: 50,
-    remainingPoints: 68
+    type: 'expense',
+    occurredAt: '2026-07-14T18:32:00+08:00',
+    title: '兑换运动水杯',
+    description: '积分商城兑换',
+    amount: -50,
+    balanceAfter: 68
   },
   {
     id: 'exchange-20260708-towel',
-    redeemedAt: '2026-07-08T12:10:00+08:00',
-    rewardName: 'PHENO 夏季限定速干运动毛巾礼盒',
-    points: 20,
-    remainingPoints: 118
+    type: 'expense',
+    occurredAt: '2026-07-08T12:10:00+08:00',
+    title: '兑换 PHENO 夏季限定速干运动毛巾礼盒',
+    description: '积分商城兑换',
+    amount: -20,
+    balanceAfter: 118
   },
   {
     id: 'exchange-20260702-socks',
-    redeemedAt: '2026-07-02T09:26:00+08:00',
-    rewardName: '羽毛球袜',
-    points: 20,
-    remainingPoints: 138
+    type: 'expense',
+    occurredAt: '2026-07-02T09:26:00+08:00',
+    title: '兑换羽毛球袜',
+    description: '积分商城兑换',
+    amount: -20,
+    balanceAfter: 138
   }
 ]
 
@@ -239,12 +257,12 @@ export default {
       rewardConfettiBursts: [],
       rewardConfettiTimers: [],
       rewardTiers,
-      exchangeRecords
+      pointRecords
     }
   },
   computed: {
-    sortedExchangeRecords() {
-      return [...this.exchangeRecords].sort((a, b) => new Date(b.redeemedAt) - new Date(a.redeemedAt))
+    sortedPointRecords() {
+      return [...this.pointRecords].sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt))
     }
   },
   methods: {
@@ -298,15 +316,17 @@ export default {
       this.animatePoints(oldPoints, this.availablePoints)
       this.launchPointDelta(points)
       this.launchRewardConfetti(this.rewardKey(item, points))
-      this.exchangeRecords = [
+      this.pointRecords = [
         {
           id: `exchange-${Date.now()}`,
-          redeemedAt: new Date().toISOString(),
-          rewardName: item.name,
-          points,
-          remainingPoints: this.availablePoints
+          type: 'expense',
+          occurredAt: new Date().toISOString(),
+          title: `兑换${item.name}`,
+          description: '积分商城兑换',
+          amount: -points,
+          balanceAfter: this.availablePoints
         },
-        ...this.exchangeRecords
+        ...this.pointRecords
       ]
     },
     animatePoints(from, to) {
@@ -387,6 +407,9 @@ export default {
     formatDate(value) {
       const date = new Date(value)
       return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+    },
+    formatPointAmount(amount) {
+      return amount > 0 ? `+${amount}` : String(amount)
     }
   },
   beforeUnmount() {
@@ -631,6 +654,16 @@ export default {
   gap: 12px;
 }
 
+.exchange-record-card.is-income .record-date-badge {
+  background: rgba(114, 216, 79, 0.16);
+  color: #2f8f32;
+}
+
+.exchange-record-card.is-expense .record-date-badge {
+  background: rgba(32, 199, 181, 0.14);
+  color: #159b8d;
+}
+
 .record-date-badge {
   width: 54px;
   height: 54px;
@@ -715,6 +748,14 @@ export default {
   font-size: 13px;
   font-weight: 950;
   line-height: 1.1;
+}
+
+.exchange-record-meta strong.is-income {
+  color: #2f8f32;
+}
+
+.exchange-record-meta strong.is-expense {
+  color: #e05a38;
 }
 
 .empty-records {

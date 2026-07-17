@@ -37,7 +37,10 @@
     <section class="record-section" aria-label="凭证记录列表">
       <div class="record-section-heading">
         <span>凭证记录</span>
-        <strong>{{ pendingReviewCount }} 条审核中</strong>
+        <button class="season-review-link" type="button" @click="openPastSeasonReviews">
+          过往赛季审核记录
+          <span aria-hidden="true">→</span>
+        </button>
       </div>
 
       <div class="history-list" v-if="sortedRecords.length">
@@ -111,9 +114,6 @@ export default {
     approvedRecords() {
       return this.records.filter(record => this.reviewStatus(record) === 'approved')
     },
-    pendingReviewCount() {
-      return this.records.filter(record => this.reviewStatus(record) === 'pending').length
-    },
     progressRows() {
       if (!this.lockedTaskNames.length || !this.selectedChallengeLevel) {
         return []
@@ -157,11 +157,14 @@ export default {
       const typeText = record.recordType === 'month-end' ? '月末体重' : '月初体重'
       return record.bmi ? `${typeText} · BMI ${record.bmi}` : typeText
     },
-    reviewStatus(record) {
-      return record.reviewStatus === 'approved' ? 'approved' : 'pending'
+    reviewStatus() {
+      return 'pending'
     },
-    reviewStatusText(record) {
-      return this.reviewStatus(record) === 'approved' ? '已通过' : '审核中'
+    reviewStatusText() {
+      return '审核中'
+    },
+    openPastSeasonReviews() {
+      this.$router.push({ name: 'season-review-history' })
     }
   }
 }
@@ -342,6 +345,35 @@ export default {
   background: rgba(255, 159, 69, 0.14);
   color: #d67624;
   font-size: 11px;
+}
+
+.season-review-link {
+  flex-shrink: 0;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(114, 216, 79, 0.16);
+  color: #2f8f32;
+  font-size: 11px;
+  font-weight: 950;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: inset 0 0 0 1px rgba(47, 143, 50, 0.1);
+}
+
+.season-review-link:hover {
+  background: rgba(114, 216, 79, 0.24);
+}
+
+.season-review-link:active {
+  transform: translateY(1px);
+}
+
+.season-review-link:focus-visible {
+  outline: 3px solid rgba(114, 216, 79, 0.32);
+  outline-offset: 2px;
 }
 
 .history-list {
