@@ -11,9 +11,11 @@
             class="lock-button"
             :class="{
               'is-locked': isLocked,
-              'is-confirming': isLockConfirming
+              'is-confirming': isLockConfirming,
+              'is-locking': isLocking,
+              'is-failed': isLockFailed
             }"
-            :disabled="isLocked || remainingLockSlots <= 0"
+            :disabled="isLockButtonDisabled"
             @click="handleLockClick"
           >
             <Transition name="lock-label" mode="out-in">
@@ -21,7 +23,14 @@
                 :key="lockButtonText"
                 class="lock-button-label"
               >
-                {{ lockButtonText }}
+                <span class="lock-button-content">
+                  <span>{{ lockButtonText }}</span>
+                  <span
+                    v-if="isLocking"
+                    class="lock-spinner"
+                    aria-hidden="true"
+                  ></span>
+                </span>
               </span>
             </Transition>
           </button>
@@ -46,15 +55,20 @@
             ></span>
           </span>
         </div>
-        <span class="lock-warning">锁定后本赛季不可更改，请确认后再提交。</span>
-        <span class="lock-hint">{{ lockHint }}</span>
+        <div v-if="shouldShowLockNote" class="lock-note">
+          <span class="lock-note-icon" aria-hidden="true">!</span>
+          <span class="lock-note-copy">
+            <span class="lock-warning">{{ lockWarning }}</span>
+            <span class="lock-hint">{{ lockHint }}</span>
+          </span>
+        </div>
       </div>
     </div>
 
     <div class="challenge-list">
       <article
         v-for="challenge in challenges"
-        :key="challenge.level"
+        :key="challenge.projectRuleLevelId || challenge.level"
         class="challenge-card"
         :class="{
           'is-selected-level': isSelectedChallenge(challenge),
@@ -64,8 +78,8 @@
         <div class="challenge-header">
           <span class="level-dot" :class="challenge.tone"></span>
           <div>
-            <strong>{{ challenge.medal }} {{ challenge.level }}挑战</strong>
-            <span>{{ challenge.subtitle }}</span>
+            <strong>{{ challenge.medal }} {{ challenge.name }}</strong>
+            <span v-if="challenge.subtitle">{{ challenge.subtitle }}</span>
           </div>
         </div>
 
@@ -80,7 +94,7 @@
           </div>
         </div>
 
-        <div class="challenge-footer">
+        <div v-if="challenge.note" class="challenge-footer">
           <span>{{ challenge.note }}</span>
         </div>
       </article>
@@ -89,14 +103,14 @@
 </template>
 
 <script>
-import { challengeRules } from '../state/challengeConfig'
-
 export default {
   name: 'ProjectDetail',
   data() {
     return {
       isLockConfirming: false,
+      isLockFailed: false,
       lockConfirmTimer: null,
+      lockFailureTimer: null,
       lockConfettiBursts: [],
       lockConfettiTimers: []
     }
@@ -114,18 +128,43 @@ export default {
       type: Number,
       default: 3
     },
+    isLocking: {
+      type: Boolean,
+      default: false
+    },
+    lockError: {
+      type: [Object, String],
+      default: null
+    },
+    isRegistrationClosed: {
+      type: Boolean,
+      default: false
+    },
     selectedChallengeLevel: {
       type: String,
       default: ''
+    },
+    challenges: {
+      type: Array,
+      default: () => []
     }
   },
   computed: {
-    challenges() {
-      return challengeRules[this.task.name] || []
-    },
     lockButtonText() {
       if (this.isLocked) {
         return '已锁定'
+      }
+
+      if (this.isRegistrationClosed) {
+        return '报名已截止'
+      }
+
+      if (this.isLocking) {
+        return '锁定中'
+      }
+
+      if (this.isLockFailed) {
+        return '锁定失败'
       }
 
       if (this.remainingLockSlots <= 0) {
@@ -139,11 +178,41 @@ export default {
         return '该运动已加入本赛季挑战'
       }
 
+      if (this.isRegistrationClosed) {
+        return '已超过本赛季报名时间，不能再锁定项目'
+      }
+
       if (this.remainingLockSlots <= 0) {
         return '本赛季最多锁定 3 个运动'
       }
 
       return `还能选择 ${this.remainingLockSlots} 个运动`
+    },
+    lockWarning() {
+      if (this.isRegistrationClosed) {
+        return '已超过本赛季报名时间，不能再锁定项目。'
+      }
+
+      return '锁定后本赛季不可更改，请确认后再提交。'
+    },
+    shouldShowLockNote() {
+      return !this.isLocked && !this.isRegistrationClosed
+    },
+    isLockButtonDisabled() {
+      return this.isLocked || this.isRegistrationClosed || this.isLocking || this.isLockFailed || this.remainingLockSlots <= 0
+    }
+  },
+  watch: {
+    isLocked(newValue, oldValue) {
+      if (newValue && !oldValue) {
+        this.clearLockFailure()
+        this.launchLockConfetti()
+      }
+    },
+    lockError(error) {
+      if (error) {
+        this.showLockFailure()
+      }
     }
   },
   methods: {
@@ -154,7 +223,7 @@ export default {
       return Boolean(this.selectedChallengeLevel) && challenge.level !== this.selectedChallengeLevel
     },
     handleLockClick() {
-      if (this.isLocked || this.remainingLockSlots <= 0) {
+      if (this.isLockButtonDisabled) {
         return
       }
 
@@ -185,8 +254,33 @@ export default {
         this.lockConfirmTimer = null
       }
 
-      this.launchLockConfetti()
       this.$emit('lock-task', this.task)
+    },
+    showLockFailure() {
+      this.isLockConfirming = false
+      this.isLockFailed = true
+
+      if (this.lockConfirmTimer) {
+        window.clearTimeout(this.lockConfirmTimer)
+        this.lockConfirmTimer = null
+      }
+
+      if (this.lockFailureTimer) {
+        window.clearTimeout(this.lockFailureTimer)
+      }
+
+      this.lockFailureTimer = window.setTimeout(() => {
+        this.isLockFailed = false
+        this.lockFailureTimer = null
+      }, 1400)
+    },
+    clearLockFailure() {
+      this.isLockFailed = false
+
+      if (this.lockFailureTimer) {
+        window.clearTimeout(this.lockFailureTimer)
+        this.lockFailureTimer = null
+      }
     },
     launchLockConfetti() {
       const colors = ['#ffffff', '#baf19d', '#72d84f', '#20c7b5', '#ffd166', '#ff9f45']
@@ -215,6 +309,10 @@ export default {
   beforeUnmount() {
     if (this.lockConfirmTimer) {
       window.clearTimeout(this.lockConfirmTimer)
+    }
+
+    if (this.lockFailureTimer) {
+      window.clearTimeout(this.lockFailureTimer)
     }
 
     this.lockConfettiTimers.forEach(timer => window.clearTimeout(timer))
@@ -291,18 +389,6 @@ export default {
   gap: 9px;
 }
 
-.lock-warning {
-  max-width: 270px;
-  padding: 7px 10px;
-  border: 1px solid rgba(255, 184, 77, 0.28);
-  border-radius: 999px;
-  background: rgba(255, 184, 77, 0.12);
-  color: rgba(255, 245, 224, 0.9);
-  font-size: 11px;
-  font-weight: 850;
-  line-height: 1.35;
-}
-
 .lock-button {
   position: relative;
   z-index: 2;
@@ -353,6 +439,24 @@ export default {
   animation: lock-confirm-pulse 1.1s ease-in-out infinite;
 }
 
+.lock-button.is-locking {
+  background: linear-gradient(135deg, #e8f7ff, #bfe8ff);
+  color: #17445f;
+  opacity: 1;
+  box-shadow:
+    0 12px 24px rgba(40, 151, 220, 0.18),
+    inset 0 -2px 0 rgba(23, 68, 95, 0.08);
+}
+
+.lock-button.is-failed {
+  background: linear-gradient(135deg, #ff8f8f, #ff5c5c);
+  color: #fff;
+  opacity: 1;
+  box-shadow:
+    0 12px 24px rgba(255, 92, 92, 0.24),
+    0 0 0 4px rgba(255, 92, 92, 0.14);
+}
+
 @keyframes lock-confirm-pulse {
   0%,
   100% {
@@ -367,6 +471,29 @@ export default {
 .lock-button-label {
   display: inline-block;
   min-width: 86px;
+}
+
+.lock-button-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.lock-spinner {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(23, 68, 95, 0.22);
+  border-top-color: #17445f;
+  border-radius: 50%;
+  animation: lock-spinner-rotate 720ms linear infinite;
+}
+
+@keyframes lock-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .lock-label-enter-active,
@@ -396,6 +523,12 @@ export default {
   opacity: 0.72;
   box-shadow: none;
   transform: none;
+}
+
+.lock-button.is-locking:disabled,
+.lock-button.is-failed:disabled,
+.lock-button.is-locked:disabled {
+  opacity: 1;
 }
 
 .lock-button.is-locked {
@@ -467,10 +600,54 @@ export default {
   }
 }
 
-.lock-hint {
-  color: rgba(255, 255, 255, 0.68);
+.lock-note {
+  max-width: 300px;
+  margin-top: 2px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  backdrop-filter: blur(10px);
+}
+
+.lock-note-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: rgba(255, 184, 77, 0.18);
+  color: #ffd699;
+  display: grid;
+  place-items: center;
   font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.lock-note-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lock-warning {
+  color: rgba(255, 248, 236, 0.94);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.4;
+}
+
+.lock-hint {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
   font-weight: 750;
+  line-height: 1.35;
 }
 
 .rules-card {

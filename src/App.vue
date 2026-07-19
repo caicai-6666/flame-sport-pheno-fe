@@ -7,7 +7,19 @@
     />
 
     <main class="page-content">
-      <router-view />
+      <router-view v-slot="{ Component, route }">
+        <KeepAlive>
+          <component
+            :is="Component"
+            v-if="route.meta.keepAlive"
+            :key="route.fullPath"
+          />
+        </KeepAlive>
+        <component
+          :is="Component"
+          v-if="!route.meta.keepAlive"
+        />
+      </router-view>
     </main>
 
     <BottomNav

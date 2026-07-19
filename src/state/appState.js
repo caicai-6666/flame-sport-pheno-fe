@@ -1,42 +1,14 @@
 import { computed, reactive } from 'vue'
 
-export const tasks = [
-  {
-    name: '日常步数',
-    description: '把通勤、散步和碎片运动都变成稳定积分。',
-    accent: '#68d65c'
-  },
-  {
-    name: '跑步/快走',
-    description: '记录有氧强度，持续拉高身体活力曲线。',
-    accent: '#ff9f45'
-  },
-  {
-    name: '健身打卡',
-    description: '用训练日历沉淀力量、柔韧和核心能力。',
-    accent: '#7b8cff'
-  },
-  {
-    name: '公司运动',
-    description: '和同事组队完成企业运动挑战。',
-    accent: '#20c7b5'
-  },
-  {
-    name: '户外登山',
-    description: '用路线、海拔和时长记录每一次远行。',
-    accent: '#3fb06d'
-  },
-  {
-    name: '减重挑战',
-    description: '关注趋势而不是焦虑，稳步推进阶段目标。',
-    accent: '#ff6f91'
-  }
-]
-
 export const appState = reactive({
+  projectTasks: [],
+  currentSeason: null,
+  lockedProjectIds: [],
   lockedTaskNames: [],
   maxLockedTasks: 3,
+  seasonParticipationStatus: 'unknown',
   selectedChallengeLevel: '',
+  selectedProjectRuleLevelId: '',
   pastSeasonReviewRecords: [
     {
       id: 'archive-20260630-run',
@@ -109,16 +81,66 @@ export const appState = reactive({
 export const remainingLockSlots = computed(() => Math.max(appState.maxLockedTasks - appState.lockedTaskNames.length, 0))
 
 export function findTaskByName(taskName) {
-  return tasks.find(task => task.name === taskName)
+  return appState.projectTasks.find(task => task.name === taskName)
 }
 
 export function isTaskLocked(task) {
-  return Boolean(task && appState.lockedTaskNames.includes(task.name))
+  return Boolean(
+    task &&
+    (
+      appState.lockedTaskNames.includes(task.name) ||
+      appState.lockedProjectIds.includes(String(task.projectId))
+    )
+  )
+}
+
+export function setProjectTasks(projectTasks) {
+  appState.projectTasks = projectTasks
+}
+
+export function setCurrentSeason(season) {
+  appState.currentSeason = season
+}
+
+export function setLockedProjects(lockedProjects, projectTasks = appState.projectTasks) {
+  const lockedProjectIds = lockedProjects.map(project => String(project.projectId)).filter(Boolean)
+  const lockedTaskNames = lockedProjects
+    .map(project => project.name || projectTasks.find(task => String(task.projectId) === String(project.projectId))?.name)
+    .filter(Boolean)
+
+  appState.lockedProjectIds = lockedProjectIds
+  appState.lockedTaskNames = lockedTaskNames
+}
+
+export function setMaxLockedTasks(maxLockedTasks) {
+  appState.maxLockedTasks = Number(maxLockedTasks) || 3
+}
+
+export function setSelectedChallengeLevel(challengeLevel) {
+  appState.selectedChallengeLevel = challengeLevel?.level || challengeLevel?.name || ''
+  appState.selectedProjectRuleLevelId = challengeLevel?.projectRuleLevelId || ''
+}
+
+export function setSeasonParticipationStatus(participation) {
+  appState.seasonParticipationStatus = participation?.status || 'unknown'
+
+  if (participation?.status === 'participated') {
+    appState.selectedChallengeLevel = participation.level || participation.name || ''
+    appState.selectedProjectRuleLevelId = participation.projectRuleLevelId || ''
+    return
+  }
+
+  appState.selectedChallengeLevel = ''
+  appState.selectedProjectRuleLevelId = ''
 }
 
 export function lockTask(task) {
   if (!task || isTaskLocked(task) || remainingLockSlots.value <= 0) {
     return
+  }
+
+  if (task.projectId) {
+    appState.lockedProjectIds = [...appState.lockedProjectIds, String(task.projectId)]
   }
 
   appState.lockedTaskNames = [...appState.lockedTaskNames, task.name]
@@ -129,11 +151,11 @@ export function addUploadRecord(proof) {
 
   appState.uploadRecords = [
     {
-      id: `proof-${Date.now()}`,
+      id: proof.id || `proof-${Date.now()}`,
       ...proof,
-      reviewStatus: 'pending',
+      reviewStatus: proof.reviewStatus || 'pending',
       accent: task?.accent || '#72d84f',
-      uploadedAt: new Date().toISOString()
+      uploadedAt: proof.uploadedAt || new Date().toISOString()
     },
     ...appState.uploadRecords
   ]

@@ -1,19 +1,21 @@
-```md
 # 赛季用户表：season_user
 
 ## 表作用
 
-`season_user` 表用于记录用户在某个赛季中的参与情况，以及赛季结束后的最终积分结算结果。
+`season_user` 表用于记录用户在某个赛季中的项目选择进度、挑战等级选择结果，以及赛季结束后的最终积分结算结果。
 
 当前平台中，用户在每个赛季中需要完成以下流程：
 ```text
 进入赛季
-选择 3 个运动项目
+选择当前赛季要求数量的运动项目
 选择一个挑战等级
 赛季期间上传运动凭证
 月末由审核人员统一审核
 根据最终完成情况发放赛季积分
 ```
+当用户开始锁定运动项目时，后端即可创建该用户在当前赛季的 `season_user` 记录。  
+该表中的 `status` 字段用于记录用户当前赛季已锁定的项目数量。
+
 该表不记录每条凭证的积分变化，也不做实时积分账户。  
 本平台当前积分发放逻辑是：赛季结束后统一审核、统一结算。
 
@@ -25,10 +27,10 @@
 | ------------ | ---------------- | -------: | -----: | ------------------------------------------------- |
 | id           | BIGINT UNSIGNED  |       是 |   自增 | 赛季用户记录主键 ID                               |
 | season_id    | BIGINT UNSIGNED  |       是 |     无 | 赛季 ID，关联 `season.id`                         |
-| user_id      | BIGINT UNSIGNED  |       是 |     无 | 用户 ID，关联 `user.id`                           |
+| user_id      | VARCHAR(64)      |       是 |     无 | 用户 ID，关联 `user.id`                           |
 | level_id     | BIGINT UNSIGNED  |       否 |   NULL | 用户本赛季选择的项目等级，关联 `project_level.id` |
 | final_points | INT UNSIGNED     |       否 |   NULL | 用户本赛季最终获得的积分                          |
-| status       | TINYINT UNSIGNED |       是 |      1 | 参与状态：`1` 正常参与，`0` 无效/取消             |
+| status       | TINYINT UNSIGNED |       是 |      0 | 已锁定项目数量，用于判断用户是否满足当前赛季参与要求 |
 
 ---
 
@@ -75,14 +77,14 @@
 
 该字段关联 `project_level.id`。
 
-当前原型流程中，用户先选择 3 个运动项目，然后选择一个挑战等级。  
+当前原型流程中，用户先选择当前赛季要求数量的运动项目，然后选择一个挑战等级。  
 该挑战等级作用于用户本赛季选择的全部项目。
 
 该字段允许为空。
 
 原因是用户可能已经进入赛季，但尚未完成：
 ```text
-选择 3 个项目
+选择当前赛季要求数量的项目
 选择挑战等级
 ```
 当用户完成挑战等级选择后，再写入该字段。
@@ -111,14 +113,26 @@ NULL = 尚未结算
 
 ### status
 
-用户赛季参与状态。
+用户当前赛季已锁定项目数量。
 
 取值说明：
+
 ```text
-1 = 正常参与
-0 = 无效/取消
+0 = 未锁定项目
+1 = 已锁定 1 个项目
+2 = 已锁定 2 个项目
+3 = 已锁定 3 个项目
+4 = 已锁定 4 个项目
+...
 ```
-保留该字段的原因是：某些情况下需要作废用户在当前赛季的参与资格，例如误加入赛季、用户离职、后台手动作废等。
+
+当用户每锁定一个运动项目时，后端应将该字段加 1。  
+当该字段达到当前赛季 `season.required_project_count` 要求的项目数量时，后续赛季结算才会将该用户视为有效赛季参与用户。
+
+需要注意：该字段不固定限制为 `3`。  
+当前原型要求选择 3 个项目，即 `season.required_project_count = 3`。  
+如果后续赛季强制选择 4 个项目，则可配置 `season.required_project_count = 4`。
+如果后台作废某个已锁定项目，应同步调整该字段，保证它和 `season_user_project` 中有效项目数量一致。
 
 ---
 
@@ -127,10 +141,10 @@ NULL = 尚未结算
 CREATE TABLE season_user (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '赛季用户记录ID',
   season_id BIGINT UNSIGNED NOT NULL COMMENT '赛季ID',
-  user_id BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
+  user_id VARCHAR(64) NOT NULL COMMENT '用户ID',
   level_id BIGINT UNSIGNED DEFAULT NULL COMMENT '项目等级ID',
   final_points INT UNSIGNED DEFAULT NULL COMMENT '赛季最终获得积分，NULL表示尚未结算',
-  status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '状态：1正常参与，0无效/取消',
+  status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '已锁定项目数量',
   PRIMARY KEY (id),
   UNIQUE KEY uk_season_user (season_id, user_id),
   KEY idx_season_user_season_id (season_id),

@@ -15,15 +15,25 @@
 
     <div class="header-meta">
       <button class="avatar-button" type="button" aria-label="头像">
-        <span>CA</span>
+        <img v-if="avatarUrl" :src="avatarUrl" alt="用户头像">
+        <span v-else>CA</span>
       </button>
     </div>
   </header>
 </template>
 
 <script>
+import { getAvatarImage } from '../api/avatar'
+import { authState } from '../state/authState'
+
 export default {
   name: 'HeaderBar',
+  data() {
+    return {
+      avatarUrl: '',
+      avatarObjectUrl: ''
+    }
+  },
   props: {
     activeTitle: {
       type: String,
@@ -32,6 +42,42 @@ export default {
     isDetail: {
       type: Boolean,
       default: false
+    }
+  },
+  computed: {
+    authCode() {
+      return authState.authCode
+    }
+  },
+  watch: {
+    authCode: {
+      immediate: true,
+      handler(authCode) {
+        if (authCode) {
+          this.loadAvatar()
+        }
+      }
+    }
+  },
+  methods: {
+    async loadAvatar() {
+      try {
+        const avatarBlob = await getAvatarImage()
+
+        if (this.avatarObjectUrl) {
+          URL.revokeObjectURL(this.avatarObjectUrl)
+        }
+
+        this.avatarObjectUrl = URL.createObjectURL(avatarBlob)
+        this.avatarUrl = this.avatarObjectUrl
+      } catch (error) {
+        this.avatarUrl = ''
+      }
+    }
+  },
+  beforeUnmount() {
+    if (this.avatarObjectUrl) {
+      URL.revokeObjectURL(this.avatarObjectUrl)
     }
   },
   emits: ['back']
@@ -114,10 +160,11 @@ export default {
 
 .avatar-button {
   position: relative;
-  width: 44px;
-  height: 44px;
+  overflow: hidden;
+  width: 52px;
+  height: 52px;
   border: 1px solid rgba(23, 33, 27, 0.08);
-  border-radius: 18px;
+  border-radius: 50%;
   background:
     linear-gradient(135deg, rgba(114, 216, 79, 0.24), rgba(255, 255, 255, 0.92)),
     #fff;
@@ -128,12 +175,25 @@ export default {
   font-weight: 800;
 }
 
+.avatar-button img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-button span {
+  position: relative;
+  z-index: 1;
+}
+
 .avatar-button::after {
   position: absolute;
-  right: 3px;
-  bottom: 4px;
-  width: 10px;
-  height: 10px;
+  right: 4px;
+  bottom: 5px;
+  width: 11px;
+  height: 11px;
   border: 2px solid #fff;
   border-radius: 50%;
   background: #72d84f;

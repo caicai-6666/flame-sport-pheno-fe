@@ -22,10 +22,11 @@
 
 | 字段名        | 类型             | 是否必填 | 默认值 | 说明                                      |
 | ------------- | ---------------- | -------: | -----: | ----------------------------------------- |
-| id            | BIGINT UNSIGNED  |       是 |   自增 | 用户主键 ID，也是系统内识别用户的唯一标识 |
+| id            | VARCHAR(64)      |       是 |     无 | 用户主键 ID，也是系统内识别用户的唯一标识 |
 | name          | VARCHAR(64)      |       是 |     无 | 用户名称，用于页面展示                    |
-| department_id | BIGINT UNSIGNED  |       是 |     无 | 用户所属部门 ID，关联 `department.id`     |
+| department_id | VARCHAR(64)      |       是 |     无 | 用户所属部门 ID，关联 `department.id`     |
 | avatar_url    | VARCHAR(255)     |       否 |   NULL | 用户头像地址                              |
+| height_cm     | DECIMAL(5,2)     |       否 |   NULL | 用户身高，单位厘米，用于 BMI 计算         |
 | status        | TINYINT UNSIGNED |       是 |      1 | 用户状态：`1` 表示启用，`0` 表示停用      |
 
 ---
@@ -36,7 +37,10 @@
 
 用户的唯一标识。
 
-使用 `BIGINT UNSIGNED AUTO_INCREMENT` 作为主键。  
+使用 `VARCHAR(64)` 作为主键。  
+该字段可以直接使用企业内部员工 ID、第三方登录返回的用户 ID 或后端统一生成的字符串 ID。  
+该字段由业务系统或用户同步程序写入，不由数据库自增生成。
+
 平台内其他业务表会通过 `user_id` 关联到该字段。
 
 例如：
@@ -100,6 +104,32 @@ department 1 : N user
 
 ---
 
+### height_cm
+
+用户身高，单位为厘米。
+
+该字段用于减重挑战中的 BMI 计算。  
+用户首次登录时，可以由前端询问用户身高并写入该字段。
+
+示例：
+
+```text
+172.50
+168.00
+180.00
+```
+
+该字段允许为空。  
+如果用户未填写身高，则系统无法自动计算 BMI，减重挑战相关功能需要提示用户先补充身高信息。
+
+BMI 可根据用户身高和体重计算：
+
+```text
+BMI = 体重 kg / (身高 m * 身高 m)
+```
+
+---
+
 ### status
 
 用户状态。
@@ -117,10 +147,11 @@ department 1 : N user
 ## MySQL 建表语句
 ```sql
 CREATE TABLE `user` (
-  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '用户ID',
+  id VARCHAR(64) NOT NULL COMMENT '用户ID',
   name VARCHAR(64) NOT NULL COMMENT '用户名称',
-  department_id BIGINT UNSIGNED NOT NULL COMMENT '所属部门ID',
+  department_id VARCHAR(64) NOT NULL COMMENT '所属部门ID',
   avatar_url VARCHAR(255) DEFAULT NULL COMMENT '头像地址',
+  height_cm DECIMAL(5,2) DEFAULT NULL COMMENT '用户身高，单位厘米，用于BMI计算',
   status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '状态：1启用，0停用',
   PRIMARY KEY (id),
   KEY idx_user_department_id (department_id),

@@ -21,7 +21,7 @@
 | 字段名        | 类型             | 是否必填 |            默认值 | 说明                                         |
 | ------------- | ---------------- | -------: | ----------------: | -------------------------------------------- |
 | id            | BIGINT UNSIGNED  |       是 |              自增 | 积分变动记录主键 ID                          |
-| user_id       | BIGINT UNSIGNED  |       是 |                无 | 用户 ID，关联 `user.id`                      |
+| user_id       | VARCHAR(64)      |       是 |                无 | 用户 ID，关联 `user.id`                      |
 | product_id    | BIGINT UNSIGNED  |       否 |              NULL | 商品 ID，关联 `product.id`，仅商品兑换时有值 |
 | change_type   | VARCHAR(32)      |       是 |                无 | 积分变动类型                                 |
 | change_points | INT              |       是 |                无 | 本次积分变动值，正数表示增加，负数表示扣减   |
@@ -185,7 +185,7 @@ points_after = 70
 ```sql
 CREATE TABLE point_record (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '积分变动记录ID',
-  user_id BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
+  user_id VARCHAR(64) NOT NULL COMMENT '用户ID',
   product_id BIGINT UNSIGNED DEFAULT NULL COMMENT '商品ID，仅商品兑换时有值',
   change_type VARCHAR(32) NOT NULL COMMENT '积分变动类型：season_reward赛季奖励，exchange商品兑换，manual_adjust后台调整',
   change_points INT NOT NULL COMMENT '积分变动值，正数增加，负数扣减',

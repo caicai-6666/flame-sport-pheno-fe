@@ -17,7 +17,8 @@ const routes = [
     component: ProjectHomeView,
     meta: {
       navKey: 'project',
-      title: '项目'
+      title: '项目',
+      keepAlive: true
     }
   },
   {
@@ -26,7 +27,8 @@ const routes = [
     component: ProjectDetailView,
     meta: {
       navKey: 'project',
-      title: '项目详情'
+      title: '项目详情',
+      keepAlive: true
     }
   },
   {
