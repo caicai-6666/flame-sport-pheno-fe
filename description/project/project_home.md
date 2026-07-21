@@ -21,7 +21,7 @@ ProjectHome 当前已接入真实接口：
 - `GET /project/rules`
 - `POST /project/lock_level`
 
-上传凭证弹窗由 `project/upload_proof.md` 单独描述。
+上传记录弹窗由 `project/upload_proof.md` 单独描述。
 
 ## 页面加载流程
 
@@ -32,6 +32,48 @@ ProjectHome 当前已接入真实接口：
 2. 检查赛季参与状态
 3. 查询当前赛季已锁定项目
 4. 如果满足条件，加载挑战等级选项
+5. 已确认挑战等级时，为每个项目加载该等级对应的规则要求并展示到项目卡片
+```
+
+## 项目卡片等级要求
+
+当用户已经确认赛季挑战等级后，`ProjectHome` 的项目卡片不再只展示项目基础描述，而是优先展示该项目在当前挑战等级下的要求。
+
+数据来源：
+
+```http
+GET /project/rules?project_id=running
+```
+
+前端匹配逻辑：
+
+- 使用 `selectedChallengeLevel` 匹配规则中的 `level`、`name` 或 `{level}挑战`
+- 优先使用 `rule_content` / `metrics` 生成要求文案
+- 如果没有可展示指标，则退回使用 `rule_note` / `note` / `subtitle`
+- 单个项目规则请求失败时，该项目卡片保留原始 `description`，不影响首页其他项目展示
+
+示例响应：
+
+```json
+{
+  "levels": [
+    {
+      "project_rule_level_id": 101,
+      "name": "青铜挑战",
+      "rule_content": [
+        {
+          "label": "完成次数",
+          "value": "5 次"
+        },
+        {
+          "label": "单次距离",
+          "value": "3 公里"
+        }
+      ],
+      "rule_note": "仅统计审核通过的记录"
+    }
+  ]
+}
 ```
 
 ## 获取项目列表

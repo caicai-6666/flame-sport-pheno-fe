@@ -1,4 +1,4 @@
-const AUTH_CODE_KEY = 'flame_winter_auth_code'
+const AUTH_CODE_KEY = 'flame_sport_pheno_auth_code'
 
 let memoryAuthCode = ''
 

@@ -29,7 +29,7 @@
             v-model="proofFileBaseName"
             type="text"
             maxlength="60"
-            aria-label="重命名凭证图片"
+            aria-label="重命名上传图片"
             :disabled="isProofUploading"
             @blur="sanitizeProofFileName"
             @input="resetProofSubmitConfirm"
@@ -64,7 +64,7 @@
             @change="handleProofUpload"
           >
           <template v-if="proofPreviewUrl">
-            <img :src="proofPreviewUrl" :alt="`${task.name}凭证预览`">
+            <img :src="proofPreviewUrl" :alt="`${task.name}记录预览`">
             <span class="replace-proof">更换图片</span>
           </template>
           <template v-else>
@@ -140,9 +140,9 @@ const PROOF_UPLOAD_FAILURE_DURATION = 1400
 
 const defaultUploadConfig = {
   uploadConfigId: '',
-  recordType: '日常凭证',
+  recordType: '日常记录',
   uploadHint: '运动记录、截图或现场照片',
-  noteExample: '补充说明本次凭证的运动内容'
+  noteExample: '补充说明本次记录的运动内容'
 }
 
 function getProofFileBaseName(fileName) {
@@ -291,11 +291,16 @@ export default {
       uploadTouchStartY: 0,
       uploadConfigs: [],
       isUploadConfigLoading: false,
-      uploadConfigError: null
+      uploadConfigError: null,
+      lockedPageScrollY: 0,
+      originalPageScrollStyle: null
     }
   },
   created() {
     this.loadUploadConfig()
+  },
+  mounted() {
+    this.lockPageScroll()
   },
   computed: {
     selectedUploadConfig() {
@@ -308,7 +313,7 @@ export default {
       return this.shouldShowRecordTypeTabs
     },
     uploadPanelTitle() {
-      return `上传${this.task.name}凭证`
+      return `上传${this.task.name}记录`
     },
     uploadSummaryLabel() {
       return this.selectedUploadConfig.recordType
@@ -356,7 +361,7 @@ export default {
         return '上传失败'
       }
 
-      return this.isProofSubmitConfirming ? '确认提交' : '提交凭证'
+      return this.isProofSubmitConfirming ? '确认提交' : '提交记录'
     }
   },
   methods: {
@@ -596,9 +601,54 @@ export default {
       if (deltaX < -48 && Math.abs(deltaY) < 64) {
         this.$emit('close')
       }
+    },
+    lockPageScroll() {
+      if (typeof window === 'undefined' || typeof document === 'undefined' || this.originalPageScrollStyle) {
+        return
+      }
+
+      const { body, documentElement } = document
+      this.lockedPageScrollY = window.scrollY || window.pageYOffset || 0
+      this.originalPageScrollStyle = {
+        bodyPosition: body.style.position,
+        bodyTop: body.style.top,
+        bodyLeft: body.style.left,
+        bodyRight: body.style.right,
+        bodyWidth: body.style.width,
+        bodyOverflow: body.style.overflow,
+        bodyTouchAction: body.style.touchAction,
+        htmlOverflow: documentElement.style.overflow
+      }
+
+      body.style.position = 'fixed'
+      body.style.top = `-${this.lockedPageScrollY}px`
+      body.style.left = '0'
+      body.style.right = '0'
+      body.style.width = '100%'
+      body.style.overflow = 'hidden'
+      body.style.touchAction = 'none'
+      documentElement.style.overflow = 'hidden'
+    },
+    unlockPageScroll() {
+      if (typeof window === 'undefined' || typeof document === 'undefined' || !this.originalPageScrollStyle) {
+        return
+      }
+
+      const { body, documentElement } = document
+      body.style.position = this.originalPageScrollStyle.bodyPosition
+      body.style.top = this.originalPageScrollStyle.bodyTop
+      body.style.left = this.originalPageScrollStyle.bodyLeft
+      body.style.right = this.originalPageScrollStyle.bodyRight
+      body.style.width = this.originalPageScrollStyle.bodyWidth
+      body.style.overflow = this.originalPageScrollStyle.bodyOverflow
+      body.style.touchAction = this.originalPageScrollStyle.bodyTouchAction
+      documentElement.style.overflow = this.originalPageScrollStyle.htmlOverflow
+      window.scrollTo(0, this.lockedPageScrollY)
+      this.originalPageScrollStyle = null
     }
   },
   beforeUnmount() {
+    this.unlockPageScroll()
     this.proofSelectionToken += 1
 
     if (this.proofPreviewUrl) {
@@ -620,10 +670,14 @@ export default {
 <style scoped>
 .upload-overlay {
   --upload-safe-top: 92px;
+  --upload-header-height: 76px;
+  --upload-panel-edge-gap: 16px;
+  --upload-bottom-nav-space: 88px;
+  --upload-panel-header-gap: calc(var(--upload-safe-top) - var(--upload-header-height) + var(--upload-panel-edge-gap));
 
   position: fixed;
   z-index: 20;
-  top: var(--upload-safe-top);
+  top: 0;
   bottom: 0;
   left: 50%;
   width: min(100vw, 430px);
@@ -634,9 +688,9 @@ export default {
 
 .upload-panel {
   position: absolute;
-  top: 16px;
+  top: calc(var(--upload-safe-top) + var(--upload-panel-edge-gap));
   right: 16px;
-  bottom: 88px;
+  bottom: calc(var(--upload-bottom-nav-space) + var(--upload-panel-header-gap));
   width: min(330px, calc(100% - 58px));
   padding: 16px;
   border: 1px solid rgba(23, 33, 27, 0.08);
@@ -1143,11 +1197,10 @@ export default {
 @media (max-height: 640px) {
   .upload-overlay {
     --upload-safe-top: 84px;
+    --upload-panel-edge-gap: 10px;
   }
 
   .upload-panel {
-    top: 10px;
-    bottom: 70px;
     gap: 9px;
     padding: 14px;
   }

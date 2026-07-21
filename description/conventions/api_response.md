@@ -38,9 +38,12 @@ Authorization: <auth_code>
 
 如果非登录接口返回 `401 Unauthorized`：
 
-1. 前端使用 `VUE_APP_AUTH_CODE` 重新请求 `/auth/login`
-2. 更新本地 `auth_code`
-3. 自动重试原业务请求一次
+1. 前端重新构造登录凭证
+   - 钉钉环境重新调用 `dd.runtime.permission.requestAuthCode()` 获取一次性免登码
+   - 非钉钉环境继续使用 `VUE_APP_AUTH_CODE`
+2. 前端重新请求 `/auth/login`
+3. 更新本地 `auth_code`
+4. 自动重试原业务请求一次
 
 同一个请求最多自动重试一次，避免死循环。
 

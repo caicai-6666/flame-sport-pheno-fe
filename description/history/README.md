@@ -1,14 +1,22 @@
-# History 文档占位
+# History 页面
 
-当前 `HistoryPage` 尚未完成 real data 查询迁移。
+## 当前状态
 
-当前状态：
+`HistoryPage` 已开始接入 real data。
 
-- 本赛季上传记录来自 `appState.uploadRecords`
-- `UploadProofPanel` 上传成功后会即时向该数组追加记录
-- 过往赛季审核记录来自 `appState.pastSeasonReviewRecords`
+已接入：
 
-后续接入真实接口时，建议新增：
+- 当前赛季参与状态检查
+- 当前赛季上传记录查询
+- 未参与本赛季时，仅展示过往赛季上传记录
+- 过往赛季上传记录查询
+- `HistoryPage` 及过往赛季上传记录页已接入路由 `KeepAlive`
+
+仍为 mock：
+
+- 赛季进度条暂用前端 mock 百分比，后续等待后端返回进度值
+
+## 相关文档
 
 ```text
 description/history/current_season_history.md

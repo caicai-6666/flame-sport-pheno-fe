@@ -4,8 +4,12 @@ node_modules
 
 
 # local env files
+.env.development
 .env.local
 .env.*.local
+
+# Keep the shareable environment-variable template under version control.
+!.env.example
 
 # Log files
 npm-debug.log*

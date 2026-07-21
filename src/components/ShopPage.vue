@@ -3,7 +3,7 @@
     <div class="shop-hero">
       <span class="shop-eyebrow">POINTS STORE</span>
       <h1>积分商城</h1>
-      <p>使用赛季积分兑换运动周边和健康补给，不同档次商品会按所需积分分组展示。</p>
+      <p>使用赛季积分兑换运动周边和健康补给，为目标助力！</p>
 
       <div class="shop-wallet">
         <div>
@@ -18,7 +18,7 @@
           </em>
         </div>
         <button class="exchange-history" type="button" @click="isRecordView = !isRecordView">
-          {{ isRecordView ? '返回商城' : '积分变动' }}
+          {{ isRecordView ? '返回商城' : '积分流水' }}
         </button>
       </div>
     </div>
@@ -27,12 +27,21 @@
       <div class="records-heading">
         <div>
           <span>POINTS LOG</span>
-          <h2>积分变动</h2>
+          <h2>记录一览</h2>
         </div>
         <strong>{{ sortedPointRecords.length }} 条</strong>
       </div>
 
-      <div v-if="sortedPointRecords.length" class="record-list">
+      <div v-if="isPointFlowLoading" class="empty-records">
+        <span>正在加载积分流水</span>
+      </div>
+
+      <div v-else-if="pointFlowErrorMessage" class="empty-records is-error">
+        <span>{{ pointFlowErrorMessage }}</span>
+        <button type="button" @click="$emit('retry-point-flow')">重试</button>
+      </div>
+
+      <div v-else-if="sortedPointRecords.length" class="record-list">
         <article
           v-for="record in sortedPointRecords"
           :key="record.id"
@@ -72,54 +81,100 @@
       </div>
     </div>
 
+    <div v-else-if="isProductLoading" class="shop-product-status">
+      <span>正在加载奖品列表</span>
+    </div>
+
+    <div v-else-if="productErrorMessage" class="shop-product-status is-error">
+      <span>{{ productErrorMessage }}</span>
+      <button type="button" @click="$emit('retry-products')">重试</button>
+    </div>
+
+    <div v-else-if="!products.length" class="shop-product-status">
+      <span>暂无可兑换奖品</span>
+    </div>
+
     <div v-else class="tier-list">
       <section
         v-for="tier in rewardTiers"
-        :key="tier.points"
+        :key="tier.key"
         class="reward-tier"
+        :class="{ 'is-crazy-tier': tier.key === 'crazy' }"
       >
         <div class="tier-heading">
           <div>
-            <span>{{ tier.label }}</span>
-            <h2>{{ tier.points }}积分礼品</h2>
+            <h2 v-if="tier.pointsTitle" class="tier-points-heading">
+              <span>积分</span>
+              <strong>{{ tier.pointsTitle }}</strong>
+            </h2>
+            <h2 v-else>{{ tier.title }}</h2>
           </div>
-          <strong>{{ tier.items.length }} 款</strong>
         </div>
 
         <div class="reward-grid">
           <article
             v-for="item in tier.items"
-            :key="item.name"
+            :key="item.id"
             class="reward-card"
-            :class="{ 'is-unavailable': availablePoints < tier.points }"
           >
-            <div class="reward-visual" :style="{ '--reward-accent': item.accent }">
-              <span>{{ item.icon }}</span>
-              <small>奖品示意图</small>
+            <div
+              class="reward-visual"
+              :class="{
+                'is-image-loading': item.isImageLoading && !item.isImageLoaded,
+                'is-image-loaded': item.isImageLoaded,
+                'is-image-failed': item.isImageFailed
+              }"
+              :style="{ '--reward-accent': item.accent }"
+            >
+              <span
+                v-if="item.isImageLoading && !item.isImageLoaded"
+                class="reward-image-skeleton"
+                aria-hidden="true"
+              ></span>
+              <img
+                v-if="item.imageSrc"
+                :src="item.imageSrc"
+                :alt="item.name"
+                decoding="async"
+                @load="$emit('product-image-loaded', item.id)"
+              >
+              <span v-else-if="item.isImageFailed || !item.imageFilename">{{ productInitial(item) }}</span>
             </div>
 
             <div class="reward-info">
               <strong>{{ item.name }}</strong>
               <span>{{ item.description }}</span>
+              <em v-if="!tier.pointsTitle">{{ item.pointsRequired }} 分</em>
             </div>
 
             <button
               class="redeem-button"
               type="button"
-              :class="{ 'is-confirming': pendingRedeemKey === rewardKey(item, tier.points) }"
-              :disabled="availablePoints < tier.points"
-              @click="handleRedeemClick(item, tier.points)"
+              :class="{
+                'is-confirming': pendingRedeemKey === rewardKey(item, item.pointsRequired),
+                'is-loading': redeemingKey === rewardKey(item, item.pointsRequired),
+                'is-error': failedRedeemKey === rewardKey(item, item.pointsRequired)
+              }"
+              :disabled="isRedeemButtonDisabled(item.pointsRequired)"
+              @click="handleRedeemClick(item, item.pointsRequired)"
             >
               <Transition name="redeem-label" mode="out-in">
                 <span
-                  :key="redeemButtonText(item, tier.points)"
+                  :key="redeemButtonText(item, item.pointsRequired)"
                   class="redeem-button-label"
                 >
-                  {{ redeemButtonText(item, tier.points) }}
+                  <span class="redeem-button-content">
+                    <span>{{ redeemButtonText(item, item.pointsRequired) }}</span>
+                    <span
+                      v-if="redeemingKey === rewardKey(item, item.pointsRequired)"
+                      class="redeem-spinner"
+                      aria-hidden="true"
+                    ></span>
+                  </span>
                 </span>
               </Transition>
               <span
-                v-for="burst in rewardConfettiBurstsFor(item, tier.points)"
+                v-for="burst in rewardConfettiBurstsFor(item, item.pointsRequired)"
                 :key="burst.id"
                 class="reward-confetti-burst"
                 aria-hidden="true"
@@ -146,142 +201,133 @@
 </template>
 
 <script>
-const rewardTiers = [
-  {
-    points: 20,
-    label: '轻量兑换',
-    items: [
-      {
-        name: '运动毛巾',
-        description: '训练后快速吸汗',
-        icon: '▧',
-        accent: '#72d84f'
-      },
-      {
-        name: '羽毛球袜',
-        description: '透气耐磨日常款',
-        icon: '◒',
-        accent: '#20c7b5'
-      }
-    ]
-  },
-  {
-    points: 30,
-    label: '进阶奖励',
-    items: [
-      {
-        name: '筋膜球',
-        description: '放松肩颈和足底',
-        icon: '●',
-        accent: '#ff9f45'
-      },
-      {
-        name: '跳绳',
-        description: '便携有氧训练',
-        icon: '⌁',
-        accent: '#7b8cff'
-      }
-    ]
-  },
-  {
-    points: 50,
-    label: '高阶礼品',
-    items: [
-      {
-        name: '运动水杯',
-        description: '大容量随行补水',
-        icon: '◫',
-        accent: '#3fb06d'
-      },
-      {
-        name: '瑜伽垫',
-        description: '居家拉伸训练',
-        icon: '▭',
-        accent: '#ff6f91'
-      }
-    ]
-  }
-]
+import { groupProductsByTier } from '../utils/shopProductTiers'
 
-const pointRecords = [
-  {
-    id: 'points-20260701-season-reward',
-    type: 'income',
-    occurredAt: '2026-07-01T09:00:00+08:00',
-    title: '2026 夏季赛积分奖励',
-    description: '赛季审核通过后发放',
-    amount: 158,
-    balanceAfter: 158
-  },
-  {
-    id: 'exchange-20260714-cup',
-    type: 'expense',
-    occurredAt: '2026-07-14T18:32:00+08:00',
-    title: '兑换运动水杯',
-    description: '积分商城兑换',
-    amount: -50,
-    balanceAfter: 68
-  },
-  {
-    id: 'exchange-20260708-towel',
-    type: 'expense',
-    occurredAt: '2026-07-08T12:10:00+08:00',
-    title: '兑换 PHENO 夏季限定速干运动毛巾礼盒',
-    description: '积分商城兑换',
-    amount: -20,
-    balanceAfter: 118
-  },
-  {
-    id: 'exchange-20260702-socks',
-    type: 'expense',
-    occurredAt: '2026-07-02T09:26:00+08:00',
-    title: '兑换羽毛球袜',
-    description: '积分商城兑换',
-    amount: -20,
-    balanceAfter: 138
+const REDEEM_REQUEST_DELAY = 1000
+const MIN_REDEEMING_DURATION = 900
+
+function wait(ms) {
+  return new Promise(resolve => window.setTimeout(resolve, ms))
+}
+
+async function waitForMinRedeemingDuration(startedAt) {
+  const elapsed = Date.now() - startedAt
+  const remaining = MIN_REDEEMING_DURATION - elapsed
+
+  if (remaining > 0) {
+    await wait(remaining)
   }
-]
+}
 
 export default {
   name: 'ShopPage',
+  emits: ['retry-products', 'retry-point-flow', 'consume-success', 'product-image-loaded'],
+  props: {
+    products: {
+      type: Array,
+      default: () => []
+    },
+    isProductLoading: {
+      type: Boolean,
+      default: false
+    },
+    productErrorMessage: {
+      type: String,
+      default: ''
+    },
+    pointRecords: {
+      type: Array,
+      default: () => []
+    },
+    initialAvailablePoints: {
+      type: Number,
+      default: 0
+    },
+    isPointFlowLoading: {
+      type: Boolean,
+      default: false
+    },
+    pointFlowErrorMessage: {
+      type: String,
+      default: ''
+    },
+    consumeProduct: {
+      type: Function,
+      default: null
+    }
+  },
   data() {
     return {
-      availablePoints: 68,
-      displayPoints: 68,
+      availablePoints: this.initialAvailablePoints,
+      displayPoints: this.initialAvailablePoints,
+      localPointRecords: [...this.pointRecords],
       isRecordView: false,
       pendingRedeemKey: '',
       pendingRedeemTimer: null,
+      redeemingKey: '',
+      failedRedeemKey: '',
+      failedRedeemTimer: null,
       pointAnimationFrame: null,
       pointDeltas: [],
       pointDeltaTimers: [],
       rewardConfettiBursts: [],
-      rewardConfettiTimers: [],
-      rewardTiers,
-      pointRecords
+      rewardConfettiTimers: []
     }
   },
   computed: {
+    rewardTiers() {
+      return groupProductsByTier(this.products)
+    },
     sortedPointRecords() {
-      return [...this.pointRecords].sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt))
+      return [...this.localPointRecords].sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt))
+    }
+  },
+  watch: {
+    pointRecords(records) {
+      this.localPointRecords = [...records]
+    },
+    initialAvailablePoints(points) {
+      const nextPoints = Number(points) || 0
+      const previousPoints = this.displayPoints
+
+      this.availablePoints = nextPoints
+      this.animatePoints(previousPoints, nextPoints)
     }
   },
   methods: {
     rewardKey(item, points) {
-      return `${points}-${item.name}`
+      return `${points}-${item.id}`
+    },
+    productInitial(item) {
+      return item.name?.trim().charAt(0) || '礼'
     },
     redeemButtonText(item, points) {
+      const key = this.rewardKey(item, points)
+
       if (this.availablePoints < points) {
         return '积分不足'
       }
 
-      return this.pendingRedeemKey === this.rewardKey(item, points) ? '确认兑换' : '兑换'
+      if (this.redeemingKey === key) {
+        return '兑换中'
+      }
+
+      if (this.failedRedeemKey === key) {
+        return '兑换失败'
+      }
+
+      return this.pendingRedeemKey === key ? '确认兑换' : '兑换'
+    },
+    isRedeemButtonDisabled(points) {
+      return this.availablePoints < points || Boolean(this.redeemingKey)
     },
     handleRedeemClick(item, points) {
-      if (this.availablePoints < points) {
+      if (this.isRedeemButtonDisabled(points)) {
         return
       }
 
       const key = this.rewardKey(item, points)
+      this.clearFailedRedeem()
 
       if (this.pendingRedeemKey !== key) {
         this.pendingRedeemKey = key
@@ -299,13 +345,13 @@ export default {
 
       this.redeemReward(item, points)
     },
-    redeemReward(item, points) {
-      if (this.availablePoints < points) {
+    async redeemReward(item, points) {
+      if (this.isRedeemButtonDisabled(points) || typeof this.consumeProduct !== 'function') {
         return
       }
 
-      const oldPoints = this.availablePoints
-      this.availablePoints -= points
+      const key = this.rewardKey(item, points)
+      this.redeemingKey = key
       this.pendingRedeemKey = ''
 
       if (this.pendingRedeemTimer) {
@@ -313,21 +359,51 @@ export default {
         this.pendingRedeemTimer = null
       }
 
-      this.animatePoints(oldPoints, this.availablePoints)
-      this.launchPointDelta(points)
-      this.launchRewardConfetti(this.rewardKey(item, points))
-      this.pointRecords = [
-        {
-          id: `exchange-${Date.now()}`,
-          type: 'expense',
-          occurredAt: new Date().toISOString(),
-          title: `兑换${item.name}`,
-          description: '积分商城兑换',
-          amount: -points,
-          balanceAfter: this.availablePoints
-        },
-        ...this.pointRecords
-      ]
+      const redeemStartedAt = Date.now()
+
+      try {
+        await wait(REDEEM_REQUEST_DELAY)
+        const result = await this.consumeProduct(item)
+        await waitForMinRedeemingDuration(redeemStartedAt)
+        const nextPoints = Number(result?.pointsAfter)
+
+        if (!Number.isNaN(nextPoints)) {
+          this.$emit('consume-success', {
+            product: item,
+            result: {
+              ...result,
+              pointsAfter: nextPoints
+            }
+          })
+        }
+
+        this.launchPointDelta(points)
+        this.launchRewardConfetti(key)
+      } catch {
+        await waitForMinRedeemingDuration(redeemStartedAt)
+        this.failedRedeemKey = key
+
+        if (this.failedRedeemTimer) {
+          window.clearTimeout(this.failedRedeemTimer)
+        }
+
+        this.failedRedeemTimer = window.setTimeout(() => {
+          this.failedRedeemKey = ''
+          this.failedRedeemTimer = null
+        }, 1600)
+      } finally {
+        if (this.redeemingKey === key) {
+          this.redeemingKey = ''
+        }
+      }
+    },
+    clearFailedRedeem() {
+      if (this.failedRedeemTimer) {
+        window.clearTimeout(this.failedRedeemTimer)
+        this.failedRedeemTimer = null
+      }
+
+      this.failedRedeemKey = ''
     },
     animatePoints(from, to) {
       if (this.pointAnimationFrame) {
@@ -417,6 +493,10 @@ export default {
       window.clearTimeout(this.pendingRedeemTimer)
     }
 
+    if (this.failedRedeemTimer) {
+      window.clearTimeout(this.failedRedeemTimer)
+    }
+
     if (this.pointAnimationFrame) {
       window.cancelAnimationFrame(this.pointAnimationFrame)
     }
@@ -476,11 +556,12 @@ export default {
 .shop-hero p {
   position: relative;
   z-index: 1;
-  max-width: 300px;
+  max-width: none;
   margin: 0;
   color: #68766d;
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: nowrap;
 }
 
 .shop-wallet {
@@ -770,6 +851,11 @@ export default {
   text-align: center;
 }
 
+.empty-records.is-error {
+  color: #b04a3f;
+  background: rgba(255, 111, 97, 0.06);
+}
+
 .empty-records span {
   color: #17211b;
   font-size: 17px;
@@ -783,6 +869,56 @@ export default {
   line-height: 1.6;
 }
 
+.empty-records button {
+  min-height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #17211b;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.shop-product-status,
+.empty-tier {
+  min-height: 190px;
+  padding: 26px 18px;
+  border: 1px dashed rgba(23, 33, 27, 0.14);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #68766d;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.shop-product-status span,
+.empty-tier span {
+  color: #17211b;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.shop-product-status.is-error {
+  color: #b04a3f;
+  background: rgba(255, 111, 97, 0.06);
+}
+
+.shop-product-status button {
+  min-height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #17211b;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .reward-tier {
   padding: 16px;
   border: 1px solid rgba(23, 33, 27, 0.08);
@@ -793,62 +929,144 @@ export default {
 
 .tier-heading {
   margin-bottom: 12px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.tier-heading span {
-  color: #159b8d;
-  font-size: 11px;
-  font-weight: 950;
-  letter-spacing: 0.12em;
 }
 
 .tier-heading h2 {
-  margin: 4px 0 0;
+  margin: 0;
   font-size: 22px;
   line-height: 1.1;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
-.tier-heading > strong {
-  flex-shrink: 0;
-  padding: 6px 9px;
-  border-radius: 999px;
-  background: rgba(32, 199, 181, 0.12);
-  color: #159b8d;
-  font-size: 11px;
+.tier-points-heading {
+  color: #75c82f;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-style: italic;
+  transform: skewX(-6deg);
+  transform-origin: left bottom;
+}
+
+.tier-points-heading span {
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 900;
+}
+
+.tier-points-heading strong {
+  font-size: 36px;
+  font-style: italic;
   font-weight: 950;
+  line-height: 0.92;
 }
 
 .reward-grid {
+  column-count: 2;
+  column-gap: 12px;
+}
+
+.reward-tier.is-crazy-tier {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(190, 112, 255, 0.22);
+  background:
+    radial-gradient(circle at 16% 10%, rgba(255, 126, 210, 0.22), transparent 34%),
+    radial-gradient(circle at 86% 18%, rgba(165, 111, 255, 0.22), transparent 36%),
+    radial-gradient(circle at 56% 94%, rgba(255, 206, 117, 0.16), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(252, 241, 255, 0.86)),
+    #fff;
+}
+
+.reward-tier.is-crazy-tier::before {
+  position: absolute;
+  inset: -48%;
+  pointer-events: none;
+  content: '';
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 126, 210, 0.22),
+    rgba(165, 111, 255, 0.2),
+    rgba(255, 206, 117, 0.14),
+    rgba(255, 126, 210, 0.22)
+  );
+  filter: blur(28px);
+  opacity: 0.72;
+  animation: crazy-aura-flow 9s linear infinite;
+}
+
+.reward-tier.is-crazy-tier .tier-heading {
+  position: relative;
+  z-index: 1;
+}
+
+.reward-tier.is-crazy-tier .reward-grid {
+  position: relative;
+  z-index: 1;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: 1fr;
+  column-count: auto;
 }
 
 .reward-card {
-  min-height: 214px;
+  width: 100%;
+  margin: 0 0 12px;
+  break-inside: avoid;
   padding: 10px;
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 24px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 245, 0.72)),
     #fff;
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
   gap: 10px;
+  vertical-align: top;
 }
 
-.reward-card.is-unavailable {
-  opacity: 0.58;
-  filter: grayscale(0.2);
+.reward-card:last-child {
+  margin-bottom: 0;
+}
+
+.reward-tier.is-crazy-tier .reward-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 132px;
+  padding: 12px;
+  border-color: rgba(204, 145, 28, 0.2);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 250, 235, 0.86)),
+    #fff;
+  box-shadow:
+    0 16px 32px rgba(154, 106, 16, 0.11),
+    inset 0 0 0 1px rgba(255, 224, 137, 0.26);
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  align-items: stretch;
+  column-gap: 12px;
+  row-gap: 10px;
+}
+
+.reward-tier.is-crazy-tier .reward-card::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -38%;
+  width: 32%;
+  pointer-events: none;
+  content: '';
+  background: linear-gradient(100deg, transparent, rgba(255, 234, 165, 0.44), transparent);
+  transform: skewX(-14deg);
+  animation: crazy-card-glint 3.8s ease-in-out infinite;
 }
 
 .reward-visual {
-  min-height: 104px;
+  position: relative;
+  min-height: 96px;
+  overflow: hidden;
   border-radius: 20px;
   background:
     radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--reward-accent), transparent 56%), transparent 28%),
@@ -858,6 +1076,151 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 6px;
+}
+
+.reward-visual.is-image-loading {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.42),
+    inset 0 -18px 38px rgba(255, 255, 255, 0.28);
+}
+
+.reward-visual img {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  opacity: 0;
+  filter: saturate(0.86) blur(8px);
+  clip-path: inset(48% 42% 48% 42% round 18px);
+  transform: translateY(10px) scale(0.88, 0.74);
+  transform-origin: center;
+  transition:
+    opacity 0.52s ease,
+    filter 0.52s ease,
+    transform 0.52s cubic-bezier(0.16, 0.9, 0.28, 1);
+  will-change: clip-path, filter, opacity, transform;
+}
+
+.reward-visual.is-image-loaded img {
+  opacity: 1;
+  filter: saturate(1) blur(0);
+  clip-path: inset(0 round 0);
+  transform: translateY(0) scale(1);
+  animation: reward-image-elastic-reveal 760ms cubic-bezier(0.18, 0.88, 0.22, 1) both;
+}
+
+.reward-image-skeleton {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.2)),
+    color-mix(in srgb, var(--reward-accent), #fff 80%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.46),
+    inset 0 16px 30px rgba(255, 255, 255, 0.34),
+    inset 0 -18px 34px color-mix(in srgb, var(--reward-accent), transparent 68%);
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  pointer-events: none;
+}
+
+.reward-image-skeleton::before,
+.reward-image-skeleton::after {
+  position: absolute;
+  content: '';
+  pointer-events: none;
+}
+
+.reward-image-skeleton::before {
+  inset: -28%;
+  background:
+    linear-gradient(
+      115deg,
+      transparent 14%,
+      rgba(255, 255, 255, 0.42) 28%,
+      transparent 43%,
+      rgba(255, 255, 255, 0.26) 58%,
+      transparent 74%
+    ),
+    radial-gradient(circle at 24% 32%, rgba(255, 255, 255, 0.46), transparent 30%),
+    radial-gradient(circle at 82% 66%, color-mix(in srgb, var(--reward-accent), transparent 42%), transparent 28%);
+  filter: blur(12px);
+  opacity: 0.86;
+  transform: translate3d(-18%, -8%, 0) rotate(0.001deg);
+  animation: reward-glass-flow 2.8s ease-in-out infinite;
+}
+
+.reward-image-skeleton::after {
+  inset: 10px;
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.24), transparent 30%, rgba(255, 255, 255, 0.3) 54%, transparent),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.06));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.16);
+  transform: translateX(-120%) skewX(-14deg);
+  animation: reward-glass-sheen 1.32s ease-in-out infinite;
+}
+
+@keyframes reward-glass-flow {
+  0%,
+  100% {
+    transform: translate3d(-18%, -8%, 0) rotate(0.001deg);
+  }
+
+  50% {
+    transform: translate3d(16%, 8%, 0) rotate(0.001deg);
+  }
+}
+
+@keyframes reward-glass-sheen {
+  100% {
+    transform: translateX(120%) skewX(-14deg);
+  }
+}
+
+@keyframes reward-image-elastic-reveal {
+  0% {
+    opacity: 0;
+    filter: saturate(0.9) blur(9px);
+    clip-path: inset(50% 42% 50% 42% round 18px);
+    transform: translateY(10px) scale(0.86, 0.7);
+  }
+
+  48% {
+    opacity: 1;
+    filter: saturate(1.04) blur(0);
+    clip-path: inset(0 round 8px);
+    transform: translateY(0) scale(1.045, 0.965);
+  }
+
+  68% {
+    clip-path: inset(0 round 0);
+    transform: translateY(0) scale(0.982, 1.018);
+  }
+
+  84% {
+    transform: translateY(0) scale(1.012, 0.992);
+  }
+
+  100% {
+    opacity: 1;
+    filter: saturate(1) blur(0);
+    clip-path: inset(0 round 0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+.reward-tier.is-crazy-tier .reward-visual {
+  min-height: 108px;
+  grid-row: 1 / 3;
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 137, 0.22);
 }
 
 .reward-visual span {
@@ -877,21 +1240,56 @@ export default {
   min-height: 48px;
 }
 
+.reward-tier.is-crazy-tier .reward-info {
+  min-height: 0;
+  align-self: center;
+}
+
 .reward-info strong {
   display: block;
+  overflow: hidden;
   color: #17211b;
   font-size: 14px;
   font-weight: 950;
   line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .reward-info span {
-  display: block;
+  min-height: 30px;
+  overflow: hidden;
   margin-top: 4px;
   color: #758078;
+  display: -webkit-box;
   font-size: 11px;
   font-weight: 750;
   line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.reward-info em {
+  display: block;
+  margin-top: 6px;
+  color: #159b8d;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.reward-tier.is-crazy-tier .reward-info strong {
+  font-size: 16px;
+}
+
+.reward-tier.is-crazy-tier .reward-info span {
+  min-height: 32px;
+  font-size: 12px;
+}
+
+.reward-tier.is-crazy-tier .reward-info em {
+  color: #b98512;
+  font-size: 13px;
 }
 
 .redeem-button {
@@ -913,6 +1311,27 @@ export default {
     box-shadow 0.2s ease,
     filter 0.2s ease,
     transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.reward-tier.is-crazy-tier .redeem-button {
+  min-height: 38px;
+  min-width: 108px;
+  margin-top: 0;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f6d66f, #c89219 52%, #a96f07);
+  box-shadow:
+    0 12px 24px rgba(174, 119, 16, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44);
+  color: #fffdf4;
+  justify-self: end;
+  align-self: end;
+}
+
+.reward-tier.is-crazy-tier .redeem-button:disabled {
+  background: rgba(23, 33, 27, 0.12);
+  box-shadow: none;
+  color: rgba(23, 33, 27, 0.42);
 }
 
 .redeem-button:not(:disabled):hover {
@@ -938,6 +1357,20 @@ export default {
   animation: confirm-pulse 1.1s ease-in-out infinite;
 }
 
+.redeem-button.is-loading {
+  background: linear-gradient(135deg, #e8f7ff, #bfe8ff);
+  color: #17445f;
+  box-shadow:
+    0 12px 24px rgba(40, 151, 220, 0.18),
+    inset 0 -2px 0 rgba(23, 68, 95, 0.08);
+  cursor: wait;
+}
+
+.redeem-button.is-error {
+  background: linear-gradient(135deg, #ff7a45, #d94d3f);
+  box-shadow: 0 12px 24px rgba(217, 77, 63, 0.22);
+}
+
 @keyframes confirm-pulse {
   0%,
   100% {
@@ -949,9 +1382,50 @@ export default {
   }
 }
 
+@keyframes crazy-aura-flow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes crazy-card-glint {
+  0%,
+  42% {
+    left: -38%;
+  }
+
+  76%,
+  100% {
+    left: 108%;
+  }
+}
+
 .redeem-button-label {
   display: inline-block;
   min-width: 52px;
+}
+
+.redeem-button-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.redeem-spinner {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(23, 68, 95, 0.22);
+  border-top-color: #17445f;
+  border-radius: 50%;
+  animation: redeem-spinner-rotate 720ms linear infinite;
+}
+
+@keyframes redeem-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .redeem-label-enter-active,
@@ -977,6 +1451,16 @@ export default {
   color: rgba(23, 33, 27, 0.42);
   cursor: not-allowed;
   transform: none;
+}
+
+.redeem-button.is-loading:disabled {
+  background: linear-gradient(135deg, #e8f7ff, #bfe8ff);
+  box-shadow:
+    0 12px 24px rgba(40, 151, 220, 0.18),
+    inset 0 -2px 0 rgba(23, 68, 95, 0.08);
+  color: #17445f;
+  cursor: wait;
+  opacity: 1;
 }
 
 .reward-confetti-burst {

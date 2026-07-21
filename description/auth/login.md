@@ -2,14 +2,18 @@
 
 ## 当前版本目标
 
-当前项目暂时不做账号密码登录页。前端启动后使用配置好的 `auth_code` 请求后端登录接口，后端校验成功后将该 `auth_code` 写入缓存，并返回给前端。
+当前项目不做账号密码登录页。应用作为钉钉 H5 应用运行时，前端通过钉钉 JSAPI 获取一次性免登码，并提交给后端登录接口。后端使用该免登码调用钉钉服务端接口换取真实用户身份，再创建或更新本系统用户，并返回本系统后续业务请求使用的 `auth_code`。
 
-后续业务接口通过请求头携带该 `auth_code`。
+非钉钉环境保留开发 fallback：前端使用配置好的 `VUE_APP_AUTH_CODE` 请求后端登录接口，便于本地联调。
+
+后续业务接口通过请求头携带后端返回的 `auth_code`。
 
 ## 相关文件
 
 ```text
 src/main.js
+src/api/dingtalkAuth.js
+src/api/loginCredential.js
 src/state/authState.js
 src/api/auth.js
 src/api/authCredential.js
@@ -20,8 +24,28 @@ src/api/request.js
 
 ```env
 VUE_APP_API_BASE_URL=http://127.0.0.1:8000
-VUE_APP_AUTH_CODE=<开发用 auth_code>
+VUE_APP_LOGIN_PROVIDER=auto
+VUE_APP_DINGTALK_CORP_ID=<钉钉企业 CorpId>
+VUE_APP_DINGTALK_CLIENT_ID=<钉钉 H5 应用 ClientId>
+VUE_APP_DINGTALK_JSAPI_URL=https://g.alicdn.com/dingding/open-develop/1.9.0/dingtalk.js
+VUE_APP_AUTH_CODE=<非钉钉环境开发用 auth_code>
 ```
+
+`VUE_APP_LOGIN_PROVIDER` 取值：
+
+| 值 | 说明 |
+| --- | --- |
+| `auto` | 默认值。钉钉客户端内走钉钉免登，普通浏览器走 `VUE_APP_AUTH_CODE` |
+| `dingtalk` | 强制走钉钉免登 |
+| `mock` / `auth_code` | 强制走开发 `auth_code` fallback |
+
+`corpId` 和 `clientId` 也可以通过 URL query 传入，例如：
+
+```text
+https://example.com/?corpId=xxx&clientId=xxx#/projects
+```
+
+这些钉钉配置仅用于前端调用钉钉 JSAPI 获取一次性免登码。当前后端专门对接本 H5 应用，服务端自行保存并使用固定的钉钉企业与应用配置，前端登录请求不再额外提交 `corp_id` 或 `client_id`。
 
 ## 登录接口
 
@@ -29,11 +53,20 @@ VUE_APP_AUTH_CODE=<开发用 auth_code>
 POST /auth/login
 ```
 
-请求体：
+钉钉环境请求体：
 
 ```json
 {
-  "auth_code": "string"
+  "auth_code": "ding_talk_once_code",
+  "auth_source": "dingtalk"
+}
+```
+
+开发 fallback 请求体：
+
+```json
+{
+  "auth_code": "dev_auth_code"
 }
 ```
 
@@ -41,29 +74,52 @@ POST /auth/login
 
 ```json
 {
-  "auth_code": "string"
+  "auth_code": "backend_session_auth_code",
+  "user": {
+    "id": "string",
+    "name": "string",
+    "department_id": "string",
+    "department_name": "string",
+    "avatar_url": "string"
+  }
 }
 ```
+
+后端要求：
+
+1. 钉钉登录时，`auth_code` 是钉钉一次性免登码，不是前端后续请求头使用的会话码。
+2. 后端应使用服务端固定配置的钉钉企业与应用凭证，调用钉钉服务端接口换取钉钉用户 ID。
+3. 后端应按钉钉用户 ID 查找或创建本系统 `user`，同步姓名、部门、头像等基础信息。
+4. 后端应返回本系统自己的 `auth_code`，后续业务接口通过该值识别当前用户。
+5. 登录失败时返回非 2xx，并提供 `message` 便于前端展示。
 
 ## 前端启动流程
 
 ```text
 main.js
   -> initLogin()
-    -> login()
-      -> POST /auth/login
+    -> loginCredential.buildLoginPayload()
+      -> 钉钉环境：dd.runtime.permission.requestAuthCode()
+      -> 非钉钉环境：读取 VUE_APP_AUTH_CODE
+    -> POST /auth/login
+    -> 保存后端返回的 auth_code 和 user
+    -> checkProfileComplete()
+      -> GET /auth/profile_complete_check
 ```
 
 登录成功后：
 
 1. 写入 `authState.authCode`
-2. 写入 `localStorage`
-3. 后续请求由 `request.js` 自动注入 `Authorization`
+2. 写入 `authState.currentUser`
+3. 将 `auth_code` 写入 `localStorage`
+4. 后续请求由 `request.js` 自动注入 `Authorization`
+5. 请求 `/auth/profile_complete_check` 检查健康基础信息是否完整
+6. 如果后端返回资料未完成且 `missing_fields` 非空，展示健康信息采集弹窗
 
 本地存储 key：
 
 ```text
-flame_winter_auth_code
+flame_sport_pheno_auth_code
 ```
 
 如果 `localStorage` 不可用，会退化为内存变量。
@@ -72,4 +128,6 @@ flame_winter_auth_code
 
 除 `/auth/login` 外，任意业务接口返回 `401` 时，前端会自动重新登录并重试原请求一次。
 
-登录接口本身失败时不会自动重试。
+钉钉免登码是一次性的，因此 `401` 自动重登时前端会重新调用 `dd.runtime.permission.requestAuthCode()` 获取新 code，再请求 `/auth/login`。
+
+登录接口本身失败时不会自动重试。页面会展示登录失败提示和“重试”按钮。

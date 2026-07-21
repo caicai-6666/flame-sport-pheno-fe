@@ -9,6 +9,7 @@ export const appState = reactive({
   seasonParticipationStatus: 'unknown',
   selectedChallengeLevel: '',
   selectedProjectRuleLevelId: '',
+  leaderboardRecords: [],
   pastSeasonReviewRecords: [
     {
       id: 'archive-20260630-run',
@@ -18,7 +19,7 @@ export const appState = reactive({
       note: '累计里程与配速记录符合本赛季预订目标。',
       result: 'approved',
       accent: '#ff9f45',
-      reviewedAt: '2026-06-30T18:30:00+08:00'
+      uploadedAt: '2026-06-18T20:30:00+08:00'
     },
     {
       id: 'archive-20260630-steps',
@@ -28,7 +29,7 @@ export const appState = reactive({
       note: '达标天数已完成审核并归档。',
       result: 'approved',
       accent: '#68d65c',
-      reviewedAt: '2026-06-30T18:24:00+08:00'
+      uploadedAt: '2026-06-16T21:24:00+08:00'
     },
     {
       id: 'archive-20260531-fitness',
@@ -38,7 +39,7 @@ export const appState = reactive({
       note: '部分记录缺少单次时长信息，未计入完成次数。',
       result: 'rejected',
       accent: '#7b8cff',
-      reviewedAt: '2026-05-31T19:10:00+08:00'
+      uploadedAt: '2026-05-20T19:10:00+08:00'
     }
   ],
   uploadRecords: [
@@ -119,6 +120,18 @@ export function setMaxLockedTasks(maxLockedTasks) {
 export function setSelectedChallengeLevel(challengeLevel) {
   appState.selectedChallengeLevel = challengeLevel?.level || challengeLevel?.name || ''
   appState.selectedProjectRuleLevelId = challengeLevel?.projectRuleLevelId || ''
+}
+
+export function setUploadRecords(uploadRecords) {
+  appState.uploadRecords = uploadRecords
+}
+
+export function setPastSeasonReviewRecords(pastSeasonReviewRecords) {
+  appState.pastSeasonReviewRecords = pastSeasonReviewRecords
+}
+
+export function setLeaderboardRecords(leaderboardRecords) {
+  appState.leaderboardRecords = leaderboardRecords
 }
 
 export function setSeasonParticipationStatus(participation) {

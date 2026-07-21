@@ -144,10 +144,11 @@
             @after-enter="clearTransitionFrameHeight"
           >
             <span
-              :key="task.description"
+              :key="taskDisplayDescription(task)"
               class="task-description"
+              :class="{ 'is-challenge-requirement': shouldShowChallengeRequirement(task) }"
             >
-              {{ task.description }}
+              {{ taskDisplayDescription(task) }}
             </span>
           </Transition>
         </span>
@@ -525,6 +526,16 @@ export default {
     taskIcon(task) {
       return task.iconUrl || task.icon || ''
     },
+    shouldShowChallengeRequirement(task) {
+      return Boolean(this.selectedChallengeLevel && task.challengeRequirement)
+    },
+    taskDisplayDescription(task) {
+      if (this.shouldShowChallengeRequirement(task)) {
+        return `${this.selectedChallengeLevel}要求：${task.challengeRequirement}`
+      }
+
+      return task.description
+    },
     taskActionText(task) {
       if (this.shouldShowSeasonChecking) {
         return '正在确认状态'
@@ -535,7 +546,7 @@ export default {
       }
 
       if (this.isSeasonSetupComplete && this.isTaskLocked(task)) {
-        return '上传凭证 →'
+        return '上传记录 →'
       }
 
       return '查看挑战 →'
@@ -1497,6 +1508,11 @@ export default {
   display: block;
   font-size: 12px;
   line-height: 1.55;
+}
+
+.task-description.is-challenge-requirement {
+  color: color-mix(in srgb, var(--accent), #17211b 42%);
+  font-weight: 850;
 }
 
 .task-description-enter-active,

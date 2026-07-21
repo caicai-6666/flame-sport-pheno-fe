@@ -1,4 +1,4 @@
-# UploadProofPanel 凭证上传
+# UploadProofPanel 记录上传
 
 ## 组件位置
 
@@ -13,15 +13,16 @@ src/api/projects.js
 
 已接入：
 
-- `GET /project/upload_config`
-- `POST /project/upload_proof`
+- `GET /proof/config`
+- `POST /proof/upload`
 
-上传成功后，前端会即时追加一条记录到 `appState.uploadRecords`，因此 `HistoryPage` 当前赛季列表能立即看到新上传内容。历史列表本身尚未接入查询接口。
+上传成功后，前端会即时追加一条记录到 `appState.uploadRecords`，因此当前会话中进入 `HistoryPage` 能立即看到新上传内容。
+进入 `HistoryPage` 时，前端会重新查询当前赛季上传历史；即时追加只用于上传成功后的当前会话反馈。
 
 ## 获取项目上传配置
 
 ```http
-GET /project/upload_config?project_id=1
+GET /proof/config?project_id=1
 ```
 
 推荐响应：
@@ -30,7 +31,7 @@ GET /project/upload_config?project_id=1
 [
   {
     "id": "10",
-    "record_type": "普通凭证",
+    "record_type": "普通记录",
     "upload_hint": "步数截图、手环记录或健康 App 截图",
     "note_example": "例如：今日累计 8600 步"
   }
@@ -49,14 +50,15 @@ GET /project/upload_config?project_id=1
 
 - `id` 归一化为 `uploadConfigId`
 - `record_type` 归一化为 `recordType`
-- 只有一条配置时不展示凭证类型切换器
+- 只有一条配置时不展示记录类型切换器
 - 多条配置时展示切换按钮
 - 缺少 `id` 时不允许提交
+- 上传配置按 `project_id` 缓存在前端，同一项目重复打开上传弹窗时不重复请求
 
-## 上传凭证
+## 上传记录
 
 ```http
-POST /project/upload_proof
+POST /proof/upload
 ```
 
 请求体使用 `FormData`：
@@ -120,7 +122,7 @@ Content-Type: image/jpeg
 ## 按钮状态
 
 ```text
-提交凭证 -> 确认提交 -> 上传中 -> 成功关闭面板
+提交记录 -> 确认提交 -> 上传中 -> 成功关闭面板
 ```
 
 失败时：

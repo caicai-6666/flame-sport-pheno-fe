@@ -2,21 +2,28 @@
   <section class="rank-page" aria-label="打卡上传排行榜">
     <div class="rank-hero">
       <span class="rank-eyebrow">SEASON CHECK-IN</span>
-      <h1>打卡上传排行榜</h1>
+      <h1>打卡排行榜</h1>
+      <p>非实时数据</p>
     </div>
 
-    <div class="my-rank-card" :class="{ 'is-outside-top': !isCurrentInTopList }">
+    <div
+      class="my-rank-card"
+      :class="{
+        'is-outside-top': !isCurrentInTopList,
+        'is-loaded': isContentReady
+      }"
+    >
       <div>
         <span>我的排名</span>
-        <strong>第 {{ currentRank }} 名</strong>
+        <strong>{{ currentRankText }}</strong>
       </div>
       <div>
         <span>上传次数</span>
-        <strong>{{ currentEmployee.uploadCount }} 次</strong>
+        <strong>{{ currentCheckinText }}</strong>
       </div>
       <div>
-        <span>挑战等级</span>
-        <strong>{{ selectedChallengeLevel || '未选择' }}</strong>
+        <span>参与人数</span>
+        <strong>{{ leaderboardTotal }} 人</strong>
       </div>
     </div>
 
@@ -24,112 +31,143 @@
       <div class="rank-board-header">
         <span>排名</span>
         <span>员工</span>
-        <span>等级</span>
-        <span>上传进度</span>
+        <span>部门</span>
+        <span>打卡次数</span>
       </div>
 
       <div class="rank-list">
-        <template v-for="row in displayRows" :key="row.type === 'ellipsis' ? 'ellipsis' : row.employee.id">
-          <div v-if="row.type === 'ellipsis'" class="rank-ellipsis" aria-label="省略部分排名">
-            <span></span>
-            <strong>···</strong>
-            <span>您当前在前 15 名之后，继续加油上榜💪</span>
+        <div v-if="isLoading" class="rank-status">
+          <span class="rank-loading-spinner" aria-hidden="true"></span>
+          <span>正在加载排行榜</span>
+          <div class="rank-loading-bars" aria-hidden="true">
+            <i></i>
+            <i></i>
+            <i></i>
           </div>
+        </div>
 
-          <article
-            v-else
-            class="rank-row"
-            :class="{
-              'is-current': row.employee.id === currentEmployeeId,
-              'is-top-three': row.rank <= 3
-            }"
-            :style="{ '--bar-width': `${row.percent}%` }"
-          >
-            <span class="rank-number">{{ row.rank }}</span>
-            <div class="employee-meta">
-              <strong>{{ row.employee.name }}</strong>
-              <small>{{ row.employee.team }}</small>
+        <div v-else-if="errorMessage" class="rank-status is-error">
+          <span>{{ errorMessage }}</span>
+          <button type="button" @click="$emit('retry')">重试</button>
+        </div>
+
+        <div v-else-if="!displayRows.length" class="rank-status">
+          <span>暂无排行榜数据</span>
+        </div>
+
+        <TransitionGroup v-else name="rank-row-reveal" tag="div" class="rank-reveal-list">
+          <template v-for="(row, index) in displayRows" :key="row.type === 'ellipsis' ? 'ellipsis' : row.employee.id">
+            <div
+              v-if="row.type === 'ellipsis'"
+              class="rank-ellipsis"
+              aria-label="省略部分排名"
+              :style="{ '--row-index': index }"
+            >
+              <span></span>
+              <strong>···</strong>
+              <span>您当前在前 15 名之后</span>
             </div>
-            <span class="challenge-level-pill">{{ row.employee.challengeLevel || '未选择' }}</span>
-            <div class="score-track" aria-hidden="true">
-              <span class="score-bar"></span>
-            </div>
-            <strong class="score-value">{{ row.employee.uploadCount }}次</strong>
-          </article>
-        </template>
+
+            <article
+              v-else
+              class="rank-row"
+              :class="{
+                'is-current': row.employee.isCurrentUser,
+                'is-top-three': row.rank <= 3
+              }"
+              :style="{ '--bar-width': `${row.percent}%`, '--row-index': index }"
+            >
+              <span
+                v-if="row.rank <= 3"
+                class="rank-medal"
+                :class="rankMedalTone(row.rank)"
+                :aria-label="`第 ${row.rank} 名`"
+              >
+                <span class="medal-ribbon" aria-hidden="true"></span>
+                <span class="medal-core" aria-hidden="true"></span>
+              </span>
+              <span v-else class="rank-number">{{ row.rank }}</span>
+              <div class="employee-meta">
+                <strong>{{ row.employee.name }}</strong>
+                <small class="level-label" :class="challengeLevelTone(row.employee)">
+                  {{ challengeLevelText(row.employee) }}
+                </small>
+              </div>
+              <span class="department-pill">{{ row.employee.departmentName }}</span>
+              <div class="score-track" aria-hidden="true">
+                <span class="score-bar"></span>
+              </div>
+              <strong class="score-value">{{ row.employee.checkinCount }}次</strong>
+            </article>
+          </template>
+        </TransitionGroup>
       </div>
     </div>
   </section>
 </template>
 
 <script>
-const employees = [
-  { id: 'james', name: 'james', team: '产品体验', uploadCount: 18, challengeLevel: '黄金' },
-  { id: 'amy', name: 'amy', team: '市场增长', uploadCount: 17, challengeLevel: '黄金' },
-  { id: 'jason', name: 'jason', team: '研发一组', uploadCount: 16, challengeLevel: '白银' },
-  { id: 'sophia', name: 'sophia', team: '运营中心', uploadCount: 15, challengeLevel: '黄金' },
-  { id: 'leo', name: 'leo', team: '研发二组', uploadCount: 14, challengeLevel: '白银' },
-  { id: 'mia', name: 'mia', team: '设计团队', uploadCount: 13, challengeLevel: '黄金' },
-  { id: 'owen', name: 'owen', team: '销售团队', uploadCount: 12, challengeLevel: '白银' },
-  { id: 'nina', name: 'nina', team: '人力行政', uploadCount: 11, challengeLevel: '青铜' },
-  { id: 'ethan', name: 'ethan', team: '数据平台', uploadCount: 10, challengeLevel: '白银' },
-  { id: 'zoe', name: 'zoe', team: '客户成功', uploadCount: 9, challengeLevel: '青铜' },
-  { id: 'chris', name: 'chris', team: '财务团队', uploadCount: 8, challengeLevel: '白银' },
-  { id: 'lily', name: 'lily', team: '研发三组', uploadCount: 7, challengeLevel: '青铜' },
-  { id: 'tony', name: 'tony', team: '业务支持', uploadCount: 6, challengeLevel: '青铜' },
-  { id: 'grace', name: 'grace', team: '品牌团队', uploadCount: 5, challengeLevel: '白银' },
-  { id: 'kevin', name: 'kevin', team: '测试团队', uploadCount: 4, challengeLevel: '青铜' },
-  { id: 'mark', name: 'mark', team: '供应链', uploadCount: 3, challengeLevel: '青铜' },
-  { id: 'iris', name: 'iris', team: '法务合规', uploadCount: 2, challengeLevel: '青铜' },
-  { id: 'me', name: '我', team: '研发一组', uploadCount: 0, challengeLevel: '' }
-]
+const CHALLENGE_LEVEL_META = {
+  1: {
+    label: '青铜',
+    tone: 'bronze'
+  },
+  2: {
+    label: '白银',
+    tone: 'silver'
+  },
+  3: {
+    label: '黄金',
+    tone: 'gold'
+  }
+}
+
+const RANK_MEDAL_TONES = {
+  1: 'gold',
+  2: 'silver',
+  3: 'bronze'
+}
 
 export default {
   name: 'RankPage',
+  emits: ['retry'],
   props: {
-    records: {
+    leaderboardRecords: {
       type: Array,
       default: () => []
     },
-    selectedChallengeLevel: {
+    isLoading: {
+      type: Boolean,
+      default: false
+    },
+    errorMessage: {
       type: String,
       default: ''
     }
   },
-  data() {
-    return {
-      currentEmployeeId: 'me',
-      employees
-    }
-  },
   computed: {
-    seasonUploadCount() {
-      return this.records.length
-    },
-    rankedSourceEmployees() {
-      return this.employees.map(employee => {
-        if (employee.id !== this.currentEmployeeId) {
-          return employee
-        }
-
-        return {
-          ...employee,
-          uploadCount: this.seasonUploadCount,
-          challengeLevel: this.selectedChallengeLevel
-        }
-      })
-    },
     rankedEmployees() {
-      return [...this.rankedSourceEmployees].sort((a, b) => b.uploadCount - a.uploadCount)
+      return [...this.leaderboardRecords].sort((a, b) => b.checkinCount - a.checkinCount)
     },
     maxScore() {
-      return this.rankedEmployees[0]?.uploadCount || 1
+      return this.rankedEmployees[0]?.checkinCount || 1
+    },
+    leaderboardTotal() {
+      return this.rankedEmployees.length
     },
     currentRank() {
-      return this.rankedEmployees.findIndex(employee => employee.id === this.currentEmployeeId) + 1
+      const currentIndex = this.rankedEmployees.findIndex(employee => employee.isCurrentUser)
+
+      return currentIndex >= 0 ? currentIndex + 1 : 0
     },
     currentEmployee() {
-      return this.rankedEmployees.find(employee => employee.id === this.currentEmployeeId) || this.rankedEmployees[0]
+      return this.rankedEmployees.find(employee => employee.isCurrentUser) || null
+    },
+    currentRankText() {
+      return this.currentRank ? `第 ${this.currentRank} 名` : '未上榜'
+    },
+    currentCheckinText() {
+      return this.currentEmployee ? `${this.currentEmployee.checkinCount} 次` : '--'
     },
     topRows() {
       return this.rankedEmployees.slice(0, 15).map((employee, index) => this.toRankRow(employee, index + 1))
@@ -138,7 +176,7 @@ export default {
       return this.currentRank > 0 && this.currentRank <= 15
     },
     displayRows() {
-      if (this.isCurrentInTopList) {
+      if (this.isCurrentInTopList || !this.currentEmployee) {
         return this.topRows
       }
 
@@ -147,16 +185,32 @@ export default {
         { type: 'ellipsis' },
         this.toRankRow(this.currentEmployee, this.currentRank)
       ]
+    },
+    isContentReady() {
+      return !this.isLoading && !this.errorMessage
     }
   },
   methods: {
     toRankRow(employee, rank) {
+      const percent = employee.checkinCount > 0
+        ? Math.max((employee.checkinCount / this.maxScore) * 100, 8).toFixed(2)
+        : '0.00'
+
       return {
         type: 'employee',
         employee,
         rank,
-        percent: Math.max((employee.uploadCount / this.maxScore) * 100, 8).toFixed(2)
+        percent
       }
+    },
+    rankMedalTone(rank) {
+      return RANK_MEDAL_TONES[rank] || ''
+    },
+    challengeLevelText(employee) {
+      return CHALLENGE_LEVEL_META[employee.projectRuleLevelId]?.label || '未选择等级'
+    },
+    challengeLevelTone(employee) {
+      return CHALLENGE_LEVEL_META[employee.projectRuleLevelId]?.tone || 'unknown'
     }
   }
 }
@@ -234,6 +288,19 @@ export default {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  opacity: 0.46;
+  filter: blur(3px);
+  transform: translateY(8px);
+  transition:
+    opacity 0.54s ease,
+    filter 0.54s ease,
+    transform 0.54s cubic-bezier(0.16, 0.9, 0.28, 1);
+}
+
+.my-rank-card.is-loaded {
+  opacity: 1;
+  filter: blur(0);
+  transform: translateY(0);
 }
 
 .my-rank-card.is-outside-top {
@@ -277,13 +344,18 @@ export default {
   padding: 0 4px 10px;
   color: #758078;
   display: grid;
-  grid-template-columns: 34px 72px 42px 1fr;
-  gap: 8px;
+  grid-template-columns: 28px minmax(52px, 0.75fr) 70px minmax(0, 1fr) 34px;
+  gap: 6px;
   font-size: 11px;
   font-weight: 900;
 }
 
 .rank-board-header span:nth-child(3) {
+  text-align: center;
+}
+
+.rank-board-header span:nth-child(4) {
+  grid-column: 4 / 6;
   text-align: center;
 }
 
@@ -307,6 +379,26 @@ export default {
   background: rgba(23, 33, 27, 0.14);
 }
 
+.rank-reveal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rank-row-reveal-enter-active {
+  transition:
+    opacity 0.56s ease,
+    transform 0.56s cubic-bezier(0.16, 0.9, 0.28, 1),
+    filter 0.56s ease;
+  transition-delay: calc(var(--row-index, 0) * 34ms);
+}
+
+.rank-row-reveal-enter-from {
+  opacity: 0;
+  filter: blur(6px);
+  transform: translateY(14px) scale(0.98);
+}
+
 .rank-row {
   flex-shrink: 0;
   min-height: 48px;
@@ -317,9 +409,9 @@ export default {
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 245, 0.72)),
     #fff;
   display: grid;
-  grid-template-columns: 28px 72px 42px minmax(0, 1fr) 34px;
+  grid-template-columns: 28px minmax(52px, 0.75fr) 70px minmax(0, 1fr) 34px;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .rank-row.is-current {
@@ -345,13 +437,52 @@ export default {
   font-weight: 950;
 }
 
-.rank-row.is-top-three .rank-number {
-  background: linear-gradient(135deg, #ffe08a, #f1b82d);
-  color: #5a3b00;
-}
-
 .employee-meta {
   min-width: 0;
+}
+
+.rank-medal {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: end center;
+}
+
+.medal-ribbon {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 16px;
+  height: 14px;
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(135deg, #d85848 0 48%, #f6ead7 48% 55%, #425c85 55% 100%);
+  transform: translateX(-50%);
+  clip-path: polygon(0 0, 100% 0, 86% 100%, 50% 74%, 14% 100%);
+}
+
+.medal-core {
+  position: relative;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgba(23, 33, 27, 0.12);
+  border-radius: 50%;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.68),
+    0 4px 8px rgba(23, 33, 27, 0.12);
+}
+
+.rank-medal.gold .medal-core {
+  background: linear-gradient(135deg, #fff0a9, #f1b82d 58%, #c98b07);
+}
+
+.rank-medal.silver .medal-core {
+  background: linear-gradient(135deg, #f6f8fb, #b9c1ca 58%, #7f8994);
+}
+
+.rank-medal.bronze .medal-core {
+  background: linear-gradient(135deg, #f0be82, #b87333 58%, #83501f);
 }
 
 .employee-meta strong {
@@ -365,18 +496,34 @@ export default {
   white-space: nowrap;
 }
 
-.employee-meta small {
+.level-label {
   display: block;
   overflow: hidden;
   margin-top: 3px;
-  color: #8a958e;
   font-size: 10px;
-  font-weight: 750;
+  font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.challenge-level-pill {
+.level-label.bronze {
+  color: #a96c32;
+}
+
+.level-label.silver {
+  color: #7f8790;
+}
+
+.level-label.gold {
+  color: #b98512;
+}
+
+.level-label.unknown {
+  color: #8a958e;
+}
+
+.department-pill {
+  width: 100%;
   min-width: 0;
   padding: 5px 6px;
   border-radius: 999px;
@@ -390,7 +537,7 @@ export default {
   justify-self: center;
 }
 
-.rank-row.is-current .challenge-level-pill {
+.rank-row.is-current .department-pill {
   background: rgba(114, 216, 79, 0.18);
   color: #2f8f32;
 }
@@ -447,5 +594,101 @@ export default {
   font-size: 20px;
   letter-spacing: 0.14em;
   line-height: 1;
+}
+
+.rank-status {
+  min-height: 160px;
+  padding: 24px;
+  border: 1px dashed rgba(23, 33, 27, 0.12);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(114, 216, 79, 0.14), transparent 34%),
+    rgba(255, 255, 255, 0.5);
+  color: #748179;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.rank-loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(47, 143, 50, 0.14);
+  border-top-color: #2f8f32;
+  border-radius: 50%;
+  box-shadow: 0 0 18px rgba(114, 216, 79, 0.18);
+  animation: rank-loading-spin 820ms linear infinite;
+}
+
+.rank-loading-bars {
+  width: min(220px, 100%);
+  display: grid;
+  gap: 8px;
+}
+
+.rank-loading-bars i {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(23, 33, 27, 0.06);
+  position: relative;
+}
+
+.rank-loading-bars i:nth-child(2) {
+  width: 82%;
+  justify-self: center;
+}
+
+.rank-loading-bars i:nth-child(3) {
+  width: 62%;
+  justify-self: center;
+}
+
+.rank-loading-bars i::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background: linear-gradient(90deg, transparent, rgba(114, 216, 79, 0.38), transparent);
+  transform: translateX(-100%);
+  animation: rank-loading-shimmer 1.2s ease-in-out infinite;
+}
+
+.rank-loading-bars i:nth-child(2)::after {
+  animation-delay: 120ms;
+}
+
+.rank-loading-bars i:nth-child(3)::after {
+  animation-delay: 240ms;
+}
+
+@keyframes rank-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rank-loading-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.rank-status.is-error {
+  color: #b04a3f;
+  background: rgba(255, 111, 97, 0.06);
+}
+
+.rank-status button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #17211b;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
 }
 </style>

@@ -31,6 +31,27 @@ function wait(ms) {
   return new Promise(resolve => window.setTimeout(resolve, ms))
 }
 
+function isSameChallengeLevel(level, selectedChallengeLevel) {
+  return level.level === selectedChallengeLevel ||
+    level.name === selectedChallengeLevel ||
+    level.name === `${selectedChallengeLevel}挑战`
+}
+
+function formatChallengeRequirement(level) {
+  const metricText = (level.metrics || [])
+    .map(metric => {
+      if (metric.label && metric.value) {
+        return `${metric.label}: ${metric.value}`
+      }
+
+      return metric.label || metric.value || ''
+    })
+    .filter(Boolean)
+    .join(' · ')
+
+  return metricText || level.note || level.subtitle || ''
+}
+
 export default {
   name: 'ProjectHomeView',
   components: {
@@ -44,13 +65,22 @@ export default {
       challengeLevelOptions: [],
       isChallengeLevelLoading: false,
       isChallengeLevelLocking: false,
-      challengeLevelError: null
+      challengeLevelError: null,
+      challengeRequirementsByProjectId: {}
     }
   },
   created() {
     this.loadHomeData()
   },
   watch: {
+    selectedChallengeLevel(level) {
+      if (level) {
+        this.loadSelectedChallengeRequirements()
+        return
+      }
+
+      this.challengeRequirementsByProjectId = {}
+    },
     isSportSelectionComplete(isComplete) {
       if (isComplete) {
         this.loadChallengeLevelOptions()
@@ -63,7 +93,10 @@ export default {
   },
   computed: {
     tasks() {
-      return this.projectTasks
+      return this.projectTasks.map(task => ({
+        ...task,
+        challengeRequirement: this.challengeRequirementsByProjectId[String(task.projectId)] || ''
+      }))
     },
     lockedTaskNames() {
       return appState.lockedTaskNames
@@ -116,6 +149,7 @@ export default {
       await this.loadSeasonParticipationStatus()
       await this.loadLockedProjects()
       await this.loadChallengeLevelOptions()
+      await this.loadSelectedChallengeRequirements()
     },
     async loadProjects() {
       try {
@@ -209,6 +243,30 @@ export default {
         this.isChallengeLevelLoading = false
       }
     },
+    async loadSelectedChallengeRequirements() {
+      if (!appState.selectedChallengeLevel || !this.projectTasks.length) {
+        this.challengeRequirementsByProjectId = {}
+        return
+      }
+
+      const requirementPairs = await Promise.all(this.projectTasks.map(async task => {
+        if (!task.projectId) {
+          return [String(task.projectId || task.name), '']
+        }
+
+        try {
+          const levels = await getProjectLevels(task.projectId)
+          const selectedLevel = levels.find(level => isSameChallengeLevel(level, appState.selectedChallengeLevel))
+
+          return [String(task.projectId), selectedLevel ? formatChallengeRequirement(selectedLevel) : '']
+        } catch {
+          // 单个项目规则失败时保留项目原描述，避免影响首页整体可用性。
+          return [String(task.projectId), '']
+        }
+      }))
+
+      this.challengeRequirementsByProjectId = Object.fromEntries(requirementPairs.filter(([, requirement]) => requirement))
+    },
     openTask(task) {
       const query = {
         projectId: task.projectId
@@ -254,6 +312,7 @@ export default {
           projectRuleLevelId,
           level: level.label
         })
+        await this.loadSelectedChallengeRequirements()
         this.challengeLevelError = null
       } catch (error) {
         this.challengeLevelError = error

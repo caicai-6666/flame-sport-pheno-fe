@@ -51,7 +51,7 @@ GET /season/current
 - 后续 `/project/lock_check`
 - 后续 `/project/lock`
 - 后续 `/project/lock_level`
-- 后续 `/project/upload_proof`
+- 后续 `/proof/upload`
 
 展示格式：
 

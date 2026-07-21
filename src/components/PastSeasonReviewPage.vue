@@ -1,18 +1,23 @@
 <template>
-  <section class="past-season-page" aria-label="过往赛季审核记录">
+  <section class="past-season-page" aria-label="过往赛季上传记录">
     <div class="past-season-hero">
       <span class="past-season-eyebrow">PAST SEASONS</span>
-      <h1>过往赛季审核记录</h1>
-      <p>查看已归档赛季的凭证审核结果，本赛季记录仍在月末统一审核。</p>
+      <h1>过往赛季上传记录</h1>
+      <p>{{ heroDescription }}</p>
     </div>
 
-    <section class="review-section" aria-label="审核记录列表">
+    <section class="review-section" aria-label="上传记录列表">
       <div class="review-section-heading">
         <div>
-          <span>审核记录</span>
+          <span>上传记录</span>
           <strong>{{ sortedRecords.length ? `${sortedRecords.length} 条已归档` : '暂无归档记录' }}</strong>
         </div>
-        <button class="current-season-link" type="button" @click="openCurrentSeasonHistory">
+        <button
+          v-if="showCurrentSeasonLink"
+          class="current-season-link"
+          type="button"
+          @click="openCurrentSeasonHistory"
+        >
           返回本赛季
         </button>
       </div>
@@ -36,19 +41,19 @@
 
           <dl class="review-meta">
             <div>
-              <dt>凭证</dt>
+              <dt>上传文件</dt>
               <dd>{{ record.fileName }}</dd>
             </div>
             <div>
-              <dt>审核时间</dt>
-              <dd>{{ formatDateTime(record.reviewedAt) }}</dd>
+              <dt>上传时间</dt>
+              <dd>{{ formatDateTime(record.uploadedAt) }}</dd>
             </div>
           </dl>
         </article>
       </div>
 
       <div v-else class="empty-review">
-        <span>暂无过往赛季记录</span>
+        <span>暂无过往赛季上传</span>
         <p>完成月末统一审核后，已归档的赛季记录会展示在这里。</p>
       </div>
     </section>
@@ -62,11 +67,19 @@ export default {
     records: {
       type: Array,
       default: () => []
+    },
+    heroDescription: {
+      type: String,
+      default: '查看已归档赛季的上传记录与审核结果。'
+    },
+    showCurrentSeasonLink: {
+      type: Boolean,
+      default: true
     }
   },
   computed: {
     sortedRecords() {
-      return [...this.records].sort((a, b) => new Date(b.reviewedAt) - new Date(a.reviewedAt))
+      return [...this.records].sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
     }
   },
   methods: {
@@ -74,13 +87,19 @@ export default {
       const resultMap = {
         approved: '已通过',
         rejected: '未通过',
-        pending: '审核中'
+        pending: '审核中',
+        reviewed: '已审核'
       }
 
       return resultMap[result] || '已审核'
     },
     formatDateTime(value) {
       const date = new Date(value)
+
+      if (Number.isNaN(date.getTime())) {
+        return '--'
+      }
+
       const month = String(date.getMonth() + 1).padStart(2, '0')
       const day = String(date.getDate()).padStart(2, '0')
       const hour = String(date.getHours()).padStart(2, '0')
@@ -275,6 +294,11 @@ export default {
 .review-card-top em.is-pending {
   background: rgba(255, 159, 69, 0.16);
   color: #d67624;
+}
+
+.review-card-top em.is-reviewed {
+  background: rgba(23, 33, 27, 0.08);
+  color: #5f6b64;
 }
 
 .review-card p {

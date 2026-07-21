@@ -37,7 +37,8 @@ const routes = [
     component: RankView,
     meta: {
       navKey: 'rank',
-      title: '排行'
+      title: '排行',
+      keepAlive: true
     }
   },
   {
@@ -46,7 +47,8 @@ const routes = [
     component: HistoryView,
     meta: {
       navKey: 'history',
-      title: '历史'
+      title: '历史',
+      keepAlive: true
     }
   },
   {
@@ -55,7 +57,8 @@ const routes = [
     component: PastSeasonReviewView,
     meta: {
       navKey: 'history',
-      title: '过往审核'
+      title: '过往审核',
+      keepAlive: true
     }
   },
   {
@@ -64,7 +67,8 @@ const routes = [
     component: ShopView,
     meta: {
       navKey: 'shop',
-      title: '商城'
+      title: '商城',
+      keepAlive: true
     }
   },
   {

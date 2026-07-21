@@ -40,6 +40,8 @@ const CHALLENGE_META_MAP = {
 
 const projectLevelCache = new Map()
 const projectLevelRequestCache = new Map()
+const uploadConfigCache = new Map()
+const uploadConfigRequestCache = new Map()
 
 function toImageSource(project) {
   const image = project.image || project.image_data || project.icon || ''
@@ -250,14 +252,43 @@ export async function getProjectLevels(projectId) {
  * 如果后端只返回一个配置，前端会直接使用该配置，不再展示记录类型选项。
  */
 export async function getProjectUploadConfig(projectId) {
-  const response = await request.get('/project/upload_config', {
+  const cacheKey = String(projectId || '')
+
+  if (cacheKey && uploadConfigCache.has(cacheKey)) {
+    return uploadConfigCache.get(cacheKey)
+  }
+
+  if (cacheKey && uploadConfigRequestCache.has(cacheKey)) {
+    return uploadConfigRequestCache.get(cacheKey)
+  }
+
+  const uploadConfigRequest = request.get('/proof/config', {
     params: {
       project_id: projectId
     }
-  })
-  const uploadConfigs = Array.isArray(response) ? response : response.uploadConfigs
+  }).then(response => {
+    const uploadConfigs = Array.isArray(response) ? response : response.uploadConfigs
+    const normalizedUploadConfigs = (uploadConfigs || []).map(normalizeUploadConfig)
 
-  return (uploadConfigs || []).map(normalizeUploadConfig)
+    if (cacheKey) {
+      uploadConfigCache.set(cacheKey, normalizedUploadConfigs)
+      uploadConfigRequestCache.delete(cacheKey)
+    }
+
+    return normalizedUploadConfigs
+  }).catch(error => {
+    if (cacheKey) {
+      uploadConfigRequestCache.delete(cacheKey)
+    }
+
+    throw error
+  })
+
+  if (cacheKey) {
+    uploadConfigRequestCache.set(cacheKey, uploadConfigRequest)
+  }
+
+  return uploadConfigRequest
 }
 
 /**
@@ -275,7 +306,7 @@ export async function uploadProjectProof({ seasonId, projectId, projectUploadCon
   formData.append('note', note || '')
   formData.append('image', imageFile, imageFile.name)
 
-  const response = await request.post('/project/upload_proof', formData)
+  const response = await request.post('/proof/upload', formData)
 
   return normalizeProofUploadResult(response)
 }

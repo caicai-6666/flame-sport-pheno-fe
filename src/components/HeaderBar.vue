@@ -15,8 +15,8 @@
 
     <div class="header-meta">
       <button class="avatar-button" type="button" aria-label="头像">
-        <img v-if="avatarUrl" :src="avatarUrl" alt="用户头像">
-        <span v-else>CA</span>
+        <img v-if="avatarUrl" :src="avatarUrl" :alt="avatarAlt">
+        <span v-else>{{ avatarInitials }}</span>
       </button>
     </div>
   </header>
@@ -47,6 +47,21 @@ export default {
   computed: {
     authCode() {
       return authState.authCode
+    },
+    currentUser() {
+      return authState.currentUser
+    },
+    avatarAlt() {
+      return this.currentUser?.name ? `${this.currentUser.name}头像` : '用户头像'
+    },
+    avatarInitials() {
+      const name = this.currentUser?.name?.trim()
+
+      if (!name) {
+        return 'PH'
+      }
+
+      return name.slice(0, 2).toUpperCase()
     }
   },
   watch: {
@@ -91,8 +106,8 @@ export default {
   top: 0;
   left: 50%;
   width: min(100vw, 430px);
-  min-height: 92px;
-  padding: 24px 20px 22px;
+  min-height: 76px;
+  padding: 16px 18px 16px;
   background:
     linear-gradient(
       180deg,
@@ -119,8 +134,8 @@ export default {
 }
 
 .back-button {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border: 0;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.82);
@@ -132,7 +147,7 @@ export default {
 }
 
 .brand-logo {
-  width: 45px;
+  width: 38px;
   height: auto;
   display: block;
   filter: drop-shadow(0 8px 14px rgba(45, 61, 49, 0.1));
@@ -161,8 +176,8 @@ export default {
 .avatar-button {
   position: relative;
   overflow: hidden;
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 50%;
   background:

@@ -1,22 +1,58 @@
 import request from './request'
 import { LOGIN_PATH } from './authConfig'
+import { buildLoginPayload, DEFAULT_AUTH_CODE } from './loginCredential'
 
-// 当前没有登录页，先从环境变量读取鉴权码；本地开发时使用默认配置值。
-const DEFAULT_AUTH_CODE = process.env.VUE_APP_AUTH_CODE
+function normalizeCurrentUser(user) {
+  if (!user) {
+    return null
+  }
+
+  return {
+    id: String(user.id || user.user_id || user.userId || ''),
+    name: user.name || user.user_name || user.userName || '',
+    departmentId: String(user.department_id || user.departmentId || ''),
+    departmentName: user.department_name || user.departmentName || '',
+    avatarUrl: user.avatar_url || user.avatarUrl || ''
+  }
+}
+
+function normalizeLoginResult(response) {
+  return {
+    authCode: response?.auth_code || response?.authCode || response?.token || response?.access_token || '',
+    authSource: response?.auth_source || response?.authSource || '',
+    user: normalizeCurrentUser(response?.user || response?.current_user || response?.currentUser)
+  }
+}
 
 /**
  * 登录接口。
  *
- * 当前登录逻辑较简单：前端向后端提交 auth_code，
- * 后端校验成功后写入缓存，并原样返回 auth_code。
- * 后续业务请求会继续使用该 auth_code 访问后端接口。
+ * 钉钉环境会先获取 H5 免登码，再交给后端换取当前系统会话 auth_code。
+ * 非钉钉环境继续使用 VUE_APP_AUTH_CODE 作为本地开发 fallback。
  */
-export async function login(authCode = DEFAULT_AUTH_CODE) {
-  const response = await request.post(LOGIN_PATH, {
-    auth_code: authCode
-  })
+export async function login() {
+  const response = await request.post(LOGIN_PATH, await buildLoginPayload())
 
-  return response.auth_code
+  const loginResult = normalizeLoginResult(response)
+
+  if (!loginResult.authCode) {
+    throw new Error('登录接口未返回 auth_code')
+  }
+
+  return loginResult
+}
+
+export async function checkProfileComplete() {
+  const response = await request.get('/auth/profile_complete_check')
+  const missingFields = Array.isArray(response?.missing_fields)
+    ? response.missing_fields
+    : []
+
+  return {
+    isComplete: Boolean(response?.is_complete ?? response?.isComplete),
+    heightCmCompleted: Boolean(response?.height_cm_completed ?? response?.heightCmCompleted),
+    missingFields
+  }
 }
 
 export { DEFAULT_AUTH_CODE }
