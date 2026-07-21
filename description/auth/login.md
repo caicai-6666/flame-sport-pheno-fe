@@ -23,7 +23,7 @@ src/api/request.js
 ## 环境配置
 
 ```env
-VUE_APP_API_BASE_URL=http://127.0.0.1:8000
+VUE_APP_API_BASE_URL=http://127.0.0.1:8000/api
 VUE_APP_LOGIN_PROVIDER=auto
 VUE_APP_DINGTALK_CORP_ID=<钉钉企业 CorpId>
 VUE_APP_DINGTALK_CLIENT_ID=<钉钉 H5 应用 ClientId>

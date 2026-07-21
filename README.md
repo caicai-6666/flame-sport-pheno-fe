@@ -74,7 +74,7 @@ npm run build
 npm run lint
 ```
 
-开发环境通过 `.env.development` 配置 API 代理、登录模式及钉钉 H5 参数。启动后根据终端输出访问本地地址，默认通常为 `http://localhost:8080`。
+开发环境通过 `.env.development` 配置带 `/api` 前缀的后端基础地址、登录模式及钉钉 H5 参数。浏览器直接请求后端，因此后端需要允许本地开发地址的跨域请求。启动后根据终端输出访问本地地址，默认通常为 `http://localhost:8080`。
 
 ## 浏览器支持
 
