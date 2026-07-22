@@ -6,6 +6,14 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <link rel="icon" href="<%= BASE_URL %>favicon.ico">
     <title><%= htmlWebpackPlugin.options.title %></title>
+    <!-- 必须早于 app.js 加载，避免钉钉 Native bridge 的 runtimeready 事件先于 SDK 注册。 -->
+    <script id="dingtalk-jsapi" src="https://g.alicdn.com/dingding/open-develop/1.9.0/dingtalk.js"></script>
+    <script>
+      // 提前注册 bridge 回调，旧版 Android SDK 只会通过 runtimeready 事件完成初始化。
+      if (window.dd && typeof window.dd.ready === 'function') {
+        window.dd.ready(function () {})
+      }
+    </script>
   </head>
   <body>
     <noscript>

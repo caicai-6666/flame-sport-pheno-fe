@@ -4,6 +4,9 @@
       <span class="shop-eyebrow">POINTS STORE</span>
       <h1>积分商城</h1>
       <p>使用赛季积分兑换运动周边和健康补给，为目标助力！</p>
+      <p class="redeem-window-hint" :class="{ 'is-unavailable': !isRedeemAvailable }">
+        {{ redeemWindowMessage }}
+      </p>
 
       <div class="shop-wallet">
         <div>
@@ -254,6 +257,14 @@ export default {
     consumeProduct: {
       type: Function,
       default: null
+    },
+    isRedeemAvailable: {
+      type: Boolean,
+      default: false
+    },
+    redeemWindowMessage: {
+      type: String,
+      default: '正在确认兑换时间'
     }
   },
   data() {
@@ -292,6 +303,11 @@ export default {
 
       this.availablePoints = nextPoints
       this.animatePoints(previousPoints, nextPoints)
+    },
+    isRedeemAvailable(isAvailable) {
+      if (!isAvailable) {
+        this.clearPendingRedeem()
+      }
     }
   },
   methods: {
@@ -304,10 +320,6 @@ export default {
     redeemButtonText(item, points) {
       const key = this.rewardKey(item, points)
 
-      if (this.availablePoints < points) {
-        return '积分不足'
-      }
-
       if (this.redeemingKey === key) {
         return '兑换中'
       }
@@ -316,10 +328,18 @@ export default {
         return '兑换失败'
       }
 
+      if (!this.isRedeemAvailable) {
+        return '暂未开放'
+      }
+
+      if (this.availablePoints < points) {
+        return '积分不足'
+      }
+
       return this.pendingRedeemKey === key ? '确认兑换' : '兑换'
     },
     isRedeemButtonDisabled(points) {
-      return this.availablePoints < points || Boolean(this.redeemingKey)
+      return !this.isRedeemAvailable || this.availablePoints < points || Boolean(this.redeemingKey)
     },
     handleRedeemClick(item, points) {
       if (this.isRedeemButtonDisabled(points)) {
@@ -345,6 +365,14 @@ export default {
 
       this.redeemReward(item, points)
     },
+    clearPendingRedeem() {
+      this.pendingRedeemKey = ''
+
+      if (this.pendingRedeemTimer) {
+        window.clearTimeout(this.pendingRedeemTimer)
+        this.pendingRedeemTimer = null
+      }
+    },
     async redeemReward(item, points) {
       if (this.isRedeemButtonDisabled(points) || typeof this.consumeProduct !== 'function') {
         return
@@ -352,12 +380,7 @@ export default {
 
       const key = this.rewardKey(item, points)
       this.redeemingKey = key
-      this.pendingRedeemKey = ''
-
-      if (this.pendingRedeemTimer) {
-        window.clearTimeout(this.pendingRedeemTimer)
-        this.pendingRedeemTimer = null
-      }
+      this.clearPendingRedeem()
 
       const redeemStartedAt = Date.now()
 
@@ -562,6 +585,24 @@ export default {
   font-size: 12px;
   line-height: 1.55;
   white-space: nowrap;
+}
+
+.shop-hero .redeem-window-hint {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(47, 143, 50, 0.1);
+  color: #2f8f32;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.shop-hero .redeem-window-hint.is-unavailable {
+  background: rgba(224, 90, 56, 0.1);
+  color: #b04a3f;
 }
 
 .shop-wallet {

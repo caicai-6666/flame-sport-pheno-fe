@@ -102,6 +102,7 @@
             maxlength="80"
             :placeholder="proofNotePlaceholder"
           ></textarea>
+          <small class="proof-note-hint">请尽量写明时长、距离、次数、步数等具体指标；描述越具体、越便于核验，越有助于通过初审。</small>
         </label>
 
         <button
@@ -1009,6 +1010,13 @@ export default {
 .proof-note textarea:focus {
   border-color: color-mix(in srgb, var(--accent), #fff 18%);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent), transparent 82%);
+}
+
+.proof-note-hint {
+  color: #78847d;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.55;
 }
 
 .upload-form.has-upload-config-fields .proof-note textarea {

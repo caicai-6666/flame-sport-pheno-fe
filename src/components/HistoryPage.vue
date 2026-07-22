@@ -17,13 +17,13 @@
           <span>赛季进度</span>
           <strong>{{ displayChallengeLevel }}</strong>
         </div>
-        <em>目前进度为初审结果计算</em>
+        <em>仅按初审通过记录计算</em>
       </div>
 
       <div v-if="progressRows.length" class="goal-progress-list">
         <article
           v-for="row in progressRows"
-          :key="row.taskName"
+          :key="row.projectId"
           class="goal-progress-row"
           :style="{ '--progress': `${row.percent}%`, '--accent': row.accent }"
         >
@@ -37,7 +37,7 @@
         </article>
       </div>
 
-      <p v-else class="goal-progress-empty">选择 3 项运动并预订挑战等级后，这里会展示三项运动的进度。</p>
+      <p v-else class="goal-progress-empty">{{ progressEmptyText }}</p>
     </section>
 
     <section class="record-board" :class="{ 'is-showing-past': isShowingPastRecords }" aria-label="上传记录看板">
@@ -81,6 +81,10 @@
                 </div>
 
                 <p v-if="record.note">{{ record.note }}</p>
+                <p v-if="record.reviewComment" class="review-comment">
+                  <span>审核意见</span>
+                  {{ record.reviewComment }}
+                </p>
 
                 <div class="record-footer">
                   <span class="proof-file">{{ record.fileName }}</span>
@@ -157,19 +161,7 @@
 
 <script>
 import PastSeasonReviewPage from './PastSeasonReviewPage.vue'
-
-const mockProgressByTaskName = {
-  日常步数: 68,
-  '跑步/快走': 42,
-  健身打卡: 76,
-  公司运动: 55,
-  户外登山: 28,
-  减重挑战: 50
-}
-
-const mockProgressFallbacks = [68, 42, 76]
-
-const mockAccentFallbacks = ['#72d84f', '#20c7b5', '#ff9f45']
+import { getReviewStatusText } from '../utils/proofReview'
 
 export default {
   name: 'HistoryPage',
@@ -178,7 +170,10 @@ export default {
   },
   data() {
     return {
-      isShowingPastRecords: false
+      isShowingPastRecords: false,
+      displayedProgressByProjectId: {},
+      hasPlayedProgressAnimation: false,
+      progressAnimationFrame: null
     }
   },
   props: {
@@ -190,9 +185,21 @@ export default {
       type: Array,
       default: () => []
     },
-    lockedTaskNames: {
+    projectProgressRecords: {
       type: Array,
       default: () => []
+    },
+    projectTasks: {
+      type: Array,
+      default: () => []
+    },
+    isProjectProgressLoading: {
+      type: Boolean,
+      default: false
+    },
+    projectProgressError: {
+      type: String,
+      default: ''
     },
     selectedChallengeLevel: {
       type: String,
@@ -201,6 +208,11 @@ export default {
     seasonParticipationStatus: {
       type: String,
       default: 'unknown'
+    }
+  },
+  watch: {
+    projectProgressRecords() {
+      this.animateProjectProgress()
     }
   },
   computed: {
@@ -222,19 +234,25 @@ export default {
     displayChallengeLevel() {
       return this.selectedChallengeLevel || '白银挑战'
     },
-    progressRows() {
-      const taskNames = this.lockedTaskNames.length
-        ? this.lockedTaskNames
-        : ['日常步数', '公司运动', '减重挑战']
+    progressEmptyText() {
+      if (this.isProjectProgressLoading) {
+        return '正在加载本赛季项目进度…'
+      }
 
-      return taskNames.map((taskName, index) => {
-        const taskRecord = this.records.find(record => record.taskName === taskName)
-        const percent = mockProgressByTaskName[taskName] ?? mockProgressFallbacks[index % mockProgressFallbacks.length]
+      return this.projectProgressError || '暂无本赛季项目进度'
+    },
+    progressRows() {
+      return this.projectProgressRecords.map(progressRecord => {
+        const task = this.projectTasks.find(item => String(item.projectId) === String(progressRecord.projectId))
+        const taskRecord = this.records.find(record => String(record.projectId) === String(progressRecord.projectId))
+        const projectId = String(progressRecord.projectId)
+        const displayedPercent = this.displayedProgressByProjectId[projectId]
 
         return {
-          taskName,
-          percent,
-          accent: taskRecord?.accent || mockAccentFallbacks[index % mockAccentFallbacks.length]
+          projectId,
+          taskName: task?.name || `项目 ${progressRecord.projectId}`,
+          percent: Number.isFinite(displayedPercent) ? displayedPercent : 0,
+          accent: task?.accent || taskRecord?.accent || '#72d84f'
         }
       })
     }
@@ -278,29 +296,72 @@ export default {
       return record.reviewStatus || 'pending'
     },
     reviewStatusText(record) {
-      const statusTextMap = {
-        pending: '审核中',
-        approved: '已通过',
-        rejected: '未通过'
-      }
-
-      return statusTextMap[this.reviewStatus(record)] || '审核中'
+      return getReviewStatusText(this.reviewStatus(record))
     },
     resultText(result) {
-      const resultMap = {
-        approved: '已通过',
-        rejected: '未通过',
-        pending: '审核中',
-        reviewed: '已审核'
+      return getReviewStatusText(result)
+    },
+    animateProjectProgress() {
+      if (this.progressAnimationFrame) {
+        window.cancelAnimationFrame(this.progressAnimationFrame)
+        this.progressAnimationFrame = null
       }
 
-      return resultMap[result] || '已审核'
+      const targetProgressByProjectId = this.projectProgressRecords.reduce((targets, record) => {
+        targets[String(record.projectId)] = Math.round(record.completionProgress * 100)
+        return targets
+      }, {})
+      const projectIds = Object.keys(targetProgressByProjectId)
+
+      if (!projectIds.length) {
+        this.displayedProgressByProjectId = {}
+        return
+      }
+
+      const shouldReduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+      if (this.hasPlayedProgressAnimation || shouldReduceMotion) {
+        this.displayedProgressByProjectId = targetProgressByProjectId
+        return
+      }
+
+      // 仅在历史页首次得到真实进度时播放，KeepAlive 切回页面不会重复从 0 开始。
+      this.hasPlayedProgressAnimation = true
+      this.displayedProgressByProjectId = Object.fromEntries(projectIds.map(projectId => [projectId, 0]))
+
+      const duration = 780
+      const startedAt = performance.now()
+      const easeOut = progress => 1 - Math.pow(1 - progress, 3)
+      const step = now => {
+        const progress = Math.min((now - startedAt) / duration, 1)
+        const easedProgress = easeOut(progress)
+
+        this.displayedProgressByProjectId = Object.fromEntries(projectIds.map(projectId => [
+          projectId,
+          Math.round(targetProgressByProjectId[projectId] * easedProgress)
+        ]))
+
+        if (progress < 1) {
+          this.progressAnimationFrame = window.requestAnimationFrame(step)
+          return
+        }
+
+        this.displayedProgressByProjectId = targetProgressByProjectId
+        this.progressAnimationFrame = null
+      }
+
+      this.progressAnimationFrame = window.requestAnimationFrame(step)
     },
     showPastSeasonRecords() {
       this.isShowingPastRecords = true
     },
     showCurrentSeasonRecords() {
       this.isShowingPastRecords = false
+    }
+  },
+  beforeUnmount() {
+    if (this.progressAnimationFrame) {
+      window.cancelAnimationFrame(this.progressAnimationFrame)
     }
   }
 }
@@ -450,7 +511,6 @@ export default {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, color-mix(in srgb, var(--accent), #fff 30%), color-mix(in srgb, var(--accent), #20c7b5 18%));
-  transition: width 0.28s ease;
 }
 
 .goal-progress-empty {
@@ -672,6 +732,20 @@ export default {
   line-height: 1.5;
 }
 
+.record-body .review-comment {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(47, 143, 50, 0.07);
+  color: #496050;
+}
+
+.review-comment span {
+  margin-right: 6px;
+  color: #2f8f32;
+  font-size: 11px;
+  font-weight: 950;
+}
+
 .record-footer {
   margin-top: 12px;
   display: flex;
@@ -692,15 +766,31 @@ export default {
 
 .proof-status {
   flex-shrink: 0;
-  padding: 5px 8px;
+  box-sizing: border-box;
+  width: 68px;
+  height: 26px;
   border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
   font-weight: 950;
+  line-height: 1;
 }
 
 .proof-status.is-pending {
   background: rgba(255, 159, 69, 0.16);
   color: #d67624;
+}
+
+.proof-status.is-preliminary_approved {
+  background: rgba(79, 156, 255, 0.15);
+  color: #3375c4;
+}
+
+.proof-status.is-preliminary_rejected {
+  background: rgba(255, 111, 145, 0.14);
+  color: #c94668;
 }
 
 .proof-status.is-approved {
@@ -749,11 +839,17 @@ export default {
 
 .past-record-top em {
   flex-shrink: 0;
-  padding: 5px 8px;
+  box-sizing: border-box;
+  width: 68px;
+  height: 26px;
   border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
   font-style: normal;
   font-weight: 950;
+  line-height: 1;
 }
 
 .past-record-top em.is-approved {
@@ -769,6 +865,16 @@ export default {
 .past-record-top em.is-pending {
   background: rgba(255, 159, 69, 0.16);
   color: #d67624;
+}
+
+.past-record-top em.is-preliminary_approved {
+  background: rgba(79, 156, 255, 0.15);
+  color: #3375c4;
+}
+
+.past-record-top em.is-preliminary_rejected {
+  background: rgba(255, 111, 145, 0.16);
+  color: #c93c62;
 }
 
 .past-record-top em.is-reviewed {
@@ -839,5 +945,11 @@ export default {
   margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.65;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goal-progress-track span {
+    transition: none;
+  }
 }
 </style>

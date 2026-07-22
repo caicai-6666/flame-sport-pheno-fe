@@ -2,7 +2,10 @@
   <HistoryPage
     :records="records"
     :past-season-review-records="pastSeasonReviewRecords"
-    :locked-task-names="lockedTaskNames"
+    :project-progress-records="projectProgressRecords"
+    :project-tasks="projectTasks"
+    :is-project-progress-loading="isProjectProgressLoading"
+    :project-progress-error="projectProgressError"
     :selected-challenge-level="selectedChallengeLevel"
     :season-participation-status="seasonParticipationStatus"
   />
@@ -10,14 +13,22 @@
 
 <script>
 import { getCurrentSeasonUploadRecords, getPastSeasonProofHistory } from '../api/history'
+import { getProjectProgress, getProjects } from '../api/projects'
 import { getCurrentSeason, getSeasonParticipationStatus } from '../api/season'
 import HistoryPage from '../components/HistoryPage.vue'
-import { appState, setCurrentSeason, setPastSeasonReviewRecords, setSeasonParticipationStatus, setUploadRecords } from '../state/appState'
+import { appState, setCurrentSeason, setPastSeasonReviewRecords, setProjectTasks, setSeasonParticipationStatus, setUploadRecords } from '../state/appState'
 
 export default {
   name: 'HistoryView',
   components: {
     HistoryPage
+  },
+  data() {
+    return {
+      projectProgressRecords: [],
+      isProjectProgressLoading: false,
+      projectProgressError: ''
+    }
   },
   created() {
     this.loadHistoryData()
@@ -29,8 +40,8 @@ export default {
     pastSeasonReviewRecords() {
       return appState.pastSeasonReviewRecords
     },
-    lockedTaskNames() {
-      return appState.lockedTaskNames
+    projectTasks() {
+      return appState.projectTasks
     },
     selectedChallengeLevel() {
       return appState.selectedChallengeLevel
@@ -60,6 +71,41 @@ export default {
 
       return participation.status
     },
+    async ensureProjectTasks() {
+      if (appState.projectTasks.length) {
+        return appState.projectTasks
+      }
+
+      const projectTasks = await getProjects()
+      setProjectTasks(projectTasks)
+
+      return projectTasks
+    },
+    async loadCurrentSeasonData(seasonId) {
+      this.isProjectProgressLoading = true
+      this.projectProgressError = ''
+
+      const [, uploadRecordsResult, projectProgressResult] = await Promise.allSettled([
+        this.ensureProjectTasks(),
+        getCurrentSeasonUploadRecords(),
+        getProjectProgress(seasonId)
+      ])
+
+      if (uploadRecordsResult.status === 'fulfilled') {
+        setUploadRecords(uploadRecordsResult.value)
+      } else {
+        setUploadRecords([])
+      }
+
+      if (projectProgressResult.status === 'fulfilled') {
+        this.projectProgressRecords = projectProgressResult.value
+      } else {
+        this.projectProgressRecords = []
+        this.projectProgressError = '项目进度加载失败，请稍后重试'
+      }
+
+      this.isProjectProgressLoading = false
+    },
     async loadHistoryData() {
       try {
         await this.loadPastSeasonProofHistory()
@@ -68,13 +114,18 @@ export default {
 
         if (participationStatus !== 'participated') {
           setUploadRecords([])
+          this.projectProgressRecords = []
+          this.projectProgressError = ''
+          this.isProjectProgressLoading = false
           return
         }
 
-        const uploadRecords = await getCurrentSeasonUploadRecords()
-        setUploadRecords(uploadRecords)
+        await this.loadCurrentSeasonData(season.seasonId)
       } catch {
         setUploadRecords([])
+        this.projectProgressRecords = []
+        this.projectProgressError = '项目进度加载失败，请稍后重试'
+        this.isProjectProgressLoading = false
       }
     },
     async loadPastSeasonProofHistory() {

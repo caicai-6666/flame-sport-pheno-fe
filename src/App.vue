@@ -1,50 +1,59 @@
 <template>
   <div class="app-shell">
-    <HeaderBar
-      :active-title="activeTitle"
-      :is-detail="isProjectDetail"
-      @back="goBack"
-    />
+    <!-- 登录完成前不创建路由页面，避免无会话时并发发起业务接口。 -->
+    <template v-if="canRenderApplication">
+      <HeaderBar
+        :active-title="activeTitle"
+        :is-detail="isProjectDetail"
+        @back="goBack"
+      />
 
-    <main class="page-content">
-      <router-view v-slot="{ Component, route }">
-        <KeepAlive>
+      <main class="page-content">
+        <router-view v-slot="{ Component, route }">
+          <KeepAlive>
+            <component
+              :is="Component"
+              v-if="route.meta.keepAlive"
+              :key="route.fullPath"
+            />
+          </KeepAlive>
           <component
             :is="Component"
-            v-if="route.meta.keepAlive"
-            :key="route.fullPath"
+            v-if="!route.meta.keepAlive"
           />
-        </KeepAlive>
-        <component
-          :is="Component"
-          v-if="!route.meta.keepAlive"
-        />
-      </router-view>
-    </main>
+        </router-view>
+      </main>
 
-    <BottomNav
-      :items="navItems"
-      :active-key="activeNav"
-      @change="changeNav"
-    />
+      <BottomNav
+        :items="navItems"
+        :active-key="activeNav"
+        @change="changeNav"
+      />
 
-    <UserHealthProfilePanel
-      v-if="shouldCollectHealthProfile"
-      :missing-fields="healthProfileMissingFields"
-      :is-saving="isHealthProfileSaving"
-      :save-error="healthProfileSaveError"
-      @submit="handleHealthProfileSubmit"
-    />
+      <UserHealthProfilePanel
+        v-if="shouldCollectHealthProfile"
+        :missing-fields="healthProfileMissingFields"
+        :is-saving="isHealthProfileSaving"
+        :save-error="healthProfileSaveError"
+        @submit="handleHealthProfileSubmit"
+      />
+    </template>
 
-    <div v-if="loginError" class="auth-status-panel" role="alert">
+    <section
+      v-else
+      class="auth-status-panel"
+      :class="{ 'is-loading': isLoggingIn }"
+      :role="loginError ? 'alert' : 'status'"
+      :aria-busy="isLoggingIn"
+    >
       <div>
-        <strong>登录失败</strong>
-        <span>{{ loginErrorMessage }}</span>
+        <strong>{{ loginPanelTitle }}</strong>
+        <span>{{ loginPanelMessage }}</span>
       </div>
-      <button type="button" :disabled="isLoggingIn" @click="retryLogin">
-        {{ isLoggingIn ? '登录中' : '重试' }}
+      <button v-if="loginError" type="button" :disabled="isLoggingIn" @click="retryLogin">
+        {{ isLoggingIn ? '登录中' : '重新尝试' }}
       </button>
-    </div>
+    </section>
 
     <span
       v-for="burst in healthProfileConfettiBursts"
@@ -131,6 +140,32 @@ export default {
     },
     isLoggingIn() {
       return authState.isLoggingIn
+    },
+    isLoginReady() {
+      return authState.isLoginReady
+    },
+    canRenderApplication() {
+      return this.isLoginReady && !this.loginError
+    },
+    loginPanelTitle() {
+      if (this.loginError) {
+        return '登录未完成'
+      }
+
+      return authState.loginStep === 'requesting_login' ? '正在建立登录会话' : '正在连接钉钉'
+    },
+    loginPanelMessage() {
+      if (this.loginError) {
+        if (authState.loginStep === 'failed_getting_credential') {
+          return `登录失败：${this.loginErrorMessage}。登录凭证尚未获取成功，因此不会发起 /auth/login 请求。`
+        }
+
+        return `登录失败：${this.loginErrorMessage}`
+      }
+
+      return authState.loginStep === 'requesting_login'
+        ? '正在向服务端验证当前身份…'
+        : '正在获取钉钉免登授权码…'
     }
   },
   watch: {

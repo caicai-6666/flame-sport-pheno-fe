@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.idea
+.env*
+npm-debug.log*
+yarn-error.log*
+
+# 以下内容不参与 Vue 构建，避免增加镜像构建上下文体积。
+concept
+description
+AGENTS.md
+README.md
+.gitignore
+jsconfig.json

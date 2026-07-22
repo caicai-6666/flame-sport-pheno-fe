@@ -2,17 +2,19 @@
 
 ## 基础地址
 
-前端通过环境变量配置后端地址：
+前端通过环境变量配置后端地址；生产环境默认使用与页面同域的 `/flame/api`：
 
 ```env
-VUE_APP_API_BASE_URL=http://127.0.0.1:8000/api
+VUE_APP_API_BASE_URL=/flame/api
 ```
 
 如果没有配置，前端默认使用：
 
 ```text
-http://127.0.0.1:8000/api
+/flame/api
 ```
+
+例如项目接口路径为 `/project/list` 时，实际请求路径为 `/flame/api/project/list`。本地联调可在 `.env.development` 中覆盖为实际后端地址，但应保留 `/flame/api` 路径前缀。
 
 ## 鉴权请求头
 

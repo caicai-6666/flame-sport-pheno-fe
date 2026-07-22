@@ -35,7 +35,7 @@ Flame Winter Pheno 是一个面向企业员工健康挑战的移动端 Web 应�
 - 当前赛季排行榜。
 - 商城商品、商品图片、积分流水和商品兑换。
 
-目前明确保留的模拟数据是 `HistoryPage` 中的赛季项目进度百分比。`src/state/appState.js` 仍包含部分原型初始记录，但历史页面加载后会使用真实接口结果覆盖或清空这些数据，不能将它们视为正式业务数据源。
+`src/state/appState.js` 仍包含部分原型初始记录，但历史页面加载后会使用真实接口结果覆盖或清空这些数据，不能将它们视为正式业务数据源。
 
 ## 关键业务规则
 
@@ -46,8 +46,10 @@ Flame Winter Pheno 是一个面向企业员工健康挑战的移动端 Web 应�
 - 项目锁定后才允许上传该项目的运动凭证。
 - 上传表单由后端项目上传配置驱动；图片提交前会转换为 JPG，并压缩到 1 MB 以内。
 - 当前赛季历史只在用户已参与该赛季时查询和展示；过往赛季记录独立查询。
-- 排行榜按当前赛季有效打卡次数 `checkin_count` 排序，并根据 `is_current_user` 定位当前用户。
+- 当前赛季项目进度由 `/project/progress?season_id` 返回的 `completion_progress` 提供，后端以 0～1 的比例返回，前端展示为百分比。
+- 排行榜仅按当前赛季通过初审的打卡次数 `checkin_count` 排序，并根据 `is_current_user` 定位当前用户。
 - 商城可用积分取最新一条积分流水的 `points_after`，兑换成功后使用接口返回余额更新页面。
+- 商城兑换仅在赛季开始后的前 N 个自然日开放，前端默认 N 为 7 且可通过 `VUE_APP_SHOP_REDEEM_WINDOW_DAYS` 配置；后端必须执行同样的最终校验。
 
 ## 前端编排
 
@@ -80,7 +82,7 @@ src/main.js
 
 ## 接口约定
 
-- 业务请求由 `src/api/request.js` 自动添加 `Authorization: <auth_code>`，不使用 `Bearer` 前缀。
+- 生产构建的静态资源使用 `/flame/` 前缀；业务请求默认使用 `/flame/api` 前缀，并由 `src/api/request.js` 自动添加 `Authorization: <auth_code>`，不使用 `Bearer` 前缀。
 - 非登录接口返回 401 时，前端重新登录并自动重试原请求一次。
 - 请求参数及推荐后端响应字段使用 snake_case。
 - `src/api/` 将后端数据归一化为组件使用的 camelCase 模型。

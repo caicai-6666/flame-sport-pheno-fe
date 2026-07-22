@@ -7,6 +7,8 @@
     :initial-available-points="availablePoints"
     :is-point-flow-loading="isPointFlowLoading"
     :point-flow-error-message="pointFlowErrorMessage"
+    :is-redeem-available="redeemAvailability.isAvailable"
+    :redeem-window-message="redeemAvailability.message"
     :consume-product="consumeProduct"
     @retry-products="loadProducts"
     @retry-point-flow="loadPointFlow"
@@ -24,7 +26,10 @@ import {
   getShopProducts,
   getShopProductImageSrc
 } from '../api/shop'
+import { getCurrentSeason } from '../api/season'
+import { setCurrentSeason } from '../state/appState'
 import { groupProductsByTier } from '../utils/shopProductTiers'
+import { getShopRedeemAvailability } from '../utils/shopRedeemWindow'
 
 export default {
   name: 'ShopView',
@@ -40,16 +45,25 @@ export default {
       productErrorMessage: '',
       isPointFlowLoading: false,
       pointFlowErrorMessage: '',
-      productImageLoadVersion: 0
+      productImageLoadVersion: 0,
+      currentSeason: null,
+      redeemAvailability: {
+        isAvailable: false,
+        message: '正在确认兑换时间',
+        nextChangeAt: null
+      },
+      redeemWindowTimer: null
     }
   },
   created() {
     this.loadProducts()
     this.loadPointFlow()
+    this.loadRedeemWindow()
   },
   beforeUnmount() {
     this.productImageLoadVersion += 1
     this.revokeProductImageUrls()
+    this.clearRedeemWindowTimer()
   },
   methods: {
     async loadProducts() {
@@ -92,7 +106,54 @@ export default {
         this.isPointFlowLoading = false
       }
     },
+    async loadRedeemWindow() {
+      try {
+        // 兑换资格会影响扣减积分，进入商城时始终刷新当前赛季，避免 KeepAlive 缓存跨赛季后沿用旧日期。
+        this.currentSeason = await getCurrentSeason()
+
+        setCurrentSeason(this.currentSeason)
+        this.updateRedeemAvailability()
+      } catch {
+        this.currentSeason = null
+        this.redeemAvailability = {
+          isAvailable: false,
+          message: '暂无法确认赛季兑换时间',
+          nextChangeAt: null
+        }
+        this.clearRedeemWindowTimer()
+      }
+    },
+    updateRedeemAvailability() {
+      this.redeemAvailability = getShopRedeemAvailability(this.currentSeason)
+      this.scheduleRedeemWindowUpdate()
+    },
+    scheduleRedeemWindowUpdate() {
+      this.clearRedeemWindowTimer()
+
+      if (!this.redeemAvailability.nextChangeAt) {
+        return
+      }
+
+      const delay = Math.max(this.redeemAvailability.nextChangeAt - Date.now() + 100, 0)
+      this.redeemWindowTimer = window.setTimeout(() => {
+        this.redeemWindowTimer = null
+        this.updateRedeemAvailability()
+      }, delay)
+    },
+    clearRedeemWindowTimer() {
+      if (this.redeemWindowTimer) {
+        window.clearTimeout(this.redeemWindowTimer)
+        this.redeemWindowTimer = null
+      }
+    },
     async consumeProduct(product) {
+      // 二次确认后仍重新计算一次，防止页面停留到兑换窗口结束后继续提交。
+      this.updateRedeemAvailability()
+
+      if (!this.redeemAvailability.isAvailable) {
+        throw new Error(this.redeemAvailability.message)
+      }
+
       return consumeShopProduct(product.id)
     },
     handleConsumeSuccess({ product, result }) {

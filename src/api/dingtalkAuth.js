@@ -1,5 +1,8 @@
 const DEFAULT_DINGTALK_JSAPI_URL = 'https://g.alicdn.com/dingding/open-develop/1.9.0/dingtalk.js'
 const DINGTALK_SCRIPT_ID = 'dingtalk-jsapi'
+const DINGTALK_SDK_LOAD_TIMEOUT = 8000
+const DINGTALK_BRIDGE_READY_TIMEOUT = 8000
+const DINGTALK_AUTH_CODE_TIMEOUT = 10000
 
 let dingtalkSdkPromise = null
 
@@ -53,6 +56,12 @@ function normalizeDingTalkError(error) {
   return normalizedError
 }
 
+function createDingTalkTimeoutError(message) {
+  const error = new Error(message)
+  error.code = 'DINGTALK_TIMEOUT'
+  return error
+}
+
 function loadDingTalkSdk() {
   if (!isBrowser()) {
     return Promise.reject(new Error('当前环境不支持钉钉免登'))
@@ -71,12 +80,20 @@ function loadDingTalkSdk() {
   dingtalkSdkPromise = new Promise((resolve, reject) => {
     const existingScript = document.getElementById(DINGTALK_SCRIPT_ID)
     const script = existingScript || document.createElement('script')
+    const loadTimeout = window.setTimeout(() => {
+      reject(createDingTalkTimeoutError('钉钉 JSAPI 加载超时，请检查网络或钉钉客户端'))
+    }, DINGTALK_SDK_LOAD_TIMEOUT)
+
+    const finish = callback => value => {
+      window.clearTimeout(loadTimeout)
+      callback(value)
+    }
 
     script.id = DINGTALK_SCRIPT_ID
     script.async = true
     script.src = process.env.VUE_APP_DINGTALK_JSAPI_URL || DEFAULT_DINGTALK_JSAPI_URL
 
-    script.addEventListener('load', () => {
+    script.addEventListener('load', finish(() => {
       const dingtalk = getDingTalkGlobal()
 
       if (dingtalk) {
@@ -85,11 +102,11 @@ function loadDingTalkSdk() {
       }
 
       reject(new Error('钉钉 JSAPI 加载成功但未初始化'))
-    }, { once: true })
+    }), { once: true })
 
-    script.addEventListener('error', () => {
+    script.addEventListener('error', finish(() => {
       reject(new Error('钉钉 JSAPI 加载失败'))
-    }, { once: true })
+    }), { once: true })
 
     if (!existingScript) {
       document.head.appendChild(script)
@@ -97,6 +114,35 @@ function loadDingTalkSdk() {
   })
 
   return dingtalkSdkPromise
+}
+
+function waitForDingTalkBridge(dingtalk) {
+  if (typeof dingtalk?.ready !== 'function') {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve, reject) => {
+    let isSettled = false
+    const settle = (callback, value) => {
+      if (isSettled) {
+        return
+      }
+
+      isSettled = true
+      window.clearTimeout(readyTimeout)
+      callback(value)
+    }
+    const readyTimeout = window.setTimeout(() => {
+      settle(reject, createDingTalkTimeoutError('钉钉 Native bridge 初始化超时，请确认从已发布的钉钉微应用打开，并升级钉钉客户端'))
+    }, DINGTALK_BRIDGE_READY_TIMEOUT)
+
+    try {
+      // 先确认客户端 bridge 已就绪，再调免登；否则旧版 SDK 会把调用无限挂起。
+      dingtalk.ready(() => settle(resolve))
+    } catch (error) {
+      settle(reject, normalizeDingTalkError(error))
+    }
+  })
 }
 
 export function isDingTalkClient() {
@@ -122,7 +168,7 @@ export function getDingTalkClientId() {
   }
 
   return process.env.VUE_APP_DINGTALK_CLIENT_ID ||
-    readRuntimeParam(['clientId', 'client_id', 'appId', 'appid'])
+    readRuntimeParam(['clientId', 'client_id'])
 }
 
 export async function requestDingTalkAuthCode() {
@@ -138,6 +184,7 @@ export async function requestDingTalkAuthCode() {
   }
 
   const dingtalk = await loadDingTalkSdk()
+  await waitForDingTalkBridge(dingtalk)
   const permission = dingtalk?.runtime?.permission
 
   if (typeof permission?.requestAuthCode !== 'function') {
@@ -145,26 +192,56 @@ export async function requestDingTalkAuthCode() {
   }
 
   return new Promise((resolve, reject) => {
-    permission.requestAuthCode({
+    let isSettled = false
+    const authCodeTimeout = window.setTimeout(() => {
+      settle(reject, createDingTalkTimeoutError('钉钉免登授权码获取超时，未收到客户端回调'))
+    }, DINGTALK_AUTH_CODE_TIMEOUT)
+
+    const settle = (callback, value) => {
+      if (isSettled) {
+        return
+      }
+
+      isSettled = true
+      window.clearTimeout(authCodeTimeout)
+      callback(value)
+    }
+
+    const handleSuccess = result => {
+      const authCode = result?.code || result?.authCode || result?.auth_code
+
+      if (!authCode) {
+        settle(reject, new Error('钉钉免登未返回 authCode'))
+        return
+      }
+
+      settle(resolve, {
+        authCode,
+        corpId,
+        clientId
+      })
+    }
+
+    const handleFail = error => {
+      settle(reject, normalizeDingTalkError(error))
+    }
+
+    const options = {
       corpId,
       clientId,
-      onSuccess(result) {
-        const authCode = result?.code || result?.authCode || result?.auth_code
+      onSuccess: handleSuccess,
+      onFail: handleFail
+    }
 
-        if (!authCode) {
-          reject(new Error('钉钉免登未返回 authCode'))
-          return
-        }
+    try {
+      const result = permission.requestAuthCode(options)
 
-        resolve({
-          authCode,
-          corpId,
-          clientId
-        })
-      },
-      onFail(error) {
-        reject(normalizeDingTalkError(error))
+      // 新版 JSAPI 返回 Promise，旧版只触发 onSuccess/onFail；两种形式均兼容。
+      if (result && typeof result.then === 'function') {
+        result.then(handleSuccess, handleFail)
       }
-    })
+    } catch (error) {
+      handleFail(error)
+    }
   })
 }

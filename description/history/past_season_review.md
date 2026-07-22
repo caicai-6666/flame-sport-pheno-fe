@@ -54,9 +54,11 @@ GET /proof/history
 `reviewStatus` 展示：
 
 ```text
-approved = 已通过
-rejected = 未通过
-pending  = 审核中
+pending                = 待初审
+preliminary_approved   = 初审通过
+preliminary_rejected   = 初审失败
+approved               = 终审通过
+rejected               = 终审失败
 ```
 
 `createdAt` 表示上传时间，不表示审核时间。

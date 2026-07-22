@@ -47,6 +47,7 @@ GET /season/current
 前端将赛季信息用于：
 
 - ProjectHome 顶部赛季名称与日期展示
+- 商城根据赛季起止日期计算前 N 个自然日的兑换窗口
 - 控制用户需要锁定的项目数量
 - 后续 `/project/lock_check`
 - 后续 `/project/lock`

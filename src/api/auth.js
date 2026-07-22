@@ -30,8 +30,12 @@ function normalizeLoginResult(response) {
  * 钉钉环境会先获取 H5 免登码，再交给后端换取当前系统会话 auth_code。
  * 非钉钉环境继续使用 VUE_APP_AUTH_CODE 作为本地开发 fallback。
  */
-export async function login() {
-  const response = await request.post(LOGIN_PATH, await buildLoginPayload())
+export async function login({ onBeforeRequest } = {}) {
+  const loginPayload = await buildLoginPayload()
+
+  // 免登码拿到之后才会请求后端，调用方据此可以准确提示故障发生位置。
+  onBeforeRequest?.()
+  const response = await request.post(LOGIN_PATH, loginPayload)
 
   const loginResult = normalizeLoginResult(response)
 

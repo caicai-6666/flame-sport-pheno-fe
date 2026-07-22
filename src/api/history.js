@@ -1,4 +1,5 @@
 import request from './request'
+import { normalizeReviewStatus } from '../utils/proofReview'
 
 const HISTORY_ACCENTS = [
   '#68d65c',
@@ -35,7 +36,8 @@ function normalizeCurrentSeasonRecord(record, index) {
     fileName: record.image_name || record.imageName || getProofFileName(record),
     note: record.note || '',
     recordType: record.record_type || uploadConfig.record_type || record.recordType || '',
-    reviewStatus: record.review_status || record.reviewStatus || 'pending',
+    reviewStatus: normalizeReviewStatus(record.review_status || record.reviewStatus),
+    reviewComment: String(record.review_comment || record.reviewComment || '').trim(),
     bmi: record.bmi || '',
     accent: record.accent || HISTORY_ACCENTS[index % HISTORY_ACCENTS.length],
     uploadedAt: record.created_at || record.createdAt || record.uploaded_at || record.uploadedAt || ''
@@ -43,7 +45,7 @@ function normalizeCurrentSeasonRecord(record, index) {
 }
 
 function normalizePastSeasonResult(record) {
-  const result = record.result || record.review_status || record.reviewStatus
+  const result = normalizeReviewStatus(record.result || record.review_status || record.reviewStatus, '')
 
   if (result) {
     return result

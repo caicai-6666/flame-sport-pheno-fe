@@ -153,6 +153,18 @@ function normalizeLockedProject(project) {
   }
 }
 
+function normalizeProjectProgress(record) {
+  const completionProgress = Number(record.completion_progress ?? record.completionProgress)
+
+  return {
+    projectId: String(record.project_id || record.projectId || ''),
+    // 后端以 0～1 返回比例，前端页面再转换为百分数，避免接口精度在 API 层丢失。
+    completionProgress: Number.isFinite(completionProgress)
+      ? Math.min(Math.max(completionProgress, 0), 1)
+      : 0
+  }
+}
+
 /**
  * 获取当前赛季已锁定项目。
  *
@@ -169,6 +181,24 @@ export async function getLockedProjects(seasonId) {
   const normalizedLockedProjects = (lockedProjects || []).map(normalizeLockedProject)
 
   return normalizedLockedProjects
+}
+
+/**
+ * 获取当前用户在指定赛季各已参与项目的完成进度。
+ *
+ * 项目进度路由为 /project/progress，按赛季 ID 查询当前用户的项目完成情况。
+ */
+export async function getProjectProgress(seasonId) {
+  const response = await request.get('/project/progress', {
+    params: {
+      season_id: seasonId
+    }
+  })
+  const progressRecords = Array.isArray(response) ? response : response.progresses || response.records
+
+  return (progressRecords || [])
+    .map(normalizeProjectProgress)
+    .filter(record => record.projectId)
 }
 
 /**

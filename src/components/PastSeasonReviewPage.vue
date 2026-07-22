@@ -61,6 +61,8 @@
 </template>
 
 <script>
+import { getReviewStatusText } from '../utils/proofReview'
+
 export default {
   name: 'PastSeasonReviewPage',
   props: {
@@ -84,14 +86,7 @@ export default {
   },
   methods: {
     resultText(result) {
-      const resultMap = {
-        approved: '已通过',
-        rejected: '未通过',
-        pending: '审核中',
-        reviewed: '已审核'
-      }
-
-      return resultMap[result] || '已审核'
+      return getReviewStatusText(result)
     },
     formatDateTime(value) {
       const date = new Date(value)
@@ -274,11 +269,17 @@ export default {
 
 .review-card-top em {
   flex-shrink: 0;
-  padding: 5px 8px;
+  box-sizing: border-box;
+  width: 68px;
+  height: 26px;
   border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
   font-style: normal;
   font-weight: 950;
+  line-height: 1;
 }
 
 .review-card-top em.is-approved {
@@ -294,6 +295,16 @@ export default {
 .review-card-top em.is-pending {
   background: rgba(255, 159, 69, 0.16);
   color: #d67624;
+}
+
+.review-card-top em.is-preliminary_approved {
+  background: rgba(79, 156, 255, 0.15);
+  color: #3375c4;
+}
+
+.review-card-top em.is-preliminary_rejected {
+  background: rgba(255, 111, 145, 0.16);
+  color: #c93c62;
 }
 
 .review-card-top em.is-reviewed {

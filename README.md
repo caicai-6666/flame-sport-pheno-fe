@@ -74,7 +74,43 @@ npm run build
 npm run lint
 ```
 
-开发环境通过 `.env.development` 配置带 `/api` 前缀的后端基础地址、登录模式及钉钉 H5 参数。浏览器直接请求后端，因此后端需要允许本地开发地址的跨域请求。启动后根据终端输出访问本地地址，默认通常为 `http://localhost:8080`。
+开发环境通过 `.env.development` 配置带 `/flame/api` 前缀的后端基础地址、登录模式及钉钉 H5 参数。浏览器直接请求后端，因此后端需要允许本地开发地址的跨域请求。启动后根据终端输出访问本地地址，默认通常为 `http://localhost:8080`。
+
+开发与生产环境均部署在 `/flame/` 子路径下，favicon、JavaScript、CSS 及其他静态资源会自动使用 `/flame/` 前缀；未显式配置 `VUE_APP_API_BASE_URL` 时，业务接口请求为 `/flame/api/<endpoint>`。部署后入口地址为 `https://<host>/flame/`；本地开发入口为 `http://localhost:8080/flame/`。
+
+商城默认仅在赛季开始日起的前 7 个自然日开放兑换。可通过 `.env.development` 或生产构建环境变量调整，修改后需要重新启动开发服务或重新构建：
+
+```env
+VUE_APP_SHOP_REDEEM_WINDOW_DAYS=7
+```
+
+## Docker 部署
+
+项目提供前端专用的两阶段 `Dockerfile`：Node 负责构建，Nginx 只负责提供静态资源。镜像默认将接口基地址编译为同域的 `/flame/api`。Vue CLI 在构建期读取 `VUE_APP_*`，因此需要在构建镜像时传入钉钉 Corp ID 与 Client ID。
+
+```bash
+docker build \
+  --build-arg VUE_APP_SHOP_REDEEM_WINDOW_DAYS=7 \
+  --build-arg VUE_APP_DINGTALK_CORP_ID=<钉钉企业 CorpId> \
+  --build-arg VUE_APP_DINGTALK_CLIENT_ID=<钉钉 H5 应用 ClientId> \
+  -t flame-sport-pheno-fe .
+docker run --rm --name flame-sport-pheno-fe -p 8080:80 flame-sport-pheno-fe
+```
+
+容器访问入口为 `http://localhost:8080/flame/`。若接口不与前端同域，可在构建时覆盖 API 基地址：
+
+```bash
+docker build \
+  --build-arg VUE_APP_API_BASE_URL=https://api.example.com/flame/api \
+  --build-arg VUE_APP_SHOP_REDEEM_WINDOW_DAYS=7 \
+  --build-arg VUE_APP_DINGTALK_CORP_ID=<钉钉企业 CorpId> \
+  --build-arg VUE_APP_DINGTALK_CLIENT_ID=<钉钉 H5 应用 ClientId> \
+  -t flame-sport-pheno-fe .
+```
+
+钉钉 JSAPI 地址使用代码内置的官方默认值，不需要传入构建参数；如需升级版本或切换 CDN，再额外配置 `VUE_APP_DINGTALK_JSAPI_URL`。
+
+该容器仅处理 `/flame/` 的前端静态资源。外层 Nginx 代理前端时应保留该前缀，例如 `proxy_pass http://flame-sport-pheno-fe;`；`/flame/api/` 应由外层 Nginx 单独代理到后端服务。
 
 ## 浏览器支持
 
