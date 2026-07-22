@@ -1,0 +1,93 @@
+import request from './request'
+
+function normalizeSeason(season) {
+  return {
+    seasonId: season.season_id || season.id,
+    name: season.name || season.season_name || '',
+    startDate: season.start_date || season.startDate || '',
+    endDate: season.end_date || season.endDate || '',
+    requiredProjectCount: Number(season.required_project_count || season.requiredProjectCount || 3)
+  }
+}
+
+function normalizeLevelName(level) {
+  if (!level) {
+    return ''
+  }
+
+  if (typeof level === 'string') {
+    return level
+  }
+
+  return level.name || level.level || level.level_name || level.challenge_level || ''
+}
+
+function normalizeParticipation(response) {
+  const participation = response.participation || response.season_user || response
+
+  if (typeof participation === 'string') {
+    return {
+      status: 'participated',
+      level: participation,
+      projectRuleLevelId: ''
+    }
+  }
+
+  const level = participation.level || participation.level_name || participation.challenge_level || participation.challenge_level_name || participation.name || participation.challengeLevel
+
+  return {
+    status: 'participated',
+    level: normalizeLevelName(level),
+    projectRuleLevelId: String(participation.project_rule_level_id || level?.id || '')
+  }
+}
+
+/**
+ * 获取当前进行中的赛季信息。
+ *
+ * 用于 ProjectHome 顶部 hero-card 展示赛季名称和赛季持续时间。
+ */
+export async function getCurrentSeason() {
+  const response = await request.get('/season/current')
+  const season = response.season || response
+
+  return normalizeSeason(season)
+}
+
+/**
+ * 检查当前用户在指定赛季中的参与状态。
+ *
+ * 200：已经完成报名，返回已选择的挑战等级。
+ * 409：仍在报名时间内，但尚未完成报名。
+ * 403：已经超过报名时间，不能继续报名。
+ */
+export async function getSeasonParticipationStatus(seasonId) {
+  try {
+    const response = await request.get('/season/participate_check', {
+      params: {
+        season_id: seasonId
+      }
+    })
+    const participation = normalizeParticipation(response)
+
+    return participation
+  } catch (error) {
+    if (error.status === 409) {
+      return {
+        status: 'registering',
+        level: '',
+        projectRuleLevelId: ''
+      }
+    }
+
+    if (error.status === 403) {
+      return {
+        status: 'closed',
+        level: '',
+        projectRuleLevelId: ''
+      }
+    }
+
+    throw error
+  }
+}

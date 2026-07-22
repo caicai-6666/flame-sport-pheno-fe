@@ -1,137 +1,258 @@
 <template>
-  <section class="history-page" aria-label="当前赛季上传记录">
+  <PastSeasonReviewPage
+    v-if="shouldShowPastSeasonOnly"
+    :records="pastSeasonReviewRecords"
+    :show-current-season-link="false"
+  />
+
+  <section v-else class="history-page" aria-label="当前赛季上传记录">
     <div class="history-hero">
-      <span class="history-eyebrow">CURRENT SEASON</span>
-      <h1>本赛季上传历史</h1>
+      <span class="history-eyebrow">{{ heroEyebrow }}</span>
+      <h1>{{ heroTitle }}</h1>
     </div>
 
-    <section class="goal-progress-panel" aria-label="目标等级完成度">
+    <section class="goal-progress-panel" aria-label="赛季目标进度">
       <div class="goal-progress-heading">
         <div>
-          <span>目标完成度</span>
-          <strong>{{ selectedChallengeLevel || '未选择等级' }}</strong>
+          <span>赛季进度</span>
+          <strong>{{ displayChallengeLevel }}</strong>
         </div>
-        <em>仅统计已通过记录</em>
+        <em>仅按初审通过记录计算</em>
       </div>
 
       <div v-if="progressRows.length" class="goal-progress-list">
         <article
           v-for="row in progressRows"
-          :key="row.taskName"
+          :key="row.projectId"
           class="goal-progress-row"
           :style="{ '--progress': `${row.percent}%`, '--accent': row.accent }"
         >
           <div class="goal-progress-meta">
             <strong>{{ row.taskName }}</strong>
-            <span>{{ row.approvedCount }}/{{ row.targetCount }} 次</span>
-          </div>
-          <div class="goal-progress-track" aria-hidden="true">
-            <span></span>
+            <div class="goal-progress-track" aria-hidden="true">
+              <span></span>
+            </div>
+            <em>{{ row.percent }}%</em>
           </div>
         </article>
       </div>
 
-      <p v-else class="goal-progress-empty">选择 3 项运动并预订挑战等级后，这里会展示三项运动的完成度。</p>
+      <p v-else class="goal-progress-empty">{{ progressEmptyText }}</p>
     </section>
 
-    <section class="record-section" aria-label="凭证记录列表">
-      <div class="record-section-heading">
-        <span>凭证记录</span>
-        <button class="season-review-link" type="button" @click="openPastSeasonReviews">
-          过往赛季审核记录
-          <span aria-hidden="true">→</span>
-        </button>
-      </div>
-
-      <div class="history-list" v-if="sortedRecords.length">
-        <article
-          v-for="record in sortedRecords"
-          :key="record.id"
-          class="history-card"
-          :style="{ '--accent': record.accent || '#72d84f' }"
+    <section class="record-board" :class="{ 'is-showing-past': isShowingPastRecords }" aria-label="上传记录看板">
+      <div class="record-board-inner">
+        <section
+          class="record-section record-board-face is-current"
+          aria-label="本赛季上传记录"
+          :aria-hidden="isShowingPastRecords"
+          :inert="isShowingPastRecords"
         >
-          <div class="record-date">
-            <strong>{{ formatDay(record.uploadedAt) }}</strong>
-            <span>{{ formatMonth(record.uploadedAt) }}</span>
+          <div class="record-section-heading">
+            <div>
+              <span>上传记录</span>
+              <strong>{{ sortedRecords.length ? `${sortedRecords.length} 条本赛季记录` : '暂无本赛季记录' }}</strong>
+            </div>
+            <button class="season-review-link" type="button" @click="showPastSeasonRecords">
+              过往赛季上传记录
+              <span aria-hidden="true">→</span>
+            </button>
           </div>
 
-          <div class="record-body">
-            <div class="record-header">
-              <div>
-                <strong>{{ record.taskName }}</strong>
-                <span>{{ recordTitle(record) }}</span>
+          <div class="history-list" v-if="sortedRecords.length">
+            <article
+              v-for="record in sortedRecords"
+              :key="record.id"
+              class="history-card"
+              :style="{ '--accent': record.accent || '#72d84f' }"
+            >
+              <div class="record-date">
+                <strong>{{ formatDay(record.uploadedAt) }}</strong>
+                <span>{{ formatMonth(record.uploadedAt) }}</span>
               </div>
-              <em>{{ formatTime(record.uploadedAt) }}</em>
-            </div>
 
-            <p v-if="record.note">{{ record.note }}</p>
+              <div class="record-body">
+                <div class="record-header">
+                  <div>
+                    <strong>{{ record.taskName }}</strong>
+                    <span>{{ recordTitle(record) }}</span>
+                  </div>
+                  <em>{{ formatTime(record.uploadedAt) }}</em>
+                </div>
 
-            <div class="record-footer">
-              <span class="proof-file">{{ record.fileName }}</span>
-              <span class="proof-status" :class="`is-${reviewStatus(record)}`">
-                {{ reviewStatusText(record) }}
-              </span>
-            </div>
+                <p v-if="record.note">{{ record.note }}</p>
+                <p v-if="record.reviewComment" class="review-comment">
+                  <span>审核意见</span>
+                  {{ record.reviewComment }}
+                </p>
+
+                <div class="record-footer">
+                  <span class="proof-file">{{ record.fileName }}</span>
+                  <span class="proof-status" :class="`is-${reviewStatus(record)}`">
+                    {{ reviewStatusText(record) }}
+                  </span>
+                </div>
+              </div>
+            </article>
           </div>
-        </article>
-      </div>
 
-      <div v-else class="empty-history">
-        <span>暂无记录</span>
-        <p>锁定运动并上传凭证后，会在这里看到当前赛季的上传历史。</p>
+          <div v-else class="empty-history">
+            <span>暂无记录</span>
+            <p>锁定运动并完成上传后，会在这里看到当前赛季的上传历史。</p>
+          </div>
+        </section>
+
+        <section
+          class="record-section record-board-face is-past"
+          aria-label="过往赛季上传记录"
+          :aria-hidden="!isShowingPastRecords"
+          :inert="!isShowingPastRecords"
+        >
+          <div class="record-section-heading">
+            <div>
+              <span>过往上传</span>
+              <strong>{{ sortedPastSeasonReviewRecords.length ? `${sortedPastSeasonReviewRecords.length} 条已归档` : '暂无归档记录' }}</strong>
+            </div>
+            <button class="season-review-link is-return" type="button" @click="showCurrentSeasonRecords">
+              <span aria-hidden="true">←</span>
+              返回本赛季
+            </button>
+          </div>
+
+          <div class="past-record-list" v-if="sortedPastSeasonReviewRecords.length">
+            <article
+              v-for="record in sortedPastSeasonReviewRecords"
+              :key="record.id"
+              class="past-record-card"
+              :style="{ '--accent': record.accent || '#72d84f' }"
+            >
+              <div class="past-record-top">
+                <div>
+                  <span>{{ record.seasonName }}</span>
+                  <strong>{{ record.taskName }}</strong>
+                </div>
+                <em :class="`is-${record.result}`">{{ resultText(record.result) }}</em>
+              </div>
+
+              <p v-if="record.note">{{ record.note }}</p>
+
+              <dl class="past-record-meta">
+                <div>
+                  <dt>上传文件</dt>
+                  <dd>{{ record.fileName }}</dd>
+                </div>
+                <div>
+                  <dt>上传时间</dt>
+                  <dd>{{ formatDateTime(record.uploadedAt) }}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+
+          <div v-else class="empty-history">
+            <span>暂无过往赛季上传</span>
+            <p>完成月末统一审核后，已归档的赛季记录会展示在这里。</p>
+          </div>
+        </section>
       </div>
     </section>
   </section>
 </template>
 
 <script>
-const targetCountByLevel = {
-  青铜: 5,
-  白银: 8,
-  黄金: 12
-}
+import PastSeasonReviewPage from './PastSeasonReviewPage.vue'
+import { getReviewStatusText } from '../utils/proofReview'
 
 export default {
   name: 'HistoryPage',
+  components: {
+    PastSeasonReviewPage
+  },
+  data() {
+    return {
+      isShowingPastRecords: false,
+      displayedProgressByProjectId: {},
+      hasPlayedProgressAnimation: false,
+      progressAnimationFrame: null
+    }
+  },
   props: {
     records: {
       type: Array,
       default: () => []
     },
-    lockedTaskNames: {
+    pastSeasonReviewRecords: {
       type: Array,
       default: () => []
+    },
+    projectProgressRecords: {
+      type: Array,
+      default: () => []
+    },
+    projectTasks: {
+      type: Array,
+      default: () => []
+    },
+    isProjectProgressLoading: {
+      type: Boolean,
+      default: false
+    },
+    projectProgressError: {
+      type: String,
+      default: ''
     },
     selectedChallengeLevel: {
       type: String,
       default: ''
+    },
+    seasonParticipationStatus: {
+      type: String,
+      default: 'unknown'
+    }
+  },
+  watch: {
+    projectProgressRecords() {
+      this.animateProjectProgress()
     }
   },
   computed: {
+    shouldShowPastSeasonOnly() {
+      return this.seasonParticipationStatus !== 'participated'
+    },
     sortedRecords() {
       return [...this.records].sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
     },
-    approvedRecords() {
-      return this.records.filter(record => this.reviewStatus(record) === 'approved')
+    sortedPastSeasonReviewRecords() {
+      return [...this.pastSeasonReviewRecords].sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
     },
-    progressRows() {
-      if (!this.lockedTaskNames.length || !this.selectedChallengeLevel) {
-        return []
+    heroEyebrow() {
+      return this.isShowingPastRecords ? 'PAST SEASONS' : 'CURRENT SEASON'
+    },
+    heroTitle() {
+      return this.isShowingPastRecords ? '过往赛季上传记录' : '本赛季上传历史'
+    },
+    displayChallengeLevel() {
+      return this.selectedChallengeLevel || '白银挑战'
+    },
+    progressEmptyText() {
+      if (this.isProjectProgressLoading) {
+        return '正在加载本赛季项目进度…'
       }
 
-      const targetCount = targetCountByLevel[this.selectedChallengeLevel] || targetCountByLevel.青铜
-
-      return this.lockedTaskNames.map(taskName => {
-        const approvedCount = this.approvedRecords.filter(record => record.taskName === taskName).length
-        const taskRecord = this.records.find(record => record.taskName === taskName)
-        const percent = Math.min(Math.round((approvedCount / targetCount) * 100), 100)
+      return this.projectProgressError || '暂无本赛季项目进度'
+    },
+    progressRows() {
+      return this.projectProgressRecords.map(progressRecord => {
+        const task = this.projectTasks.find(item => String(item.projectId) === String(progressRecord.projectId))
+        const taskRecord = this.records.find(record => String(record.projectId) === String(progressRecord.projectId))
+        const projectId = String(progressRecord.projectId)
+        const displayedPercent = this.displayedProgressByProjectId[projectId]
 
         return {
-          taskName,
-          approvedCount,
-          targetCount,
-          percent,
-          accent: taskRecord?.accent || '#72d84f'
+          projectId,
+          taskName: task?.name || `项目 ${progressRecord.projectId}`,
+          percent: Number.isFinite(displayedPercent) ? displayedPercent : 0,
+          accent: task?.accent || taskRecord?.accent || '#72d84f'
         }
       })
     }
@@ -149,22 +270,98 @@ export default {
       const date = new Date(value)
       return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
     },
+    formatDateTime(value) {
+      const date = new Date(value)
+
+      if (Number.isNaN(date.getTime())) {
+        return '--'
+      }
+
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hour = String(date.getHours()).padStart(2, '0')
+      const minute = String(date.getMinutes()).padStart(2, '0')
+
+      return `${date.getFullYear()}.${month}.${day} ${hour}:${minute}`
+    },
     recordTitle(record) {
       if (record.taskName !== '减重挑战') {
-        return '运动凭证'
+        return '运动上传'
       }
 
       const typeText = record.recordType === 'month-end' ? '月末体重' : '月初体重'
       return record.bmi ? `${typeText} · BMI ${record.bmi}` : typeText
     },
-    reviewStatus() {
-      return 'pending'
+    reviewStatus(record) {
+      return record.reviewStatus || 'pending'
     },
-    reviewStatusText() {
-      return '审核中'
+    reviewStatusText(record) {
+      return getReviewStatusText(this.reviewStatus(record))
     },
-    openPastSeasonReviews() {
-      this.$router.push({ name: 'season-review-history' })
+    resultText(result) {
+      return getReviewStatusText(result)
+    },
+    animateProjectProgress() {
+      if (this.progressAnimationFrame) {
+        window.cancelAnimationFrame(this.progressAnimationFrame)
+        this.progressAnimationFrame = null
+      }
+
+      const targetProgressByProjectId = this.projectProgressRecords.reduce((targets, record) => {
+        targets[String(record.projectId)] = Math.round(record.completionProgress * 100)
+        return targets
+      }, {})
+      const projectIds = Object.keys(targetProgressByProjectId)
+
+      if (!projectIds.length) {
+        this.displayedProgressByProjectId = {}
+        return
+      }
+
+      const shouldReduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+      if (this.hasPlayedProgressAnimation || shouldReduceMotion) {
+        this.displayedProgressByProjectId = targetProgressByProjectId
+        return
+      }
+
+      // 仅在历史页首次得到真实进度时播放，KeepAlive 切回页面不会重复从 0 开始。
+      this.hasPlayedProgressAnimation = true
+      this.displayedProgressByProjectId = Object.fromEntries(projectIds.map(projectId => [projectId, 0]))
+
+      const duration = 780
+      const startedAt = performance.now()
+      const easeOut = progress => 1 - Math.pow(1 - progress, 3)
+      const step = now => {
+        const progress = Math.min((now - startedAt) / duration, 1)
+        const easedProgress = easeOut(progress)
+
+        this.displayedProgressByProjectId = Object.fromEntries(projectIds.map(projectId => [
+          projectId,
+          Math.round(targetProgressByProjectId[projectId] * easedProgress)
+        ]))
+
+        if (progress < 1) {
+          this.progressAnimationFrame = window.requestAnimationFrame(step)
+          return
+        }
+
+        this.displayedProgressByProjectId = targetProgressByProjectId
+        this.progressAnimationFrame = null
+      }
+
+      this.progressAnimationFrame = window.requestAnimationFrame(step)
+    },
+    showPastSeasonRecords() {
+      this.isShowingPastRecords = true
+    },
+    showCurrentSeasonRecords() {
+      this.isShowingPastRecords = false
+    }
+  },
+  beforeUnmount() {
+    if (this.progressAnimationFrame) {
+      window.cancelAnimationFrame(this.progressAnimationFrame)
     }
   }
 }
@@ -221,11 +418,13 @@ export default {
 
 .goal-progress-panel {
   flex-shrink: 0;
-  padding: 14px;
+  padding: 16px 16px 15px;
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 28px;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 16px 34px rgba(38, 64, 45, 0.07);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 252, 247, 0.78)),
+    rgba(255, 255, 255, 0.76);
+  box-shadow: 0 14px 30px rgba(38, 64, 45, 0.06);
 }
 
 .goal-progress-heading,
@@ -253,52 +452,54 @@ export default {
 
 .goal-progress-heading em {
   flex-shrink: 0;
+  max-width: 128px;
   color: #8b958e;
   font-size: 11px;
   font-style: normal;
   font-weight: 850;
+  line-height: 1.35;
+  text-align: right;
 }
 
 .goal-progress-list {
-  margin-top: 12px;
+  margin-top: 15px;
   display: grid;
-  gap: 9px;
+  gap: 12px;
 }
 
 .goal-progress-row {
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
+  min-width: 0;
 }
 
 .goal-progress-meta {
   min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(58px, 78px) minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 10px;
 }
 
-.goal-progress-meta strong,
-.goal-progress-meta span {
+.goal-progress-meta strong {
   overflow: hidden;
-  display: block;
+  color: #17211b;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.goal-progress-meta strong {
-  color: #17211b;
-  font-size: 12px;
+.goal-progress-meta em {
+  color: #607068;
+  font-size: 11px;
+  font-style: normal;
   font-weight: 950;
-}
-
-.goal-progress-meta span {
-  margin-top: 3px;
-  color: #7a857d;
-  font-size: 10px;
-  font-weight: 850;
+  line-height: 1.2;
+  text-align: right;
 }
 
 .goal-progress-track {
-  height: 12px;
+  height: 7px;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(23, 33, 27, 0.07);
@@ -309,9 +510,7 @@ export default {
   width: var(--progress);
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent), #fff 18%), var(--accent));
-  box-shadow: 0 0 16px color-mix(in srgb, var(--accent), transparent 68%);
-  transition: width 0.28s ease;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent), #fff 30%), color-mix(in srgb, var(--accent), #20c7b5 18%));
 }
 
 .goal-progress-empty {
@@ -322,6 +521,41 @@ export default {
   line-height: 1.6;
 }
 
+.record-board {
+  min-height: 0;
+  flex: 1;
+  perspective: 1200px;
+}
+
+.record-board-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.68s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.record-board.is-showing-past .record-board-inner {
+  transform: rotateY(-180deg);
+}
+
+.record-board-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  pointer-events: none;
+}
+
+.record-board-face.is-past {
+  transform: rotateY(180deg);
+}
+
+.record-board:not(.is-showing-past) .record-board-face.is-current,
+.record-board.is-showing-past .record-board-face.is-past {
+  pointer-events: auto;
+}
+
 .record-section {
   min-height: 0;
   padding: 14px;
@@ -330,7 +564,6 @@ export default {
   background: rgba(255, 255, 255, 0.58);
   box-shadow: 0 16px 34px rgba(38, 64, 45, 0.06);
   display: flex;
-  flex: 1;
   flex-direction: column;
   gap: 12px;
 }
@@ -376,7 +609,18 @@ export default {
   outline-offset: 2px;
 }
 
-.history-list {
+.season-review-link.is-return {
+  background: rgba(23, 33, 27, 0.08);
+  color: #17211b;
+  box-shadow: none;
+}
+
+.season-review-link.is-return:hover {
+  background: rgba(23, 33, 27, 0.12);
+}
+
+.history-list,
+.past-record-list {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -387,11 +631,13 @@ export default {
   gap: 12px;
 }
 
-.history-list::-webkit-scrollbar {
+.history-list::-webkit-scrollbar,
+.past-record-list::-webkit-scrollbar {
   width: 4px;
 }
 
-.history-list::-webkit-scrollbar-thumb {
+.history-list::-webkit-scrollbar-thumb,
+.past-record-list::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(23, 33, 27, 0.14);
 }
@@ -486,6 +732,20 @@ export default {
   line-height: 1.5;
 }
 
+.record-body .review-comment {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(47, 143, 50, 0.07);
+  color: #496050;
+}
+
+.review-comment span {
+  margin-right: 6px;
+  color: #2f8f32;
+  font-size: 11px;
+  font-weight: 950;
+}
+
 .record-footer {
   margin-top: 12px;
   display: flex;
@@ -506,10 +766,16 @@ export default {
 
 .proof-status {
   flex-shrink: 0;
-  padding: 5px 8px;
+  box-sizing: border-box;
+  width: 68px;
+  height: 26px;
   border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
   font-weight: 950;
+  line-height: 1;
 }
 
 .proof-status.is-pending {
@@ -517,9 +783,142 @@ export default {
   color: #d67624;
 }
 
+.proof-status.is-preliminary_approved {
+  background: rgba(79, 156, 255, 0.15);
+  color: #3375c4;
+}
+
+.proof-status.is-preliminary_rejected {
+  background: rgba(255, 111, 145, 0.14);
+  color: #c94668;
+}
+
 .proof-status.is-approved {
   background: rgba(114, 216, 79, 0.16);
   color: #2f8f32;
+}
+
+.proof-status.is-rejected {
+  background: rgba(255, 111, 145, 0.14);
+  color: #c94668;
+}
+
+.past-record-card {
+  flex-shrink: 0;
+  padding: 16px;
+  border: 1px solid rgba(23, 33, 27, 0.08);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.72)),
+    #fff;
+  box-shadow: 0 16px 38px rgba(38, 64, 45, 0.08);
+}
+
+.past-record-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.past-record-top span {
+  display: block;
+  color: #77827b;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.past-record-top strong {
+  display: block;
+  margin-top: 5px;
+  color: #17211b;
+  font-size: 17px;
+  font-weight: 950;
+  line-height: 1.2;
+}
+
+.past-record-top em {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 68px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.past-record-top em.is-approved {
+  background: rgba(114, 216, 79, 0.16);
+  color: #2f8f32;
+}
+
+.past-record-top em.is-rejected {
+  background: rgba(255, 111, 145, 0.16);
+  color: #c93c62;
+}
+
+.past-record-top em.is-pending {
+  background: rgba(255, 159, 69, 0.16);
+  color: #d67624;
+}
+
+.past-record-top em.is-preliminary_approved {
+  background: rgba(79, 156, 255, 0.15);
+  color: #3375c4;
+}
+
+.past-record-top em.is-preliminary_rejected {
+  background: rgba(255, 111, 145, 0.16);
+  color: #c93c62;
+}
+
+.past-record-top em.is-reviewed {
+  background: rgba(23, 33, 27, 0.08);
+  color: #5f6b64;
+}
+
+.past-record-card p {
+  margin: 12px 0 0;
+  color: #4a554e;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.past-record-meta {
+  margin: 14px 0 0;
+  display: grid;
+  gap: 8px;
+}
+
+.past-record-meta div {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.past-record-meta dt {
+  flex-shrink: 0;
+  color: #8b958e;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.past-record-meta dd {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  color: #17211b;
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-history {
@@ -546,5 +945,11 @@ export default {
   margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.65;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goal-progress-track span {
+    transition: none;
+  }
 }
 </style>
