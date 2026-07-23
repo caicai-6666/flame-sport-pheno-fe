@@ -15,6 +15,7 @@
     @retry-point-flow="loadPointFlow"
     @consume-success="handleConsumeSuccess"
     @product-image-loaded="markProductImageLoaded"
+    @product-image-failed="markProductImageFailed"
   />
 </template>
 
@@ -231,6 +232,10 @@ export default {
             }
           : item)
       } catch {
+        if (imageLoadVersion !== this.productImageLoadVersion) {
+          return
+        }
+
         this.products = this.products.map(item => item.id === product.id
           ? {
               ...item,
@@ -248,6 +253,24 @@ export default {
             isImageLoading: false,
             isImageLoaded: true,
             isImageFailed: false
+          }
+        : item)
+    },
+    markProductImageFailed(productId) {
+      const product = this.products.find(item => item.id === productId)
+
+      if (product?.imageSrc?.startsWith('blob:')) {
+        URL.revokeObjectURL(product.imageSrc)
+      }
+
+      // Blob 已下载但浏览器解码失败时，不应让 shimmer 永远停留，应退回到奖品名称占位。
+      this.products = this.products.map(item => item.id === productId
+        ? {
+            ...item,
+            imageSrc: '',
+            isImageLoading: false,
+            isImageLoaded: false,
+            isImageFailed: true
           }
         : item)
     },

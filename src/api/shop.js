@@ -13,6 +13,20 @@ const PRODUCT_ACCENTS = [
   '#2ec4b6'
 ]
 
+const PRODUCT_IMAGE_MAX_ATTEMPTS = 3
+const PRODUCT_IMAGE_RETRY_DELAYS = [600, 1400]
+
+function waitForProductImageRetry(delay) {
+  return new Promise(resolve => window.setTimeout(resolve, delay))
+}
+
+function isRetriableProductImageError(error) {
+  const status = Number(error?.status)
+
+  // 无 HTTP 状态通常表示超时、断网或连接中断；明确的客户端错误不应重复占用网络。
+  return !status || status === 408 || status === 429 || status >= 500
+}
+
 function toProductList(response) {
   if (Array.isArray(response)) {
     return response
@@ -155,14 +169,36 @@ export async function getShopProductImageSrc(filename) {
     return ''
   }
 
-  const imageBlob = await request.get('/image/product', {
-    params: {
-      filename
-    },
-    responseType: 'blob'
-  })
+  let lastError
 
-  return URL.createObjectURL(imageBlob)
+  for (let attempt = 0; attempt < PRODUCT_IMAGE_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const imageBlob = await request.get('/image/product', {
+        params: {
+          filename
+        },
+        responseType: 'blob'
+      })
+
+      if (!imageBlob?.size) {
+        throw new Error('奖品图片内容为空')
+      }
+
+      return URL.createObjectURL(imageBlob)
+    } catch (error) {
+      lastError = error
+
+      const isLastAttempt = attempt === PRODUCT_IMAGE_MAX_ATTEMPTS - 1
+      if (isLastAttempt || !isRetriableProductImageError(error)) {
+        throw error
+      }
+
+      // 图片按档位串行加载，短暂退避后再试，既降低瞬时失败概率，也避免集中重试压垮服务端。
+      await waitForProductImageRetry(PRODUCT_IMAGE_RETRY_DELAYS[attempt])
+    }
+  }
+
+  throw lastError
 }
 
 /**
