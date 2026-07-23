@@ -77,10 +77,30 @@
         }"
       ></span>
     </span>
+
+    <Transition name="launch-cover">
+      <section
+        v-if="shouldShowLaunchCover"
+        class="launch-cover"
+        aria-hidden="true"
+      >
+        <img
+          class="launch-cover-image"
+          :src="launchCoverSource"
+          alt=""
+          decoding="sync"
+          fetchpriority="high"
+          :class="{ 'is-ready': isLaunchCoverImageLoaded }"
+          @load="handleLaunchCoverLoaded"
+          @error="handleLaunchCoverLoadError"
+        >
+      </section>
+    </Transition>
   </div>
 </template>
 
 <script>
+import launchCoverSource from './assets/cover.png'
 import HeaderBar from './components/HeaderBar.vue'
 import BottomNav from './components/BottomNav.vue'
 import UserHealthProfilePanel from './components/UserHealthProfilePanel.vue'
@@ -96,6 +116,7 @@ const navItems = [
   { key: 'history', label: '历史', icon: '◷', routeName: 'history' },
   { key: 'shop', label: '商城', icon: '🛍', routeName: 'shop' }
 ]
+const LAUNCH_COVER_MIN_DURATION = 1500
 
 export default {
   name: 'App',
@@ -107,6 +128,11 @@ export default {
   data() {
     return {
       navItems,
+      isLaunchCoverImageLoaded: false,
+      launchCoverSource,
+      isLaunchCoverImageReady: false,
+      isLaunchCoverMinimumElapsed: false,
+      launchCoverTimer: null,
       isHealthProfileSaving: false,
       healthProfileSaveError: null,
       healthProfileConfettiBursts: [],
@@ -147,6 +173,10 @@ export default {
     },
     canRenderApplication() {
       return this.isLoginReady && !this.loginError
+    },
+    shouldShowLaunchCover() {
+      // 图片完整加载后才开始封面计时，避免用户看到图片逐步绘制或只停留极短时间。
+      return !this.isLaunchCoverImageReady || !this.isLaunchCoverMinimumElapsed || !this.isLoginReady
     },
     usesDingTalkLogin() {
       return getLoginCredentialSource() === 'dingtalk'
@@ -191,6 +221,25 @@ export default {
     }
   },
   methods: {
+    handleLaunchCoverLoaded() {
+      this.isLaunchCoverImageLoaded = true
+      this.startLaunchCoverTimer()
+    },
+    handleLaunchCoverLoadError() {
+      // 图片异常时不能永久遮挡应用，退化为同色背景后继续既有启动流程。
+      this.startLaunchCoverTimer()
+    },
+    startLaunchCoverTimer() {
+      if (this.isLaunchCoverImageReady) {
+        return
+      }
+
+      this.isLaunchCoverImageReady = true
+      this.launchCoverTimer = window.setTimeout(() => {
+        this.isLaunchCoverMinimumElapsed = true
+        this.launchCoverTimer = null
+      }, LAUNCH_COVER_MIN_DURATION)
+    },
     changeNav(key) {
       const item = this.navItems.find(navItem => navItem.key === key)
 
@@ -277,6 +326,7 @@ export default {
   beforeUnmount() {
     document.body.classList.remove('is-profile-panel-open')
     document.body.classList.remove('is-auth-panel-open')
+    window.clearTimeout(this.launchCoverTimer)
     this.healthProfileConfettiTimers.forEach(timer => window.clearTimeout(timer))
   }
 }
@@ -412,6 +462,54 @@ button {
   cursor: wait;
 }
 
+.launch-cover {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  width: min(100vw, 430px);
+  height: 100vh;
+  height: 100dvh;
+  margin: auto;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 85% 11%, rgba(166, 239, 72, 0.48), transparent 28%),
+    linear-gradient(145deg, #f8f8f2, #eef4e7);
+}
+
+.launch-cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  visibility: hidden;
+}
+
+.launch-cover-image.is-ready {
+  visibility: visible;
+}
+
+.launch-cover-leave-active {
+  transition:
+    opacity 460ms ease,
+    transform 460ms ease;
+}
+
+.launch-cover-leave-to {
+  opacity: 0;
+  transform: scale(1.012);
+}
+
+/* 超长屏若继续 cover 会裁掉封面两侧的主标题或 Logo，优先完整呈现核心品牌信息。 */
+@media (max-aspect-ratio: 9 / 17) {
+  .launch-cover-image {
+    object-fit: contain;
+    /* 完整展示在超长屏会留下上下留白，用遮罩将封面边缘自然融入同色背景。 */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 8%, #000 13%, #000 80%, rgba(0, 0, 0, 0.45) 87%, transparent 96%);
+    mask-image: linear-gradient(to bottom, transparent 8%, #000 13%, #000 80%, rgba(0, 0, 0, 0.45) 87%, transparent 96%);
+  }
+}
+
 .module-page {
   min-height: 420px;
   margin-top: 18px;
@@ -503,6 +601,12 @@ button {
       translate(calc(-50% + var(--confetti-x)), calc((var(--confetti-origin-y) * -1) + var(--confetti-y)))
       scale(0.86)
       rotate(var(--confetti-rotate));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-cover-leave-active {
+    transition-duration: 1ms;
   }
 }
 
