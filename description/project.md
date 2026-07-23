@@ -52,6 +52,8 @@ Flame Winter Pheno 是一个面向企业员工健康挑战的移动端 Web 应�
 - 排行榜仅按当前赛季通过初审的打卡次数 `checkin_count` 排序，并根据 `is_current_user` 定位当前用户。
 - 商城可用积分取最新一条积分流水的 `points_after`，兑换成功后使用接口返回余额更新页面。
 - 商城兑换仅在赛季开始后的前 N 个自然日开放，前端默认 N 为 7 且可通过 `VUE_APP_SHOP_REDEEM_WINDOW_DAYS` 配置；后端必须执行同样的最终校验。
+- 登录模式默认使用 `VUE_APP_LOGIN_PROVIDER=auto`：开发构建直接读取 `VUE_APP_AUTH_CODE`，生产构建走钉钉免登；两者都通过同一个 `/auth/login` 换取后续业务会话。
+- 页面视觉对不支持 CSS `color-mix()` 的旧版 Android WebView 提供实色回退，并关闭背景模糊，避免未知颜色函数使完整背景声明失效而出现内容透出。
 
 ## 前端编排
 

@@ -1,4 +1,4 @@
-import { isDingTalkClient, requestDingTalkAuthCode } from './dingtalkAuth'
+import { requestDingTalkAuthCode } from './dingtalkAuth'
 
 export const DEFAULT_AUTH_CODE = process.env.VUE_APP_AUTH_CODE
 
@@ -6,22 +6,23 @@ function getLoginProvider() {
   return String(process.env.VUE_APP_LOGIN_PROVIDER || 'auto').trim().toLowerCase()
 }
 
-function shouldUseDingTalkLogin() {
+// auto 跟随 Vue CLI 的构建环境，保证本地即使在钉钉容器中调试也不会触发 Native bridge。
+export function getLoginCredentialSource() {
   const loginProvider = getLoginProvider()
 
   if (loginProvider === 'dingtalk') {
-    return true
+    return 'dingtalk'
   }
 
   if (loginProvider === 'mock' || loginProvider === 'auth_code') {
-    return false
+    return 'auth_code'
   }
 
-  return isDingTalkClient()
+  return process.env.NODE_ENV === 'development' ? 'auth_code' : 'dingtalk'
 }
 
 export async function buildLoginPayload() {
-  if (shouldUseDingTalkLogin()) {
+  if (getLoginCredentialSource() === 'dingtalk') {
     const { authCode } = await requestDingTalkAuthCode()
 
     return {

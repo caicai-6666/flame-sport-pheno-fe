@@ -4,7 +4,7 @@
 
 当前项目不做账号密码登录页。应用作为钉钉 H5 应用运行时，前端通过钉钉 JSAPI 获取一次性免登码，并提交给后端登录接口。后端使用该免登码调用钉钉服务端接口换取真实用户身份，再创建或更新本系统用户，并返回本系统后续业务请求使用的 `auth_code`。
 
-非钉钉环境保留开发 fallback：前端使用配置好的 `VUE_APP_AUTH_CODE` 请求后端登录接口，便于本地联调。
+开发构建保留浏览器联调入口：前端直接使用配置好的 `VUE_APP_AUTH_CODE` 请求后端登录接口，不请求钉钉 JSAPI；生产构建默认只走钉钉免登。
 
 后续业务接口通过请求头携带后端返回的 `auth_code`。
 
@@ -28,14 +28,14 @@ VUE_APP_LOGIN_PROVIDER=auto
 VUE_APP_DINGTALK_CORP_ID=<钉钉企业 CorpId>
 VUE_APP_DINGTALK_CLIENT_ID=<钉钉 H5 应用 ClientId>
 VUE_APP_DINGTALK_JSAPI_URL=https://g.alicdn.com/dingding/open-develop/1.9.0/dingtalk.js
-VUE_APP_AUTH_CODE=<非钉钉环境开发用 auth_code>
+VUE_APP_AUTH_CODE=<开发环境用 auth_code>
 ```
 
 `VUE_APP_LOGIN_PROVIDER` 取值：
 
 | 值 | 说明 |
 | --- | --- |
-| `auto` | 默认值。钉钉客户端内走钉钉免登，普通浏览器走 `VUE_APP_AUTH_CODE` |
+| `auto` | 推荐默认值。`npm run serve` 使用 `VUE_APP_AUTH_CODE`，`npm run build` 使用钉钉免登 |
 | `dingtalk` | 强制走钉钉免登 |
 | `mock` / `auth_code` | 强制走开发 `auth_code` fallback |
 
@@ -101,8 +101,8 @@ POST /auth/login
 main.js
   -> initLogin()
     -> loginCredential.buildLoginPayload()
-      -> 钉钉环境：dd.runtime.permission.requestAuthCode()
-      -> 非钉钉环境：读取 VUE_APP_AUTH_CODE
+      -> 开发构建（NODE_ENV=development）：读取 VUE_APP_AUTH_CODE
+      -> 生产构建（NODE_ENV=production）：dd.runtime.permission.requestAuthCode()
     -> POST /auth/login
     -> 保存后端返回的 auth_code 和 user
     -> checkProfileComplete()
@@ -138,6 +138,6 @@ flame_sport_pheno_auth_code
 
 除 `/auth/login` 外，任意业务接口返回 `401` 时，前端会自动重新登录并重试原请求一次。
 
-钉钉免登码是一次性的，因此 `401` 自动重登时前端会重新调用 `dd.runtime.permission.requestAuthCode()` 获取新 code，再请求 `/auth/login`。
+钉钉免登码是一次性的，因此生产构建的 `401` 自动重登时前端会重新调用 `dd.runtime.permission.requestAuthCode()` 获取新 code，再请求 `/auth/login`；开发构建则再次读取 `VUE_APP_AUTH_CODE`。
 
 登录接口本身失败时不会自动重试。页面会展示登录失败提示和“重试”按钮。

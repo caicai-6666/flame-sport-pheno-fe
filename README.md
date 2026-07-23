@@ -74,14 +74,27 @@ npm run build
 npm run lint
 ```
 
-开发环境通过 `.env.development` 配置带 `/flame/api` 前缀的后端基础地址、登录模式及钉钉 H5 参数。浏览器直接请求后端，因此后端需要允许本地开发地址的跨域请求。启动后根据终端输出访问本地地址，默认通常为 `http://localhost:8080`。
+开发环境通过 `.env` 配置带 `/flame/api` 前缀的后端基础地址、登录模式及钉钉 H5 参数。浏览器直接请求后端，因此后端需要允许本地开发地址的跨域请求。启动后根据终端输出访问本地地址，默认通常为 `http://localhost:8080`。
+
+推荐将浏览器联调配置放入 `.env.development`。保持 `VUE_APP_LOGIN_PROVIDER=auto` 时，`npm run serve` 会直接使用 `VUE_APP_AUTH_CODE` 调用后端登录接口，不会向钉钉请求免登码；`npm run build` 则默认走钉钉免登。修改环境变量后需要重启开发服务。
+
+```env
+VUE_APP_LOGIN_PROVIDER=auto
+VUE_APP_AUTH_CODE=<后端提供的开发 auth_code>
+```
 
 开发与生产环境均部署在 `/flame/` 子路径下，favicon、JavaScript、CSS 及其他静态资源会自动使用 `/flame/` 前缀；未显式配置 `VUE_APP_API_BASE_URL` 时，业务接口请求为 `/flame/api/<endpoint>`。部署后入口地址为 `https://<host>/flame/`；本地开发入口为 `http://localhost:8080/flame/`。
 
-商城默认仅在赛季开始日起的前 7 个自然日开放兑换。可通过 `.env.development` 或生产构建环境变量调整，修改后需要重新启动开发服务或重新构建：
+商城默认仅在赛季开始日起的前 7 个自然日开放兑换。可通过 `.env` 或生产构建环境变量调整，修改后需要重新启动开发服务或重新构建：
 
 ```env
 VUE_APP_SHOP_REDEEM_WINDOW_DAYS=7
+```
+
+页面标题可在 `.env.development`（本地开发）或对应的构建环境中配置；不配置时为“燃动现象”。
+
+```env
+VUE_APP_PAGE_TITLE=燃动现象
 ```
 
 ## Docker 部署
@@ -91,6 +104,7 @@ VUE_APP_SHOP_REDEEM_WINDOW_DAYS=7
 ```bash
 docker build \
   --build-arg VUE_APP_SHOP_REDEEM_WINDOW_DAYS=7 \
+  --build-arg VUE_APP_PAGE_TITLE=燃动现象 \
   --build-arg VUE_APP_DINGTALK_CORP_ID=<钉钉企业 CorpId> \
   --build-arg VUE_APP_DINGTALK_CLIENT_ID=<钉钉 H5 应用 ClientId> \
   -t flame-sport-pheno-fe .
@@ -103,6 +117,7 @@ docker run --rm --name flame-sport-pheno-fe -p 8080:80 flame-sport-pheno-fe
 docker build \
   --build-arg VUE_APP_API_BASE_URL=https://api.example.com/flame/api \
   --build-arg VUE_APP_SHOP_REDEEM_WINDOW_DAYS=7 \
+  --build-arg VUE_APP_PAGE_TITLE=燃动现象 \
   --build-arg VUE_APP_DINGTALK_CORP_ID=<钉钉企业 CorpId> \
   --build-arg VUE_APP_DINGTALK_CLIENT_ID=<钉钉 H5 应用 ClientId> \
   -t flame-sport-pheno-fe .
@@ -114,4 +129,4 @@ docker build \
 
 ## 浏览器支持
 
-目标运行环境为现代移动端浏览器及钉钉 H5 WebView。项目使用 CSS 自定义属性、`backdrop-filter` 和现代 CSS 动画，旧版浏览器可能需要额外的样式降级处理。
+目标运行环境为现代移动端浏览器及钉钉 H5 WebView。项目会在不支持 CSS `color-mix()` 的旧版 Android WebView 中自动降级为实色卡片并关闭背景模糊，避免未知颜色函数导致整块背景声明失效、内容透出；支持这些能力的设备保持原有玻璃质感和动画。

@@ -14,7 +14,7 @@ VUE_APP_API_BASE_URL=/flame/api
 /flame/api
 ```
 
-例如项目接口路径为 `/project/list` 时，实际请求路径为 `/flame/api/project/list`。本地联调可在 `.env.development` 中覆盖为实际后端地址，但应保留 `/flame/api` 路径前缀。
+例如项目接口路径为 `/project/list` 时，实际请求路径为 `/flame/api/project/list`。本地联调可在 `../../.env` 中覆盖为实际后端地址，但应保留 `/flame/api` 路径前缀。
 
 ## 鉴权请求头
 
@@ -41,8 +41,8 @@ Authorization: <auth_code>
 如果非登录接口返回 `401 Unauthorized`：
 
 1. 前端重新构造登录凭证
-   - 钉钉环境重新调用 `dd.runtime.permission.requestAuthCode()` 获取一次性免登码
-   - 非钉钉环境继续使用 `VUE_APP_AUTH_CODE`
+   - 开发构建继续使用 `VUE_APP_AUTH_CODE`
+   - 生产构建重新调用 `dd.runtime.permission.requestAuthCode()` 获取一次性免登码
 2. 前端重新请求 `/auth/login`
 3. 更新本地 `auth_code`
 4. 自动重试原业务请求一次
