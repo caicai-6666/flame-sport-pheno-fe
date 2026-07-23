@@ -1,5 +1,10 @@
 import request from './request'
 
+// /season/current 的 404 是产品约定的“暂无激活赛季”，不能与其他接口的 404 混为一谈。
+export function isNoActiveSeasonError(error) {
+  return error?.status === 404
+}
+
 function normalizeSeason(season) {
   return {
     seasonId: season.season_id || season.id,

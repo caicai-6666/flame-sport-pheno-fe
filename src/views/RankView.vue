@@ -3,6 +3,7 @@
     :leaderboard-records="leaderboardRecords"
     :is-loading="isLoading"
     :error-message="errorMessage"
+    :is-no-active-season="isNoActiveSeason"
     @retry="loadLeaderboard"
   />
 </template>
@@ -10,7 +11,8 @@
 <script>
 import RankPage from '../components/RankPage.vue'
 import { getLeaderboardInfo } from '../api/rank'
-import { appState, setLeaderboardRecords } from '../state/appState'
+import { getCurrentSeason, isNoActiveSeasonError } from '../api/season'
+import { appState, setCurrentSeason, setLeaderboardRecords, setSeasonAvailability } from '../state/appState'
 
 const MIN_LOADING_DURATION = 1000
 
@@ -35,7 +37,8 @@ export default {
   data() {
     return {
       isLoading: false,
-      errorMessage: ''
+      errorMessage: '',
+      isNoActiveSeason: false
     }
   },
   computed: {
@@ -50,7 +53,33 @@ export default {
     async loadLeaderboard() {
       this.isLoading = true
       this.errorMessage = ''
+      this.isNoActiveSeason = false
       const loadingStartedAt = Date.now()
+
+      setSeasonAvailability('loading')
+
+      try {
+        const season = await getCurrentSeason()
+        setCurrentSeason(season)
+        setSeasonAvailability('active')
+      } catch (error) {
+        await waitForMinLoadingDuration(loadingStartedAt)
+
+        if (isNoActiveSeasonError(error)) {
+          // 无赛季时清空 KeepAlive 留下的旧榜单，避免误把上一赛季结果当作当前排名。
+          this.isNoActiveSeason = true
+          setCurrentSeason(null)
+          setSeasonAvailability('unavailable')
+          setLeaderboardRecords([])
+          this.isLoading = false
+          return
+        }
+
+        this.isNoActiveSeason = false
+        this.errorMessage = error.message || '排行榜加载失败'
+        this.isLoading = false
+        return
+      }
 
       try {
         const leaderboardRecords = await getLeaderboardInfo()

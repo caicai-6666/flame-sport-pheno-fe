@@ -6,9 +6,12 @@
     :remaining-lock-slots="remainingLockSlots"
     :selected-challenge-level="selectedChallengeLevel"
     :challenges="challenges"
+    :is-challenge-loading="isChallengeLoading"
     :is-locking="isLocking"
     :lock-error="lockError"
     :is-registration-closed="isSeasonRegistrationClosed"
+    :is-no-active-season="isNoActiveSeason"
+    :is-season-context-loading="isSeasonContextLoading"
     @lock-task="lockTask"
   />
 
@@ -24,9 +27,9 @@
 
 <script>
 import { getProjectLevels, getProjects, lockProject } from '../api/projects'
-import { getCurrentSeason, getSeasonParticipationStatus } from '../api/season'
+import { getCurrentSeason, getSeasonParticipationStatus, isNoActiveSeasonError } from '../api/season'
 import ProjectDetail from '../components/ProjectDetail.vue'
-import { appState, findTaskByName, isTaskLocked, lockTask as markTaskLocked, remainingLockSlots, setCurrentSeason, setProjectTasks, setSeasonParticipationStatus } from '../state/appState'
+import { appState, findTaskByName, isTaskLocked, lockTask as markTaskLocked, remainingLockSlots, setCurrentSeason, setProjectTasks, setSeasonAvailability, setSeasonParticipationStatus } from '../state/appState'
 
 const MIN_LOCKING_DURATION = 900
 
@@ -51,14 +54,16 @@ export default {
   data() {
     return {
       challenges: [],
+      isChallengeLoading: true,
       isLocking: false,
-      lockError: null
+      lockError: null,
+      isSeasonContextLoading: true
     }
   },
   async created() {
     await this.ensureProjectTasks()
     this.loadProjectLevels()
-    this.loadSeasonParticipationStatus()
+    this.loadSeasonContext()
   },
   computed: {
     task() {
@@ -77,10 +82,13 @@ export default {
       return this.$route.query.projectId || this.task?.projectId || ''
     },
     seasonId() {
-      return this.$route.query.seasonId || appState.currentSeason?.seasonId || ''
+      return appState.currentSeason?.seasonId || ''
     },
     isSeasonRegistrationClosed() {
       return appState.seasonParticipationStatus === 'closed'
+    },
+    isNoActiveSeason() {
+      return appState.seasonAvailability === 'unavailable'
     }
   },
   methods: {
@@ -101,45 +109,56 @@ export default {
 
       if (!projectId) {
         this.challenges = []
+        this.isChallengeLoading = false
         return
       }
+
+      this.isChallengeLoading = true
 
       try {
         this.challenges = await getProjectLevels(projectId)
       } catch {
         this.challenges = []
+      } finally {
+        this.isChallengeLoading = false
       }
     },
-    async ensureSeasonId() {
-      if (this.seasonId) {
-        return this.seasonId
-      }
+    async loadSeasonContext() {
+      this.isSeasonContextLoading = true
+      setSeasonAvailability('loading')
 
-      const season = await getCurrentSeason()
-      setCurrentSeason(season)
+      try {
+        // 详情页不能信任路由中遗留的 seasonId，必须以当前赛季接口的结果决定能否锁定。
+        const season = await getCurrentSeason()
+        setCurrentSeason(season)
+        setSeasonAvailability('active')
+      } catch (error) {
+        if (isNoActiveSeasonError(error)) {
+          setCurrentSeason(null)
+          setSeasonAvailability('unavailable')
+          setSeasonParticipationStatus({ status: 'unknown' })
+          this.isSeasonContextLoading = false
+          return
+        }
 
-      return season.seasonId
-    },
-    async loadSeasonParticipationStatus() {
-      if (appState.seasonParticipationStatus !== 'unknown') {
+        setSeasonAvailability('error')
+        setSeasonParticipationStatus({ status: 'unknown' })
+        this.isSeasonContextLoading = false
         return
       }
 
       try {
-        const seasonId = await this.ensureSeasonId()
-
-        if (!seasonId) {
-          return
-        }
-
-        const participation = await getSeasonParticipationStatus(seasonId)
+        const participation = await getSeasonParticipationStatus(this.seasonId)
         setSeasonParticipationStatus(participation)
       } catch {
-        // 参与状态检查失败不阻断详情规则展示，锁定时仍以后端接口结果为准。
+        // 参与状态检查失败不影响规则浏览；锁定接口仍由后端执行最终校验。
+        setSeasonParticipationStatus({ status: 'unknown' })
+      } finally {
+        this.isSeasonContextLoading = false
       }
     },
     async lockTask(task) {
-      if (this.isLocking || this.isLocked || this.isSeasonRegistrationClosed) {
+      if (this.isLocking || this.isLocked || this.isSeasonRegistrationClosed || this.isNoActiveSeason || this.isSeasonContextLoading) {
         return
       }
 
@@ -155,7 +174,7 @@ export default {
       const lockStartedAt = Date.now()
 
       try {
-        const seasonId = await this.ensureSeasonId()
+        const seasonId = this.seasonId
 
         if (!seasonId) {
           throw new Error('缺少 season_id，无法锁定项目')

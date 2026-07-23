@@ -16,6 +16,8 @@ src/api/projects.js
 - `GET /proof/config`
 - `POST /proof/upload`
 
+无激活赛季时，首页不会打开上传弹窗；即使通过旧页面缓存或异常入口绕过前端，后端也必须拒绝没有有效当前赛季的 `POST /proof/upload`。
+
 上传成功后，前端会即时追加一条记录到 `appState.uploadRecords`，因此当前会话中进入 `HistoryPage` 能立即看到新上传内容。
 进入 `HistoryPage` 时，前端会重新查询当前赛季上传历史；即时追加只用于上传成功后的当前会话反馈。
 

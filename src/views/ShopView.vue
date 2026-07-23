@@ -9,6 +9,7 @@
     :point-flow-error-message="pointFlowErrorMessage"
     :is-redeem-available="redeemAvailability.isAvailable"
     :redeem-window-message="redeemAvailability.message"
+    :is-no-active-season="isNoActiveSeason"
     :consume-product="consumeProduct"
     @retry-products="loadProducts"
     @retry-point-flow="loadPointFlow"
@@ -26,8 +27,8 @@ import {
   getShopProducts,
   getShopProductImageSrc
 } from '../api/shop'
-import { getCurrentSeason } from '../api/season'
-import { setCurrentSeason } from '../state/appState'
+import { getCurrentSeason, isNoActiveSeasonError } from '../api/season'
+import { appState, setCurrentSeason, setSeasonAvailability } from '../state/appState'
 import { groupProductsByTier } from '../utils/shopProductTiers'
 import { getShopRedeemAvailability } from '../utils/shopRedeemWindow'
 
@@ -64,6 +65,11 @@ export default {
     this.productImageLoadVersion += 1
     this.revokeProductImageUrls()
     this.clearRedeemWindowTimer()
+  },
+  computed: {
+    isNoActiveSeason() {
+      return appState.seasonAvailability === 'unavailable'
+    }
   },
   methods: {
     async loadProducts() {
@@ -107,17 +113,22 @@ export default {
       }
     },
     async loadRedeemWindow() {
+      setSeasonAvailability('loading')
+
       try {
         // 兑换资格会影响扣减积分，进入商城时始终刷新当前赛季，避免 KeepAlive 缓存跨赛季后沿用旧日期。
         this.currentSeason = await getCurrentSeason()
 
         setCurrentSeason(this.currentSeason)
+        setSeasonAvailability('active')
         this.updateRedeemAvailability()
-      } catch {
+      } catch (error) {
         this.currentSeason = null
+        setCurrentSeason(null)
+        setSeasonAvailability(isNoActiveSeasonError(error) ? 'unavailable' : 'error')
         this.redeemAvailability = {
           isAvailable: false,
-          message: '暂无法确认赛季兑换时间',
+          message: isNoActiveSeasonError(error) ? '当前暂无激活赛季，兑换敬请期待' : '暂无法确认赛季兑换时间',
           nextChangeAt: null
         }
         this.clearRedeemWindowTimer()

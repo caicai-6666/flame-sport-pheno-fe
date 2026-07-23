@@ -265,6 +265,10 @@ export default {
     redeemWindowMessage: {
       type: String,
       default: '正在确认兑换时间'
+    },
+    isNoActiveSeason: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
@@ -329,7 +333,7 @@ export default {
       }
 
       if (!this.isRedeemAvailable) {
-        return '暂未开放'
+        return this.isNoActiveSeason ? '敬请期待' : '暂未开放'
       }
 
       if (this.availablePoints < points) {
