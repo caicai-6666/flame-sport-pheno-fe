@@ -45,14 +45,14 @@ Flame Winter Pheno 是一个面向企业员工健康挑战的移动端 Web 应�
 - 用户锁定足够数量的项目后，才能锁定青铜、白银或黄金挑战等级并完成赛季报名。
 - 赛季参与状态由 `/season/participate_check` 表达：`200` 为已参与，`409` 为报名中，`403` 为报名已截止。
 - 项目锁定后才允许上传该项目的运动凭证。
-- 上传表单由后端项目上传配置驱动；图片提交前会转换为 JPG，并压缩到 1 MB 以内。
+- 上传表单由后端项目上传配置驱动；每次可选择 1～2 张图片，双图在前端按等比完整展示的方式拼为一张 JPG，再压缩到 1 MB 以内提交，后端仍只接收单个 `image` 文件。
 - 当前赛季历史只在用户已参与该赛季时查询和展示；过往赛季记录独立查询。
 - 当前赛季项目进度由 `/project/progress?season_id` 返回的 `completion_progress` 提供，后端以 0～1 的比例返回，前端展示为百分比。
 - `/season/current` 返回约定的 404 表示当前没有激活赛季，不是普通网络错误；前端以独立的 `seasonAvailability` 状态处理，不能与报名状态混用。
 - 排行榜仅按当前赛季通过初审的打卡次数 `checkin_count` 排序，并根据 `is_current_user` 定位当前用户。
 - 商城可用积分取最新一条积分流水的 `points_after`，兑换成功后使用接口返回余额更新页面。
 - 商城兑换仅在赛季开始后的前 N 个自然日开放，前端默认 N 为 7 且可通过 `VUE_APP_SHOP_REDEEM_WINDOW_DAYS` 配置；后端必须执行同样的最终校验。
-- 登录模式默认使用 `VUE_APP_LOGIN_PROVIDER=auto`：开发构建直接读取 `VUE_APP_AUTH_CODE`，生产构建走钉钉免登；两者都通过同一个 `/auth/login` 换取后续业务会话。
+- 登录模式由 `VUE_APP_MODE` 唯一决定：`development` 直接读取 `VUE_APP_AUTH_CODE`，`production` 走钉钉免登；两者都通过同一个 `/auth/login` 换取后续业务会话。未配置或值无效时，按 Vue CLI 的 `NODE_ENV` 回退，兼容既有构建。
 - 页面视觉对不支持 CSS `color-mix()` 的旧版 Android WebView 提供实色回退，并关闭背景模糊，避免未知颜色函数使完整背景声明失效而出现内容透出。
 
 ## 前端编排

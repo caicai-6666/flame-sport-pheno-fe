@@ -41,8 +41,8 @@ Authorization: <auth_code>
 如果非登录接口返回 `401 Unauthorized`：
 
 1. 前端重新构造登录凭证
-   - 开发构建继续使用 `VUE_APP_AUTH_CODE`
-   - 生产构建重新调用 `dd.runtime.permission.requestAuthCode()` 获取一次性免登码
+   - `VUE_APP_MODE=development` 继续使用 `VUE_APP_AUTH_CODE`
+   - `VUE_APP_MODE=production` 重新调用 `dd.runtime.permission.requestAuthCode()` 获取一次性免登码
 2. 前端重新请求 `/auth/login`
 3. 更新本地 `auth_code`
 4. 自动重试原业务请求一次

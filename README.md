@@ -76,10 +76,10 @@ npm run lint
 
 开发环境通过 `.env` 配置带 `/flame/api` 前缀的后端基础地址、登录模式及钉钉 H5 参数。浏览器直接请求后端，因此后端需要允许本地开发地址的跨域请求。启动后根据终端输出访问本地地址，默认通常为 `http://localhost:8080`。
 
-推荐将浏览器联调配置放入 `.env.development`。保持 `VUE_APP_LOGIN_PROVIDER=auto` 时，`npm run serve` 会直接使用 `VUE_APP_AUTH_CODE` 调用后端登录接口，不会向钉钉请求免登码；`npm run build` 则默认走钉钉免登。修改环境变量后需要重启开发服务。
+推荐将浏览器联调配置放入 `.env.development`。通过 `VUE_APP_MODE` 指定登录模式：`development` 会直接使用 `VUE_APP_AUTH_CODE` 调用后端登录接口，不会向钉钉请求免登码；`production` 会走钉钉免登。修改环境变量后需要重启开发服务。
 
 ```env
-VUE_APP_LOGIN_PROVIDER=auto
+VUE_APP_MODE=development
 VUE_APP_AUTH_CODE=<后端提供的开发 auth_code>
 ```
 

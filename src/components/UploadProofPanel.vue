@@ -49,10 +49,12 @@
         :class="{ 'has-upload-config-fields': shouldShowUploadConfigFields }"
         @submit.prevent="submitProof"
       >
+        <div class="upload-form-body">
         <label
           class="upload-dropzone"
           :class="{
             'has-preview': proofPreviewUrl,
+            'has-collage-preview': selectedProofCount > 1,
             'is-processing': isProofProcessing
           }"
         >
@@ -60,16 +62,19 @@
             ref="proofFileInput"
             type="file"
             accept="image/*"
+            multiple
             :disabled="isProofProcessing || isProofUploading"
             @change="handleProofUpload"
           >
           <template v-if="proofPreviewUrl">
             <img :src="proofPreviewUrl" :alt="`${task.name}记录预览`">
-            <span class="replace-proof">更换图片</span>
+            <span class="replace-proof">
+              {{ selectedProofCount > 1 ? `已拼接 ${selectedProofCount} 张 · 更换` : '更换图片' }}
+            </span>
           </template>
           <template v-else>
             <span class="upload-icon">＋</span>
-            <strong>点击上传图片</strong>
+            <strong>点击上传图片（最多 2 张）</strong>
             <small>{{ uploadHelpText }}</small>
           </template>
         </label>
@@ -104,7 +109,9 @@
           ></textarea>
           <small class="proof-note-hint">请尽量写明时长、距离、次数、步数等具体指标；描述越具体、越便于核验，越有助于通过初审。</small>
         </label>
+        </div>
 
+        <div class="upload-submit-footer">
         <button
           class="submit-proof"
           type="submit"
@@ -124,6 +131,7 @@
             </span>
           </Transition>
         </button>
+        </div>
       </form>
     </aside>
   </div>
@@ -133,11 +141,17 @@
 import { getProjectUploadConfig, uploadProjectProof } from '../api/projects'
 
 const MAX_PROOF_IMAGE_BYTES = 1024 * 1024
+const MAX_PROOF_IMAGE_COUNT = 2
 const INITIAL_IMAGE_MAX_EDGE = 1920
 const MIN_IMAGE_MAX_EDGE = 320
 const JPEG_QUALITY_STEPS = [0.9, 0.82, 0.74, 0.66, 0.58, 0.5, 0.42]
 const MIN_PROOF_UPLOADING_DURATION = 1800
 const PROOF_UPLOAD_FAILURE_DURATION = 1400
+const COLLAGE_SIZE = 1920
+const COLLAGE_PADDING = 24
+const COLLAGE_GAP = 24
+const COLLAGE_CELL_WIDTH = (COLLAGE_SIZE - COLLAGE_PADDING * 2 - COLLAGE_GAP) / 2
+const COLLAGE_CELL_HEIGHT = COLLAGE_SIZE - COLLAGE_PADDING * 2
 
 const defaultUploadConfig = {
   uploadConfigId: '',
@@ -213,14 +227,13 @@ function canvasToJpegBlob(canvas, quality) {
   })
 }
 
-async function compressImageToJpeg(file) {
-  const image = await loadImage(file)
+async function compressDrawableToJpeg(drawable, sourceWidth, sourceHeight) {
   let maxEdge = INITIAL_IMAGE_MAX_EDGE
 
   while (maxEdge >= MIN_IMAGE_MAX_EDGE) {
     const canvas = document.createElement('canvas')
     const context = canvas.getContext('2d')
-    const imageSize = getImageSizeForMaxEdge(image.naturalWidth || image.width, image.naturalHeight || image.height, maxEdge)
+    const imageSize = getImageSizeForMaxEdge(sourceWidth, sourceHeight, maxEdge)
 
     if (!context) {
       throw new Error('当前浏览器无法处理图片，请更换浏览器后重试')
@@ -232,7 +245,7 @@ async function compressImageToJpeg(file) {
     // PNG 等透明图片转 JPG 时先铺白底，避免透明区域被浏览器渲染成黑色。
     context.fillStyle = '#fff'
     context.fillRect(0, 0, canvas.width, canvas.height)
-    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+    context.drawImage(drawable, 0, 0, canvas.width, canvas.height)
 
     for (const quality of JPEG_QUALITY_STEPS) {
       const blob = await canvasToJpegBlob(canvas, quality)
@@ -246,6 +259,55 @@ async function compressImageToJpeg(file) {
   }
 
   throw new Error('图片压缩后仍超过 1MB，请更换图片')
+}
+
+async function compressImageToJpeg(file) {
+  const image = await loadImage(file)
+
+  return compressDrawableToJpeg(
+    image,
+    image.naturalWidth || image.width,
+    image.naturalHeight || image.height
+  )
+}
+
+function drawImageContain(context, image, x, y, width, height) {
+  const imageWidth = image.naturalWidth || image.width
+  const imageHeight = image.naturalHeight || image.height
+  const scale = Math.min(width / imageWidth, height / imageHeight)
+  const drawWidth = imageWidth * scale
+  const drawHeight = imageHeight * scale
+  const drawX = x + (width - drawWidth) / 2
+  const drawY = y + (height - drawHeight) / 2
+
+  context.drawImage(image, drawX, drawY, drawWidth, drawHeight)
+}
+
+async function composeProofImagesToJpeg(files) {
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d')
+
+  if (!context) {
+    throw new Error('当前浏览器无法处理图片，请更换浏览器后重试')
+  }
+
+  canvas.width = COLLAGE_SIZE
+  canvas.height = COLLAGE_SIZE
+  context.fillStyle = '#fff'
+  context.fillRect(0, 0, canvas.width, canvas.height)
+
+  // 两张图片按选择顺序左右排布，只等比缩放，绝不裁切或拉伸凭证内容。
+  for (const [index, file] of files.entries()) {
+    const image = await loadImage(file)
+    const cellX = COLLAGE_PADDING + index * (COLLAGE_CELL_WIDTH + COLLAGE_GAP)
+    const cellY = COLLAGE_PADDING
+
+    context.fillStyle = '#f5f7f4'
+    context.fillRect(cellX, cellY, COLLAGE_CELL_WIDTH, COLLAGE_CELL_HEIGHT)
+    drawImageContain(context, image, cellX, cellY, COLLAGE_CELL_WIDTH, COLLAGE_CELL_HEIGHT)
+  }
+
+  return compressDrawableToJpeg(canvas, canvas.width, canvas.height)
 }
 
 function wait(ms) {
@@ -279,6 +341,7 @@ export default {
       proofRecordType: '',
       proofPreviewUrl: '',
       proofFileBaseName: '',
+      selectedProofCount: 0,
       compressedProofBlob: null,
       isProofProcessing: false,
       proofProcessError: null,
@@ -321,7 +384,9 @@ export default {
     },
     uploadHelpText() {
       if (this.isProofProcessing) {
-        return '正在转换为 JPG 并压缩到 1MB 以内...'
+        return this.selectedProofCount > 1
+          ? `正在等比拼接 ${this.selectedProofCount} 张图片并压缩到 1MB 以内...`
+          : '正在转换为 JPG 并压缩到 1MB 以内...'
       }
 
       return this.isUploadConfigLoading ? '正在加载上传要求...' : this.selectedUploadConfig.uploadHint
@@ -405,11 +470,33 @@ export default {
       this.resetProofSubmitConfirm()
     },
     async handleProofUpload(event) {
-      const [file] = event.target.files || []
+      const files = Array.from(event.target.files || [])
 
-      if (!file) {
+      if (!files.length) {
         return
       }
+
+      if (files.length > MAX_PROOF_IMAGE_COUNT) {
+        this.proofProcessError = `一次最多上传 ${MAX_PROOF_IMAGE_COUNT} 张图片，请重新选择`
+
+        if (this.$refs.proofFileInput) {
+          this.$refs.proofFileInput.value = ''
+        }
+
+        return
+      }
+
+      if (files.some(file => file.type && !file.type.startsWith('image/'))) {
+        this.proofProcessError = '请选择图片文件'
+
+        if (this.$refs.proofFileInput) {
+          this.$refs.proofFileInput.value = ''
+        }
+
+        return
+      }
+
+      const [firstFile] = files
 
       if (this.proofPreviewUrl) {
         URL.revokeObjectURL(this.proofPreviewUrl)
@@ -419,14 +506,19 @@ export default {
       this.proofSelectionToken = selectionToken
       this.proofPreviewUrl = ''
       this.compressedProofBlob = null
-      this.proofFileBaseName = sanitizeProofFileBaseName(getProofFileBaseName(file.name))
+      this.selectedProofCount = files.length
+      this.proofFileBaseName = sanitizeProofFileBaseName(
+        files.length > 1 ? `${getProofFileBaseName(firstFile.name)}-${files.length}张凭证` : getProofFileBaseName(firstFile.name)
+      )
       this.isProofProcessing = true
       this.proofProcessError = null
       this.clearProofUploadFailure()
       this.resetProofSubmitConfirm()
 
       try {
-        const compressedBlob = await compressImageToJpeg(file)
+        const compressedBlob = files.length === 1
+          ? await compressImageToJpeg(firstFile)
+          : await composeProofImagesToJpeg(files)
 
         if (selectionToken !== this.proofSelectionToken) {
           return
@@ -441,6 +533,7 @@ export default {
 
         this.proofProcessError = error.message || '图片处理失败，请重新选择图片'
         this.proofFileBaseName = ''
+        this.selectedProofCount = 0
         this.compressedProofBlob = null
 
         if (this.$refs.proofFileInput) {
@@ -568,6 +661,7 @@ export default {
       this.setDefaultProofRecordType()
       this.proofPreviewUrl = ''
       this.proofFileBaseName = ''
+      this.selectedProofCount = 0
       this.compressedProofBlob = null
       this.isProofProcessing = false
       this.proofProcessError = null
@@ -696,6 +790,8 @@ export default {
   padding: 16px;
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 30px;
+  /* 旧版 Android WebView 忽略 color-mix() 时，仍需保留不透明面板。 */
+  background: #f7fbf4;
   background:
     radial-gradient(circle at 86% 10%, color-mix(in srgb, var(--accent), transparent 76%), transparent 28%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 244, 0.92));
@@ -716,6 +812,7 @@ export default {
 }
 
 .upload-kicker {
+  color: var(--accent, #2f8f32);
   color: color-mix(in srgb, var(--accent), #17211b 22%);
   font-size: 10px;
   font-weight: 950;
@@ -836,15 +933,33 @@ export default {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.upload-form-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 2px 2px 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+}
+
+.upload-submit-footer {
+  flex: 0 0 auto;
+  padding: 12px 0 4px;
 }
 
 .upload-dropzone {
   position: relative;
   flex: 1;
   min-height: 128px;
+  border: 1.5px dashed var(--accent, #49b84b);
   border: 1.5px dashed color-mix(in srgb, var(--accent), #fff 18%);
   border-radius: 24px;
+  background: #f4fbf0;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--accent), #fff 90%), rgba(255, 255, 255, 0.74)),
     #fff;
@@ -873,6 +988,7 @@ export default {
   width: 48px;
   height: 48px;
   border-radius: 18px;
+  background: var(--accent, #49b84b);
   background: color-mix(in srgb, var(--accent), #fff 20%);
   color: #fff;
   display: grid;
@@ -913,6 +1029,12 @@ export default {
   object-fit: cover;
 }
 
+.upload-dropzone.has-collage-preview img {
+  /* 拼图预览必须完整展示两张凭证，不能再按封面模式裁切。 */
+  background: #f5f7f4;
+  object-fit: contain;
+}
+
 .replace-proof {
   position: absolute;
   right: 10px;
@@ -925,7 +1047,7 @@ export default {
   font-weight: 900;
 }
 
-.upload-form.has-upload-config-fields {
+.upload-form.has-upload-config-fields .upload-form-body {
   gap: 10px;
 }
 
@@ -1024,11 +1146,14 @@ export default {
 }
 
 .submit-proof {
+  width: 100%;
+  display: block;
   position: relative;
   overflow: hidden;
   min-height: 46px;
   border: 0;
   border-radius: 18px;
+  background: linear-gradient(135deg, var(--accent, #49b84b), #2f8f32);
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent), #fff 8%), #2f8f32);
   color: #fff;
   box-shadow: 0 14px 26px color-mix(in srgb, var(--accent), transparent 68%);
@@ -1211,6 +1336,11 @@ export default {
   .upload-panel {
     gap: 9px;
     padding: 14px;
+  }
+
+  .upload-submit-footer {
+    padding-top: 9px;
+    padding-bottom: 3px;
   }
 
   .upload-summary {
