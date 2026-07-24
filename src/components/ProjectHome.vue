@@ -159,6 +159,20 @@
         </span>
         <span class="task-link">{{ taskActionText(task) }}</span>
       </button>
+
+      <!-- 意见收集不属于后端项目，不参与项目锁定与赛季状态判断，固定排在全部项目之后。 -->
+      <article class="task-card feedback-card" style="--accent: #ee55b8">
+        <span class="task-card-header">
+          <span class="task-name">意见收集</span>
+          <span class="task-illustration" aria-hidden="true">
+            <img :src="feedbackIcon" alt="">
+          </span>
+        </span>
+        <span class="task-description-frame">
+          <span class="task-description">你的每一条建议，都能让燃动现象变得更好。</span>
+        </span>
+        <span class="task-link">敬请期待</span>
+      </article>
     </div>
 
     <Transition name="upload-panel">
@@ -175,6 +189,7 @@
 
 <script>
 import UploadProofPanel from './UploadProofPanel.vue'
+import feedbackIcon from '../assets/xinxiang.png'
 
 export default {
   name: 'ProjectHome',
@@ -197,7 +212,8 @@ export default {
       levelLockingHoldTimer: null,
       isLevelCompletionAnimating: false,
       levelCompletionTimer: null,
-      levelProgressParticles: []
+      levelProgressParticles: [],
+      feedbackIcon
     }
   },
   props: {
@@ -1485,6 +1501,29 @@ export default {
 .task-card.is-disabled:hover {
   border-color: rgba(23, 33, 27, 0.08);
   transform: none;
+}
+
+.feedback-card {
+  border-color: color-mix(in srgb, var(--accent), #fff 74%);
+  background:
+    radial-gradient(circle at 88% 14%, rgba(255, 131, 209, 0.2), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 247, 253, 0.82)),
+    #fff;
+  cursor: default;
+}
+
+.feedback-card:hover {
+  border-color: color-mix(in srgb, var(--accent), #fff 60%);
+  box-shadow: 0 14px 34px rgba(38, 64, 45, 0.08);
+  transform: none;
+}
+
+.feedback-card .task-illustration {
+  background: rgba(255, 239, 250, 0.78);
+}
+
+.feedback-card .task-link {
+  color: color-mix(in srgb, var(--accent), #17211b 30%);
 }
 
 .locked-badge {
