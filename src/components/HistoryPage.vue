@@ -2,6 +2,7 @@
   <PastSeasonReviewPage
     v-if="shouldShowPastSeasonOnly"
     :records="pastSeasonReviewRecords"
+    :hero-description="pastSeasonHeroDescription"
     :show-current-season-link="false"
   />
 
@@ -208,6 +209,10 @@ export default {
     seasonParticipationStatus: {
       type: String,
       default: 'unknown'
+    },
+    isNoActiveSeason: {
+      type: Boolean,
+      default: false
     }
   },
   watch: {
@@ -218,6 +223,11 @@ export default {
   computed: {
     shouldShowPastSeasonOnly() {
       return this.seasonParticipationStatus !== 'participated'
+    },
+    pastSeasonHeroDescription() {
+      return this.isNoActiveSeason
+        ? '当前暂无进行中的赛季，敬请期待。你仍可查看已归档的上传记录与审核结果。'
+        : '查看已归档赛季的上传记录与审核结果。'
     },
     sortedRecords() {
       return [...this.records].sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))

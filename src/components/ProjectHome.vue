@@ -2,8 +2,8 @@
   <section class="project-home" aria-label="项目任务">
     <div class="hero-card">
       <span class="eyebrow">{{ seasonLabel }}</span>
-      <h1>当前赛季可选任务</h1>
-      <p>围绕日常、训练、团队和户外场景，把健康行为拆成可完成的挑战。</p>
+      <h1>{{ heroTitle }}</h1>
+      <p>{{ heroDescription }}</p>
 
       <div
         ref="heroGuidanceFrame"
@@ -16,7 +16,12 @@
           @enter="animateHeroGuidanceHeight"
           @after-enter="clearHeroGuidanceHeight"
         >
-          <div v-if="shouldShowSeasonResultCard" key="target" class="season-target-card">
+          <div v-if="isNoActiveSeason" key="unavailable" class="season-target-card">
+            <span>新赛季敬请期待</span>
+            <strong>当前暂无进行中的赛季，你可以先浏览运动项目与挑战规则。</strong>
+          </div>
+
+          <div v-else-if="shouldShowSeasonResultCard" key="target" class="season-target-card">
             <span>{{ seasonResultTitle }}</span>
             <strong v-if="seasonResultDescription">{{ seasonResultDescription }}</strong>
           </div>
@@ -98,7 +103,7 @@
             </p>
           </div>
 
-          <div v-else key="unavailable" class="season-target-card">
+          <div v-else key="unknown" class="season-target-card">
             <span>暂时无法确认赛季报名状态</span>
           </div>
         </Transition>
@@ -154,6 +159,20 @@
         </span>
         <span class="task-link">{{ taskActionText(task) }}</span>
       </button>
+
+      <!-- 意见收集不属于后端项目，不参与项目锁定与赛季状态判断，固定排在全部项目之后。 -->
+      <article class="task-card feedback-card" style="--accent: #ee55b8">
+        <span class="task-card-header">
+          <span class="task-name">意见收集</span>
+          <span class="task-illustration" aria-hidden="true">
+            <img :src="feedbackIcon" alt="">
+          </span>
+        </span>
+        <span class="task-description-frame">
+          <span class="task-description">你的每一条建议，都能让燃动现象变得更好。</span>
+        </span>
+        <span class="task-link">敬请期待</span>
+      </article>
     </div>
 
     <Transition name="upload-panel">
@@ -170,6 +189,7 @@
 
 <script>
 import UploadProofPanel from './UploadProofPanel.vue'
+import feedbackIcon from '../assets/xinxiang.png'
 
 export default {
   name: 'ProjectHome',
@@ -192,7 +212,8 @@ export default {
       levelLockingHoldTimer: null,
       isLevelCompletionAnimating: false,
       levelCompletionTimer: null,
-      levelProgressParticles: []
+      levelProgressParticles: [],
+      feedbackIcon
     }
   },
   props: {
@@ -228,6 +249,10 @@ export default {
       type: String,
       default: 'unknown'
     },
+    isNoActiveSeason: {
+      type: Boolean,
+      default: false
+    },
     isSeasonParticipationLoading: {
       type: Boolean,
       default: false
@@ -247,6 +272,10 @@ export default {
   },
   computed: {
     seasonLabel() {
+      if (this.isNoActiveSeason) {
+        return '敬请期待'
+      }
+
       if (!this.season) {
         return '当前赛季'
       }
@@ -255,6 +284,14 @@ export default {
       const seasonName = this.season.name || '当前赛季'
 
       return duration ? `${seasonName} · ${duration}` : seasonName
+    },
+    heroTitle() {
+      return this.isNoActiveSeason ? '新赛季敬请期待' : '当前赛季可选任务'
+    },
+    heroDescription() {
+      return this.isNoActiveSeason
+        ? '赛季开启后即可选择项目、锁定挑战等级并上传运动记录。'
+        : '围绕日常、训练、团队和户外场景，把健康行为拆成可完成的挑战。'
     },
     seasonDuration() {
       if (!this.season?.startDate || !this.season?.endDate) {
@@ -281,13 +318,13 @@ export default {
       return this.seasonParticipationStatus === 'registering'
     },
     shouldShowSetupGuide() {
-      return this.isSeasonRegistering || this.isLevelLockingHolding || this.isLevelCompletionAnimating
+      return !this.isNoActiveSeason && (this.isSeasonRegistering || this.isLevelLockingHolding || this.isLevelCompletionAnimating)
     },
     isSeasonRegistrationClosed() {
       return this.seasonParticipationStatus === 'closed'
     },
     shouldShowSeasonChecking() {
-      return this.isSeasonParticipationLoading || this.seasonParticipationStatus === 'unknown' || this.isParticipatedLevelResolving
+      return !this.isNoActiveSeason && (this.isSeasonParticipationLoading || this.seasonParticipationStatus === 'unknown' || this.isParticipatedLevelResolving)
     },
     isParticipatedLevelResolving() {
       return this.seasonParticipationStatus === 'participated' && !this.selectedChallengeLevel
@@ -521,7 +558,7 @@ export default {
       return this.lockedTaskNames.includes(task.name)
     },
     isTaskDisabled(task) {
-      return this.shouldShowSeasonChecking || (!this.isTaskLocked(task) && this.remainingLockSlots <= 0)
+      return this.shouldShowSeasonChecking || (!this.isNoActiveSeason && !this.isTaskLocked(task) && this.remainingLockSlots <= 0)
     },
     taskIcon(task) {
       return task.iconUrl || task.icon || ''
@@ -539,6 +576,10 @@ export default {
     taskActionText(task) {
       if (this.shouldShowSeasonChecking) {
         return '正在确认状态'
+      }
+
+      if (this.isNoActiveSeason) {
+        return '查看挑战 →'
       }
 
       if (this.isTaskDisabled(task)) {
@@ -1460,6 +1501,29 @@ export default {
 .task-card.is-disabled:hover {
   border-color: rgba(23, 33, 27, 0.08);
   transform: none;
+}
+
+.feedback-card {
+  border-color: color-mix(in srgb, var(--accent), #fff 74%);
+  background:
+    radial-gradient(circle at 88% 14%, rgba(255, 131, 209, 0.2), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 247, 253, 0.82)),
+    #fff;
+  cursor: default;
+}
+
+.feedback-card:hover {
+  border-color: color-mix(in srgb, var(--accent), #fff 60%);
+  box-shadow: 0 14px 34px rgba(38, 64, 45, 0.08);
+  transform: none;
+}
+
+.feedback-card .task-illustration {
+  background: rgba(255, 239, 250, 0.78);
+}
+
+.feedback-card .task-link {
+  color: color-mix(in srgb, var(--accent), #17211b 30%);
 }
 
 .locked-badge {

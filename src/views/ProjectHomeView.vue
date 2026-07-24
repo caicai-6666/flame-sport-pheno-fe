@@ -8,6 +8,7 @@
     :season-id="seasonId"
     :challenge-level-options="challengeLevelOptions"
     :season-participation-status="seasonParticipationStatus"
+    :is-no-active-season="isNoActiveSeason"
     :is-season-participation-loading="isSeasonParticipationLoading"
     :is-challenge-level-loading="isChallengeLevelLoading"
     :is-challenge-level-locking="isChallengeLevelLocking"
@@ -20,9 +21,9 @@
 
 <script>
 import { getLockedProjects, getProjectLevels, getProjects, lockProjectLevel } from '../api/projects'
-import { getCurrentSeason, getSeasonParticipationStatus } from '../api/season'
+import { getCurrentSeason, getSeasonParticipationStatus, isNoActiveSeasonError } from '../api/season'
 import ProjectHome from '../components/ProjectHome.vue'
-import { addUploadRecord, appState, setCurrentSeason, setLockedProjects, setMaxLockedTasks, setProjectTasks, setSeasonParticipationStatus, setSelectedChallengeLevel } from '../state/appState'
+import { addUploadRecord, appState, setCurrentSeason, setLockedProjects, setMaxLockedTasks, setProjectTasks, setSeasonAvailability, setSeasonParticipationStatus, setSelectedChallengeLevel } from '../state/appState'
 
 const SEASON_PARTICIPATION_CHECK_DELAY = 2000
 const CHALLENGE_LEVEL_QUERY_DELAY = 2000
@@ -113,6 +114,9 @@ export default {
     seasonParticipationStatus() {
       return appState.seasonParticipationStatus
     },
+    isNoActiveSeason() {
+      return appState.seasonAvailability === 'unavailable'
+    },
     isSeasonRegistering() {
       return appState.seasonParticipationStatus === 'registering'
     },
@@ -161,13 +165,17 @@ export default {
       }
     },
     async loadCurrentSeason() {
+      setSeasonAvailability('loading')
+
       try {
         this.currentSeason = await getCurrentSeason()
         setCurrentSeason(this.currentSeason)
+        setSeasonAvailability('active')
         setMaxLockedTasks(this.currentSeason.requiredProjectCount)
-      } catch {
+      } catch (error) {
         this.currentSeason = null
         setCurrentSeason(null)
+        setSeasonAvailability(isNoActiveSeasonError(error) ? 'unavailable' : 'error')
       }
     },
     async loadSeasonParticipationStatus() {

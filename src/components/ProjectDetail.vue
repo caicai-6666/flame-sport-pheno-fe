@@ -65,15 +65,29 @@
       </div>
     </div>
 
-    <div class="challenge-list">
+    <div v-if="isChallengeLoading" class="challenge-list" aria-busy="true" aria-live="polite">
+      <div class="challenge-loading-card">
+        <span class="challenge-loading-spinner" aria-hidden="true"></span>
+        <span>正在加载挑战规则</span>
+      </div>
+    </div>
+
+    <TransitionGroup
+      v-else
+      appear
+      name="challenge-card-reveal"
+      tag="div"
+      class="challenge-list"
+    >
       <article
-        v-for="challenge in challenges"
+        v-for="(challenge, index) in challenges"
         :key="challenge.projectRuleLevelId || challenge.level"
         class="challenge-card"
         :class="{
           'is-selected-level': isSelectedChallenge(challenge),
           'is-dimmed-level': isDimmedChallenge(challenge)
         }"
+        :style="{ '--challenge-enter-delay': `${index * 90}ms` }"
       >
         <div class="challenge-header">
           <span class="level-dot" :class="challenge.tone"></span>
@@ -98,7 +112,7 @@
           <span>{{ challenge.note }}</span>
         </div>
       </article>
-    </div>
+    </TransitionGroup>
   </section>
 </template>
 
@@ -140,6 +154,14 @@ export default {
       type: Boolean,
       default: false
     },
+    isNoActiveSeason: {
+      type: Boolean,
+      default: false
+    },
+    isSeasonContextLoading: {
+      type: Boolean,
+      default: false
+    },
     selectedChallengeLevel: {
       type: String,
       default: ''
@@ -147,10 +169,22 @@ export default {
     challenges: {
       type: Array,
       default: () => []
+    },
+    isChallengeLoading: {
+      type: Boolean,
+      default: false
     }
   },
   computed: {
     lockButtonText() {
+      if (this.isSeasonContextLoading) {
+        return '正在确认赛季'
+      }
+
+      if (this.isNoActiveSeason) {
+        return '赛季敬请期待'
+      }
+
       if (this.isLocked) {
         return '已锁定'
       }
@@ -174,6 +208,14 @@ export default {
       return this.isLockConfirming ? '确认锁定' : '锁定这个运动'
     },
     lockHint() {
+      if (this.isSeasonContextLoading) {
+        return '正在确认当前赛季是否开放'
+      }
+
+      if (this.isNoActiveSeason) {
+        return '当前暂无进行中的赛季，开放后即可锁定项目'
+      }
+
       if (this.isLocked) {
         return '该运动已加入本赛季挑战'
       }
@@ -189,6 +231,10 @@ export default {
       return `还能选择 ${this.remainingLockSlots} 个运动`
     },
     lockWarning() {
+      if (this.isNoActiveSeason) {
+        return '新赛季敬请期待，当前仅支持浏览挑战规则。'
+      }
+
       if (this.isRegistrationClosed) {
         return '已超过本赛季报名时间，不能再锁定项目。'
       }
@@ -196,10 +242,10 @@ export default {
       return '锁定后本赛季不可更改，请确认后再提交。'
     },
     shouldShowLockNote() {
-      return !this.isLocked && !this.isRegistrationClosed
+      return !this.isLocked
     },
     isLockButtonDisabled() {
-      return this.isLocked || this.isRegistrationClosed || this.isLocking || this.isLockFailed || this.remainingLockSlots <= 0
+      return this.isLocked || this.isRegistrationClosed || this.isNoActiveSeason || this.isSeasonContextLoading || this.isLocking || this.isLockFailed || this.remainingLockSlots <= 0
     }
   },
   watch: {
@@ -688,6 +734,34 @@ export default {
   gap: 12px;
 }
 
+.challenge-loading-card {
+  min-height: 154px;
+  padding: 18px;
+  border: 1px solid rgba(23, 33, 27, 0.08);
+  border-radius: 30px;
+  background:
+    linear-gradient(110deg, rgba(255, 255, 255, 0.78), rgba(242, 248, 238, 0.94), rgba(255, 255, 255, 0.78));
+  background-size: 220% 100%;
+  box-shadow: 0 16px 38px rgba(38, 64, 45, 0.06);
+  color: #68766d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  animation: challenge-loading-shimmer 1.35s ease-in-out infinite;
+}
+
+.challenge-loading-spinner {
+  width: 17px;
+  height: 17px;
+  border: 2px solid rgba(47, 143, 50, 0.2);
+  border-top-color: #49b84b;
+  border-radius: 50%;
+  animation: challenge-loading-spin 0.72s linear infinite;
+}
+
 .challenge-card {
   position: relative;
   min-height: 154px;
@@ -708,6 +782,47 @@ export default {
     filter 0.24s ease,
     opacity 0.24s ease,
     transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.challenge-card-reveal-enter-active,
+.challenge-card-reveal-appear-active {
+  transition:
+    opacity 0.48s ease-out var(--challenge-enter-delay, 0ms),
+    transform 0.48s cubic-bezier(0.2, 0.82, 0.2, 1) var(--challenge-enter-delay, 0ms);
+}
+
+.challenge-card.challenge-card-reveal-enter-from,
+.challenge-card.challenge-card-reveal-appear-from {
+  opacity: 0;
+  transform: translateX(42px);
+}
+
+@keyframes challenge-loading-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -120% 0;
+  }
+}
+
+@keyframes challenge-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .challenge-loading-card,
+  .challenge-loading-spinner {
+    animation: none;
+  }
+
+  .challenge-card-reveal-enter-active,
+  .challenge-card-reveal-appear-active {
+    transition: none;
+  }
 }
 
 .challenge-card.is-selected-level {

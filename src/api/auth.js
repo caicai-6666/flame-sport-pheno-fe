@@ -27,8 +27,8 @@ function normalizeLoginResult(response) {
 /**
  * 登录接口。
  *
- * 钉钉环境会先获取 H5 免登码，再交给后端换取当前系统会话 auth_code。
- * 非钉钉环境继续使用 VUE_APP_AUTH_CODE 作为本地开发 fallback。
+ * 生产构建先获取 H5 免登码，再交给后端换取当前系统会话 auth_code。
+ * 开发构建直接使用 VUE_APP_AUTH_CODE，保证普通浏览器可联调。
  */
 export async function login({ onBeforeRequest } = {}) {
   const loginPayload = await buildLoginPayload()

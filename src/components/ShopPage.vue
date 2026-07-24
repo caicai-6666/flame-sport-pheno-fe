@@ -140,6 +140,7 @@
                 :alt="item.name"
                 decoding="async"
                 @load="$emit('product-image-loaded', item.id)"
+                @error="$emit('product-image-failed', item.id)"
               >
               <span v-else-if="item.isImageFailed || !item.imageFilename">{{ productInitial(item) }}</span>
             </div>
@@ -224,7 +225,7 @@ async function waitForMinRedeemingDuration(startedAt) {
 
 export default {
   name: 'ShopPage',
-  emits: ['retry-products', 'retry-point-flow', 'consume-success', 'product-image-loaded'],
+  emits: ['retry-products', 'retry-point-flow', 'consume-success', 'product-image-loaded', 'product-image-failed'],
   props: {
     products: {
       type: Array,
@@ -265,6 +266,10 @@ export default {
     redeemWindowMessage: {
       type: String,
       default: '正在确认兑换时间'
+    },
+    isNoActiveSeason: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
@@ -329,7 +334,7 @@ export default {
       }
 
       if (!this.isRedeemAvailable) {
-        return '暂未开放'
+        return this.isNoActiveSeason ? '敬请期待' : '暂未开放'
       }
 
       if (this.availablePoints < points) {

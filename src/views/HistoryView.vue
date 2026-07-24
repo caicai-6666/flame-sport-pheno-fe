@@ -8,15 +8,16 @@
     :project-progress-error="projectProgressError"
     :selected-challenge-level="selectedChallengeLevel"
     :season-participation-status="seasonParticipationStatus"
+    :is-no-active-season="isNoActiveSeason"
   />
 </template>
 
 <script>
 import { getCurrentSeasonUploadRecords, getPastSeasonProofHistory } from '../api/history'
 import { getProjectProgress, getProjects } from '../api/projects'
-import { getCurrentSeason, getSeasonParticipationStatus } from '../api/season'
+import { getCurrentSeason, getSeasonParticipationStatus, isNoActiveSeasonError } from '../api/season'
 import HistoryPage from '../components/HistoryPage.vue'
-import { appState, setCurrentSeason, setPastSeasonReviewRecords, setProjectTasks, setSeasonParticipationStatus, setUploadRecords } from '../state/appState'
+import { appState, setCurrentSeason, setPastSeasonReviewRecords, setProjectTasks, setSeasonAvailability, setSeasonParticipationStatus, setUploadRecords } from '../state/appState'
 
 export default {
   name: 'HistoryView',
@@ -48,6 +49,9 @@ export default {
     },
     seasonParticipationStatus() {
       return appState.seasonParticipationStatus
+    },
+    isNoActiveSeason() {
+      return appState.seasonAvailability === 'unavailable'
     }
   },
   methods: {
@@ -56,10 +60,19 @@ export default {
         return appState.currentSeason
       }
 
-      const season = await getCurrentSeason()
-      setCurrentSeason(season)
+      setSeasonAvailability('loading')
 
-      return season
+      try {
+        const season = await getCurrentSeason()
+        setCurrentSeason(season)
+        setSeasonAvailability('active')
+
+        return season
+      } catch (error) {
+        setCurrentSeason(null)
+        setSeasonAvailability(isNoActiveSeasonError(error) ? 'unavailable' : 'error')
+        throw error
+      }
     },
     async ensureSeasonParticipationStatus(seasonId) {
       if (appState.seasonParticipationStatus !== 'unknown') {
@@ -121,10 +134,10 @@ export default {
         }
 
         await this.loadCurrentSeasonData(season.seasonId)
-      } catch {
+      } catch (error) {
         setUploadRecords([])
         this.projectProgressRecords = []
-        this.projectProgressError = '项目进度加载失败，请稍后重试'
+        this.projectProgressError = isNoActiveSeasonError(error) ? '' : '项目进度加载失败，请稍后重试'
         this.isProjectProgressLoading = false
       }
     },

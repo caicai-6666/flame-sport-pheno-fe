@@ -77,14 +77,35 @@
         }"
       ></span>
     </span>
+
+    <Transition name="launch-cover">
+      <section
+        v-if="shouldShowLaunchCover"
+        class="launch-cover"
+        aria-hidden="true"
+      >
+        <img
+          class="launch-cover-image"
+          :src="launchCoverSource"
+          alt=""
+          decoding="sync"
+          fetchpriority="high"
+          :class="{ 'is-ready': isLaunchCoverImageLoaded }"
+          @load="handleLaunchCoverLoaded"
+          @error="handleLaunchCoverLoadError"
+        >
+      </section>
+    </Transition>
   </div>
 </template>
 
 <script>
+import launchCoverSource from './assets/cover.png'
 import HeaderBar from './components/HeaderBar.vue'
 import BottomNav from './components/BottomNav.vue'
 import UserHealthProfilePanel from './components/UserHealthProfilePanel.vue'
 import { updateUserProfile } from './api/userProfile'
+import { getLoginCredentialSource } from './api/loginCredential'
 import { findTaskByName } from './state/appState'
 import { authState, initLogin } from './state/authState'
 import { saveUserHealthProfile, userHealthProfileState } from './state/userHealthProfileState'
@@ -95,6 +116,7 @@ const navItems = [
   { key: 'history', label: '历史', icon: '◷', routeName: 'history' },
   { key: 'shop', label: '商城', icon: '🛍', routeName: 'shop' }
 ]
+const LAUNCH_COVER_MIN_DURATION = 1500
 
 export default {
   name: 'App',
@@ -106,6 +128,11 @@ export default {
   data() {
     return {
       navItems,
+      isLaunchCoverImageLoaded: false,
+      launchCoverSource,
+      isLaunchCoverImageReady: false,
+      isLaunchCoverMinimumElapsed: false,
+      launchCoverTimer: null,
       isHealthProfileSaving: false,
       healthProfileSaveError: null,
       healthProfileConfettiBursts: [],
@@ -147,12 +174,23 @@ export default {
     canRenderApplication() {
       return this.isLoginReady && !this.loginError
     },
+    shouldShowLaunchCover() {
+      // 图片完整加载后才开始封面计时，避免用户看到图片逐步绘制或只停留极短时间。
+      return !this.isLaunchCoverImageReady || !this.isLaunchCoverMinimumElapsed || !this.isLoginReady
+    },
+    usesDingTalkLogin() {
+      return getLoginCredentialSource() === 'dingtalk'
+    },
     loginPanelTitle() {
       if (this.loginError) {
         return '登录未完成'
       }
 
-      return authState.loginStep === 'requesting_login' ? '正在建立登录会话' : '正在连接钉钉'
+      if (authState.loginStep === 'requesting_login') {
+        return '正在建立登录会话'
+      }
+
+      return this.usesDingTalkLogin ? '正在连接钉钉' : '正在读取开发登录凭证'
     },
     loginPanelMessage() {
       if (this.loginError) {
@@ -165,7 +203,7 @@ export default {
 
       return authState.loginStep === 'requesting_login'
         ? '正在向服务端验证当前身份…'
-        : '正在获取钉钉免登授权码…'
+        : (this.usesDingTalkLogin ? '正在获取钉钉免登授权码…' : '正在读取 VUE_APP_AUTH_CODE…')
     }
   },
   watch: {
@@ -183,6 +221,25 @@ export default {
     }
   },
   methods: {
+    handleLaunchCoverLoaded() {
+      this.isLaunchCoverImageLoaded = true
+      this.startLaunchCoverTimer()
+    },
+    handleLaunchCoverLoadError() {
+      // 图片异常时不能永久遮挡应用，退化为同色背景后继续既有启动流程。
+      this.startLaunchCoverTimer()
+    },
+    startLaunchCoverTimer() {
+      if (this.isLaunchCoverImageReady) {
+        return
+      }
+
+      this.isLaunchCoverImageReady = true
+      this.launchCoverTimer = window.setTimeout(() => {
+        this.isLaunchCoverMinimumElapsed = true
+        this.launchCoverTimer = null
+      }, LAUNCH_COVER_MIN_DURATION)
+    },
     changeNav(key) {
       const item = this.navItems.find(navItem => navItem.key === key)
 
@@ -269,6 +326,7 @@ export default {
   beforeUnmount() {
     document.body.classList.remove('is-profile-panel-open')
     document.body.classList.remove('is-auth-panel-open')
+    window.clearTimeout(this.launchCoverTimer)
     this.healthProfileConfettiTimers.forEach(timer => window.clearTimeout(timer))
   }
 }
@@ -404,6 +462,54 @@ button {
   cursor: wait;
 }
 
+.launch-cover {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  width: min(100vw, 430px);
+  height: 100vh;
+  height: 100dvh;
+  margin: auto;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 85% 11%, rgba(166, 239, 72, 0.48), transparent 28%),
+    linear-gradient(145deg, #f8f8f2, #eef4e7);
+}
+
+.launch-cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  visibility: hidden;
+}
+
+.launch-cover-image.is-ready {
+  visibility: visible;
+}
+
+.launch-cover-leave-active {
+  transition:
+    opacity 460ms ease,
+    transform 460ms ease;
+}
+
+.launch-cover-leave-to {
+  opacity: 0;
+  transform: scale(1.012);
+}
+
+/* 超长屏若继续 cover 会裁掉封面两侧的主标题或 Logo，优先完整呈现核心品牌信息。 */
+@media (max-aspect-ratio: 9 / 17) {
+  .launch-cover-image {
+    object-fit: contain;
+    /* 完整展示在超长屏会留下上下留白，用遮罩将封面边缘自然融入同色背景。 */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 8%, #000 13%, #000 80%, rgba(0, 0, 0, 0.45) 87%, transparent 96%);
+    mask-image: linear-gradient(to bottom, transparent 8%, #000 13%, #000 80%, rgba(0, 0, 0, 0.45) 87%, transparent 96%);
+  }
+}
+
 .module-page {
   min-height: 420px;
   margin-top: 18px;
@@ -495,6 +601,157 @@ button {
       translate(calc(-50% + var(--confetti-x)), calc((var(--confetti-origin-y) * -1) + var(--confetti-y)))
       scale(0.86)
       rotate(var(--confetti-rotate));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-cover-leave-active {
+    transition-duration: 1ms;
+  }
+}
+
+/*
+ * 部分 Android 钉钉仍使用不支持 color-mix() 的 Chromium WebView。
+ * 这类浏览器会丢弃包含未知颜色函数的整条 background 声明，半透明面板便会露出底层内容。
+ * 仅在特性缺失时使用实色回退，避免影响支持现代 CSS 的设备。
+ */
+@supports not (color: color-mix(in srgb, #000, #fff)) {
+  .app-shell {
+    background: #f8fbf5;
+  }
+
+  .app-shell .header-bar,
+  .app-shell .bottom-nav {
+    background: #f8fbf5;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .auth-status-panel {
+    background: #f8fbf5;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .app-shell .upload-overlay {
+    background: rgba(18, 27, 21, 0.56);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .app-shell .upload-overlay .upload-panel {
+    background: #f7fbf4;
+  }
+
+  .app-shell .upload-panel .upload-kicker {
+    color: var(--accent, #2f8f32);
+  }
+
+  .app-shell .upload-panel .upload-daily-hint {
+    border-color: rgba(47, 143, 50, 0.22);
+    background: #edf8e8;
+  }
+
+  .app-shell .upload-panel .upload-daily-hint span,
+  .app-shell .upload-panel .upload-icon {
+    background: var(--accent, #49b84b);
+  }
+
+  .app-shell .upload-panel .upload-dropzone {
+    border-color: var(--accent, #49b84b);
+    background: #f4fbf0;
+  }
+
+  .app-shell .upload-panel .record-type-toggle button.is-active {
+    border-color: var(--accent, #49b84b);
+    background: #edf8e8;
+  }
+
+  .app-shell .upload-panel .submit-proof {
+    background: linear-gradient(135deg, var(--accent, #49b84b), #2f8f32);
+  }
+
+  .app-shell .project-detail .detail-hero {
+    background: linear-gradient(135deg, #17211b, #263d2a);
+  }
+
+  .app-shell .project-detail .lock-button.is-locked,
+  .app-shell .project-detail .challenge-level-badge {
+    background: var(--accent, #49b84b);
+  }
+
+  .app-shell .project-detail .challenge-card.is-selected-level {
+    border-color: var(--accent, #49b84b);
+    background: linear-gradient(180deg, #edf8e8, #fff);
+    box-shadow: 0 16px 32px rgba(47, 143, 50, 0.18);
+  }
+
+  .app-shell .project-detail .level-dot {
+    box-shadow: 0 0 0 7px rgba(47, 143, 50, 0.22);
+  }
+
+  .app-shell .project-detail .lock-note {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .app-shell .task-card.is-locked {
+    border-color: var(--accent, #49b84b);
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(224, 231, 229, 0.9) 40%, rgba(255, 255, 255, 0.92)),
+      #f7f9f8;
+    box-shadow: 0 18px 42px rgba(38, 64, 45, 0.14);
+  }
+
+  .app-shell .task-card.is-locked::after {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.86) 46%, rgba(186, 241, 157, 0.72) 56%, transparent);
+    mix-blend-mode: normal;
+  }
+
+  .app-shell .task-card .locked-badge {
+    background: linear-gradient(135deg, #fff, #dfe9db);
+    color: var(--accent, #2f8f32);
+  }
+
+  .app-shell .task-card .task-description.is-challenge-requirement,
+  .app-shell .task-card .task-link {
+    color: var(--accent, #2f8f32);
+  }
+
+  .app-shell .goal-progress-track span {
+    background: var(--accent, #49b84b);
+  }
+
+  .app-shell .history-card::before {
+    background: rgba(47, 143, 50, 0.38);
+  }
+
+  .app-shell .history-card .record-date {
+    background: #edf8e8;
+    color: var(--accent, #2f8f32);
+  }
+
+  .app-shell .reward-visual {
+    background: linear-gradient(135deg, #ecf8e7, #fff);
+  }
+
+  .app-shell .reward-image-skeleton {
+    background: rgba(239, 248, 235, 0.94);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.7),
+      inset 0 16px 30px rgba(255, 255, 255, 0.42);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .app-shell .reward-image-skeleton::before {
+    background:
+      linear-gradient(115deg, transparent 14%, rgba(255, 255, 255, 0.5) 28%, transparent 43%, rgba(255, 255, 255, 0.3) 58%, transparent 74%),
+      radial-gradient(circle at 24% 32%, rgba(255, 255, 255, 0.46), transparent 30%);
+  }
+
+  .app-shell .reward-visual span {
+    color: var(--reward-accent, #2f8f32);
   }
 }
 </style>

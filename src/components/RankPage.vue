@@ -3,31 +3,36 @@
     <div class="rank-hero">
       <span class="rank-eyebrow">SEASON CHECK-IN</span>
       <h1>打卡排行榜</h1>
-      <p>仅统计本赛季通过初审的打卡记录（非实时）</p>
+      <p>仅统计本赛季通过初审的打卡记录（定时更新）</p>
     </div>
 
-    <div
-      class="my-rank-card"
-      :class="{
-        'is-outside-top': !isCurrentInTopList,
-        'is-loaded': isContentReady
-      }"
-    >
-      <div>
-        <span>我的排名</span>
-        <strong>{{ currentRankText }}</strong>
-      </div>
-      <div>
-        <span>上传次数</span>
-        <strong>{{ currentCheckinText }}</strong>
-      </div>
-      <div>
-        <span>参与人数</span>
-        <strong>{{ leaderboardTotal }} 人</strong>
-      </div>
+    <div v-if="isNoActiveSeason" class="rank-status">
+      <strong>新赛季敬请期待</strong>
+      <span>当前暂无进行中的赛季，排行榜将在赛季开启并产生通过初审的记录后生成。</span>
     </div>
 
-    <div class="rank-board">
+    <template v-else>
+      <div
+        class="my-rank-card"
+        :class="{
+          'is-loaded': isContentReady
+        }"
+      >
+        <div>
+          <span>我的排名</span>
+          <strong>{{ currentRankText }}</strong>
+        </div>
+        <div>
+          <span>上传次数</span>
+          <strong>{{ currentCheckinText }}</strong>
+        </div>
+        <div>
+          <span>参与人数</span>
+          <strong>{{ leaderboardTotal }} 人</strong>
+        </div>
+      </div>
+
+      <div class="rank-board">
       <div class="rank-board-header">
         <span>排名</span>
         <span>员工</span>
@@ -51,58 +56,50 @@
           <button type="button" @click="$emit('retry')">重试</button>
         </div>
 
-        <div v-else-if="!displayRows.length" class="rank-status">
+        <div v-else-if="!rankedEmployees.length" class="rank-status">
           <span>暂无排行榜数据</span>
         </div>
 
         <TransitionGroup v-else name="rank-row-reveal" tag="div" class="rank-reveal-list">
-          <template v-for="(row, index) in displayRows" :key="row.type === 'ellipsis' ? 'ellipsis' : row.employee.id">
-            <div
-              v-if="row.type === 'ellipsis'"
-              class="rank-ellipsis"
-              aria-label="省略部分排名"
-              :style="{ '--row-index': index }"
+          <article
+            v-for="(employee, index) in rankedEmployees"
+            :key="employee.id"
+            class="rank-row"
+            :class="{
+              'is-current': employee.isCurrentUser,
+              'is-top-three': index < 3
+            }"
+            :style="{
+              '--bar-width': `${rankPercent(employee)}%`,
+              '--row-index': Math.min(index, 14)
+            }"
+          >
+            <span
+              v-if="index < 3"
+              class="rank-medal"
+              :class="rankMedalTone(index + 1)"
+              :aria-label="`第 ${index + 1} 名`"
             >
-              <span></span>
-              <strong>···</strong>
-              <span>您当前在前 15 名之后</span>
+              <span class="medal-ribbon" aria-hidden="true"></span>
+              <span class="medal-core" aria-hidden="true"></span>
+            </span>
+            <span v-else class="rank-number">{{ index + 1 }}</span>
+            <div class="employee-meta">
+              <strong>{{ employee.name }}</strong>
+              <small class="level-label" :class="challengeLevelTone(employee)">
+                {{ challengeLevelText(employee) }}
+              </small>
             </div>
-
-            <article
-              v-else
-              class="rank-row"
-              :class="{
-                'is-current': row.employee.isCurrentUser,
-                'is-top-three': row.rank <= 3
-              }"
-              :style="{ '--bar-width': `${row.percent}%`, '--row-index': index }"
-            >
-              <span
-                v-if="row.rank <= 3"
-                class="rank-medal"
-                :class="rankMedalTone(row.rank)"
-                :aria-label="`第 ${row.rank} 名`"
-              >
-                <span class="medal-ribbon" aria-hidden="true"></span>
-                <span class="medal-core" aria-hidden="true"></span>
-              </span>
-              <span v-else class="rank-number">{{ row.rank }}</span>
-              <div class="employee-meta">
-                <strong>{{ row.employee.name }}</strong>
-                <small class="level-label" :class="challengeLevelTone(row.employee)">
-                  {{ challengeLevelText(row.employee) }}
-                </small>
-              </div>
-              <span class="department-pill">{{ row.employee.departmentName }}</span>
-              <div class="score-track" aria-hidden="true">
-                <span class="score-bar"></span>
-              </div>
-              <strong class="score-value">{{ row.employee.checkinCount }}次</strong>
-            </article>
-          </template>
+            <span class="department-pill">{{ employee.departmentName }}</span>
+            <div class="score-track" aria-hidden="true">
+              <span class="score-bar"></span>
+            </div>
+            <strong class="score-value">{{ employee.checkinCount }}次</strong>
+          </article>
         </TransitionGroup>
       </div>
-    </div>
+      </div>
+    </template>
   </section>
 </template>
 
@@ -143,6 +140,10 @@ export default {
     errorMessage: {
       type: String,
       default: ''
+    },
+    isNoActiveSeason: {
+      type: Boolean,
+      default: false
     }
   },
   computed: {
@@ -169,39 +170,15 @@ export default {
     currentCheckinText() {
       return this.currentEmployee ? `${this.currentEmployee.checkinCount} 次` : '--'
     },
-    topRows() {
-      return this.rankedEmployees.slice(0, 15).map((employee, index) => this.toRankRow(employee, index + 1))
-    },
-    isCurrentInTopList() {
-      return this.currentRank > 0 && this.currentRank <= 15
-    },
-    displayRows() {
-      if (this.isCurrentInTopList || !this.currentEmployee) {
-        return this.topRows
-      }
-
-      return [
-        ...this.topRows,
-        { type: 'ellipsis' },
-        this.toRankRow(this.currentEmployee, this.currentRank)
-      ]
-    },
     isContentReady() {
       return !this.isLoading && !this.errorMessage
     }
   },
   methods: {
-    toRankRow(employee, rank) {
-      const percent = employee.checkinCount > 0
+    rankPercent(employee) {
+      return employee.checkinCount > 0
         ? Math.max((employee.checkinCount / this.maxScore) * 100, 8).toFixed(2)
         : '0.00'
-
-      return {
-        type: 'employee',
-        employee,
-        rank,
-        percent
-      }
     },
     rankMedalTone(rank) {
       return RANK_MEDAL_TONES[rank] || ''
@@ -301,12 +278,6 @@ export default {
   opacity: 1;
   filter: blur(0);
   transform: translateY(0);
-}
-
-.my-rank-card.is-outside-top {
-  background:
-    radial-gradient(circle at 86% 20%, rgba(114, 216, 79, 0.32), transparent 30%),
-    linear-gradient(135deg, #17211b, #263d2a);
 }
 
 .my-rank-card span {
@@ -569,31 +540,6 @@ export default {
   font-weight: 950;
   text-align: right;
   white-space: nowrap;
-}
-
-.rank-ellipsis {
-  flex-shrink: 0;
-  min-height: 36px;
-  padding: 4px 10px;
-  color: #7a857d;
-  display: grid;
-  grid-template-columns: 28px 44px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 850;
-}
-
-.rank-ellipsis span:last-child {
-  justify-self: center;
-  text-align: center;
-}
-
-.rank-ellipsis strong {
-  color: #17211b;
-  font-size: 20px;
-  letter-spacing: 0.14em;
-  line-height: 1;
 }
 
 .rank-status {
