@@ -84,23 +84,33 @@
         class="launch-cover"
         aria-hidden="true"
       >
-        <img
-          class="launch-cover-image"
-          :src="launchCoverSource"
-          alt=""
-          decoding="sync"
-          fetchpriority="high"
-          :class="{ 'is-ready': isLaunchCoverImageLoaded }"
-          @load="handleLaunchCoverLoaded"
-          @error="handleLaunchCoverLoadError"
+        <span class="launch-cover-aura launch-cover-aura-primary"></span>
+        <span class="launch-cover-aura launch-cover-aura-secondary"></span>
+        <span class="launch-cover-grain"></span>
+
+        <div
+          class="launch-cover-content"
+          :class="{
+            'is-ready': isLaunchCoverReady,
+            'uses-font-fallback': isLaunchCoverFontFallback
+          }"
         >
+          <div class="launch-cover-logo-frame">
+            <img class="launch-cover-logo" :src="launchLogoSource" alt="">
+          </div>
+          <span class="launch-cover-brand">燃动现象</span>
+          <h1 class="launch-cover-slogan">
+            <span>让运动成为一种习惯</span>
+            <span>让挑战成为一种乐趣</span>
+          </h1>
+        </div>
       </section>
     </Transition>
   </div>
 </template>
 
 <script>
-import launchCoverSource from './assets/cover.png'
+import launchLogoSource from './assets/logo.png'
 import HeaderBar from './components/HeaderBar.vue'
 import BottomNav from './components/BottomNav.vue'
 import UserHealthProfilePanel from './components/UserHealthProfilePanel.vue'
@@ -117,6 +127,8 @@ const navItems = [
   { key: 'shop', label: '商城', icon: '🛍', routeName: 'shop' }
 ]
 const LAUNCH_COVER_MIN_DURATION = 1500
+const LAUNCH_COVER_FONT_TIMEOUT = 2000
+const LAUNCH_COVER_FONT_FAMILY = 'Flame Launch Slogan'
 
 export default {
   name: 'App',
@@ -128,11 +140,12 @@ export default {
   data() {
     return {
       navItems,
-      isLaunchCoverImageLoaded: false,
-      launchCoverSource,
-      isLaunchCoverImageReady: false,
+      launchLogoSource,
+      isLaunchCoverReady: false,
+      isLaunchCoverFontFallback: false,
       isLaunchCoverMinimumElapsed: false,
       launchCoverTimer: null,
+      launchCoverFontTimer: null,
       isHealthProfileSaving: false,
       healthProfileSaveError: null,
       healthProfileConfettiBursts: [],
@@ -175,8 +188,8 @@ export default {
       return this.isLoginReady && !this.loginError
     },
     shouldShowLaunchCover() {
-      // 图片完整加载后才开始封面计时，避免用户看到图片逐步绘制或只停留极短时间。
-      return !this.isLaunchCoverImageReady || !this.isLaunchCoverMinimumElapsed || !this.isLoginReady
+      // 标语字体就绪后才开始封面计时，避免先以系统字体显示、再突然替换为艺术字。
+      return !this.isLaunchCoverReady || !this.isLaunchCoverMinimumElapsed || !this.isLoginReady
     },
     usesDingTalkLogin() {
       return getLoginCredentialSource() === 'dingtalk'
@@ -220,21 +233,48 @@ export default {
       }
     }
   },
+  mounted() {
+    this.prepareLaunchCover()
+  },
   methods: {
-    handleLaunchCoverLoaded() {
-      this.isLaunchCoverImageLoaded = true
+    async prepareLaunchCover() {
+      const isFontLoaded = await this.waitForLaunchCoverFont()
+
+      // 极端弱网下不让封面永久停留；超时后固定使用系统衬线字体，不会在稍后发生字体跳变。
+      this.isLaunchCoverFontFallback = !isFontLoaded
+      this.isLaunchCoverReady = true
       this.startLaunchCoverTimer()
     },
-    handleLaunchCoverLoadError() {
-      // 图片异常时不能永久遮挡应用，退化为同色背景后继续既有启动流程。
-      this.startLaunchCoverTimer()
+    waitForLaunchCoverFont() {
+      if (!document.fonts?.load) {
+        return Promise.resolve(false)
+      }
+
+      return new Promise(resolve => {
+        let isSettled = false
+        const settle = isLoaded => {
+          if (isSettled) {
+            return
+          }
+
+          isSettled = true
+          window.clearTimeout(this.launchCoverFontTimer)
+          this.launchCoverFontTimer = null
+          resolve(isLoaded)
+        }
+
+        this.launchCoverFontTimer = window.setTimeout(() => settle(false), LAUNCH_COVER_FONT_TIMEOUT)
+        document.fonts
+          .load(`400 1em "${LAUNCH_COVER_FONT_FAMILY}"`, '让运动成为一种习惯，让挑战成为一种乐趣')
+          .then(() => settle(true))
+          .catch(() => settle(false))
+      })
     },
     startLaunchCoverTimer() {
-      if (this.isLaunchCoverImageReady) {
+      if (this.launchCoverTimer) {
         return
       }
 
-      this.isLaunchCoverImageReady = true
       this.launchCoverTimer = window.setTimeout(() => {
         this.isLaunchCoverMinimumElapsed = true
         this.launchCoverTimer = null
@@ -327,6 +367,7 @@ export default {
     document.body.classList.remove('is-profile-panel-open')
     document.body.classList.remove('is-auth-panel-open')
     window.clearTimeout(this.launchCoverTimer)
+    window.clearTimeout(this.launchCoverFontTimer)
     this.healthProfileConfettiTimers.forEach(timer => window.clearTimeout(timer))
   }
 }
@@ -462,6 +503,12 @@ button {
   cursor: wait;
 }
 
+@font-face {
+  font-family: 'Flame Launch Slogan';
+  src: url('./assets/fonts/LXGWWenKai-Launch.woff2') format('woff2');
+  font-display: block;
+}
+
 .launch-cover {
   position: fixed;
   z-index: 100;
@@ -472,21 +519,123 @@ button {
   margin: auto;
   overflow: hidden;
   background:
-    radial-gradient(circle at 85% 11%, rgba(166, 239, 72, 0.48), transparent 28%),
-    linear-gradient(145deg, #f8f8f2, #eef4e7);
+    radial-gradient(circle at 86% 14%, rgba(255, 117, 176, 0.66), transparent 36%),
+    radial-gradient(circle at 8% 88%, rgba(113, 202, 255, 0.42), transparent 42%),
+    linear-gradient(142deg, #f1ebff 0%, #e6f4ff 47%, #fff0f6 100%);
+  background-size: 155% 155%;
+  animation: launch-cover-base-flow 8s ease-in-out -1.6s infinite alternate;
 }
 
-.launch-cover-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
+.launch-cover-aura,
+.launch-cover-grain {
+  position: absolute;
+  pointer-events: none;
+}
+
+.launch-cover-aura {
+  inset: -34%;
+  border-radius: 42%;
+  filter: blur(44px);
+  opacity: 0.64;
+  will-change: transform;
+}
+
+.launch-cover-aura-primary {
+  background:
+    radial-gradient(circle at 30% 35%, rgba(99, 183, 255, 0.4), transparent 24%),
+    radial-gradient(circle at 68% 57%, rgba(166, 132, 242, 0.3), transparent 31%),
+    radial-gradient(circle at 50% 84%, rgba(255, 126, 178, 0.54), transparent 31%);
+  animation: launch-cover-drift-primary 8s linear -1.8s infinite alternate;
+}
+
+.launch-cover-aura-secondary {
+  background:
+    radial-gradient(circle at 74% 25%, rgba(255, 137, 184, 0.72), transparent 26%),
+    radial-gradient(circle at 24% 65%, rgba(94, 185, 247, 0.32), transparent 29%);
+  opacity: 0.54;
+  animation: launch-cover-drift-secondary 10s linear -3.6s infinite alternate;
+}
+
+.launch-cover-grain {
+  inset: 0;
+  opacity: 0.08;
+  background-image:
+    repeating-radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.22) 0 1px, transparent 1px 4px),
+    linear-gradient(110deg, transparent 15%, rgba(229, 220, 255, 0.15) 46%, transparent 75%);
+  mix-blend-mode: multiply;
+}
+
+.launch-cover-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  padding: 56px 26px;
+  padding: max(56px, env(safe-area-inset-top)) 26px max(56px, env(safe-area-inset-bottom));
+  color: #24263d;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 560ms ease, transform 760ms cubic-bezier(0.22, 0.88, 0.28, 1);
+}
+
+.launch-cover-content.is-ready {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.launch-cover-logo-frame {
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
+}
+
+.launch-cover-logo {
   display: block;
-  visibility: hidden;
+  width: 122%;
+  height: 122%;
+  max-width: none;
+  transform: translate(-9%, -9%);
 }
 
-.launch-cover-image.is-ready {
-  visibility: visible;
+.launch-cover-brand {
+  margin-top: 15px;
+  color: rgba(47, 47, 79, 0.7);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+}
+
+.launch-cover-slogan {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin: auto 0;
+  color: transparent;
+  font-family: 'Flame Launch Slogan', 'STKaiti', 'KaiTi', 'Noto Serif SC', serif;
+  font-size: clamp(24px, 8vw, 36px);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  line-height: 1.26;
+  text-align: center;
+  text-shadow: 0 8px 26px rgba(111, 105, 158, 0.16);
+}
+
+.launch-cover-content.uses-font-fallback .launch-cover-slogan {
+  font-family: 'STKaiti', 'KaiTi', 'Noto Serif SC', serif;
+  font-weight: 600;
+}
+
+.launch-cover-slogan span {
+  display: block;
+  white-space: nowrap;
+  background: linear-gradient(112deg, #252743 8%, #4a3c67 52%, #2f5d83 105%);
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
 .launch-cover-leave-active {
@@ -500,13 +649,33 @@ button {
   transform: scale(1.012);
 }
 
-/* 超长屏若继续 cover 会裁掉封面两侧的主标题或 Logo，优先完整呈现核心品牌信息。 */
-@media (max-aspect-ratio: 9 / 17) {
-  .launch-cover-image {
-    object-fit: contain;
-    /* 完整展示在超长屏会留下上下留白，用遮罩将封面边缘自然融入同色背景。 */
-    -webkit-mask-image: linear-gradient(to bottom, transparent 8%, #000 13%, #000 80%, rgba(0, 0, 0, 0.45) 87%, transparent 96%);
-    mask-image: linear-gradient(to bottom, transparent 8%, #000 13%, #000 80%, rgba(0, 0, 0, 0.45) 87%, transparent 96%);
+@keyframes launch-cover-drift-primary {
+  from {
+    transform: translate3d(-13%, -10%, 0) rotate(-8deg) scale(0.94);
+  }
+
+  to {
+    transform: translate3d(15%, 14%, 0) rotate(10deg) scale(1.14);
+  }
+}
+
+@keyframes launch-cover-drift-secondary {
+  from {
+    transform: translate3d(13%, 12%, 0) rotate(14deg) scale(1.06);
+  }
+
+  to {
+    transform: translate3d(-15%, -12%, 0) rotate(-10deg) scale(0.88);
+  }
+}
+
+@keyframes launch-cover-base-flow {
+  from {
+    background-position: 0% 8%;
+  }
+
+  to {
+    background-position: 100% 92%;
   }
 }
 
@@ -607,6 +776,15 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .launch-cover-leave-active {
     transition-duration: 1ms;
+  }
+
+  .launch-cover-content {
+    transition-duration: 1ms;
+  }
+
+  .launch-cover,
+  .launch-cover-aura {
+    animation: none;
   }
 }
 

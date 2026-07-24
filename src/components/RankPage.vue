@@ -3,7 +3,7 @@
     <div class="rank-hero">
       <span class="rank-eyebrow">SEASON CHECK-IN</span>
       <h1>打卡排行榜</h1>
-      <p>仅统计本赛季通过初审的打卡记录（非实时）</p>
+      <p>仅统计本赛季通过初审的打卡记录（定时更新）</p>
     </div>
 
     <div v-if="isNoActiveSeason" class="rank-status">
