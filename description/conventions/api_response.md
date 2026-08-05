@@ -8,6 +8,8 @@
 VUE_APP_API_BASE_URL=/flame/api
 ```
 
+`VUE_APP_API_BASE_URL` 始终配置普通 `/flame/api` 地址。`VUE_APP_MODE=development` 时，前端请求层会自动在标准 API 路径前插入 `/dev`，例如 `/flame/api` 转换为 `/dev/flame/api`，`https://www.phenosolar.cloud/flame/api` 转换为 `https://www.phenosolar.cloud/dev/flame/api`。已经包含 `/dev/flame/api` 或不使用标准 `/flame/api` 路径的自定义地址不会被重复或额外改写。生产模式保持配置值不变。
+
 如果没有配置，前端默认使用：
 
 ```text

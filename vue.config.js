@@ -1,7 +1,7 @@
 const { defineConfig } = require('@vue/cli-service')
 
-// 页面和接口统一部署在 /flame/ 下，开发与生产环境都必须保持相同的静态资源前缀，避免联调时遗漏子路径问题。
-const publicPath = '/flame/'
+// 云服务器开发环境独立挂载在 /dev/flame/，避免开发资源误命中 /flame/ 下的生产容器。
+const publicPath = process.env.NODE_ENV === 'development' ? '/dev/flame/' : '/flame/'
 // Vue CLI 仅在构建时读取环境变量；空值回退到产品默认名称，避免页签显示 npm 包名。
 const pageTitle = process.env.VUE_APP_PAGE_TITLE?.trim() || '燃动现象'
 
@@ -14,6 +14,21 @@ module.exports = defineConfig({
       template: 'public/index.html',
       filename: 'index.html',
       title: pageTitle,
+    },
+  },
+  devServer: {
+    // 开发服务只向本机 Nginx 开放，外部统一通过 HTTPS 反向代理访问。
+    host: '127.0.0.1',
+    port: 8080,
+    client: {
+      webSocketURL: {
+        pathname: '/dev/flame/ws',
+      },
+    },
+    webSocketServer: {
+      options: {
+        path: '/dev/flame/ws',
+      },
     },
   },
   transpileDependencies: true

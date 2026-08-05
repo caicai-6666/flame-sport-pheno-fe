@@ -9,6 +9,8 @@ src/api/avatar.js
 
 `HeaderBar` 展示品牌 Logo、项目详情页返回按钮和当前用户头像。
 
+品牌 Logo 使用带 Alpha 通道的 `src/assets/logo.png`，组件不为图片绘制额外实色背景，透明区域直接显示 Header 背景。生产构建会生成带内容哈希的 PNG 文件，并由容器 Nginx 设置一年不可变缓存；Logo 更新后文件哈希变化，浏览器会自动获取新版本。
+
 ## 获取用户头像
 
 ```http

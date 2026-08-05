@@ -1,10 +1,11 @@
 import axios from 'axios'
+import { resolveApiBaseUrl } from './apiBaseUrl'
 import { LOGIN_PATH } from './authConfig'
 import { getAuthCode, setAuthCode } from './authCredential'
 import { buildLoginPayload } from './loginCredential'
 
 // 生产环境与页面同部署在 /flame 下，未配置环境变量时统一请求该应用的 API 前缀。
-const API_BASE_URL = process.env.VUE_APP_API_BASE_URL || '/flame/api'
+const API_BASE_URL = resolveApiBaseUrl()
 const REQUEST_TIMEOUT = 15000
 
 const request = axios.create({

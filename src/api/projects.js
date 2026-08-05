@@ -42,9 +42,41 @@ const projectLevelCache = new Map()
 const projectLevelRequestCache = new Map()
 const uploadConfigCache = new Map()
 const uploadConfigRequestCache = new Map()
+const projectIconSourceCache = new Map()
+
+function getProjectIconFilename(project) {
+  return String(project.image || project.icon_url || project.iconUrl || '').trim()
+}
+
+function isImagePath(image) {
+  return image.startsWith('/') || image.startsWith('project_icon/')
+}
+
+async function getProjectIconSource(filename) {
+  if (!filename) {
+    return ''
+  }
+
+  if (!projectIconSourceCache.has(filename)) {
+    const sourceRequest = request.get('/image/project_icon', {
+      params: { filename },
+      responseType: 'blob'
+    })
+      .then(imageBlob => URL.createObjectURL(imageBlob))
+      .catch(error => {
+        // 单个图标不可用时仍保留项目卡片，避免资源问题阻断报名流程。
+        projectIconSourceCache.delete(filename)
+        throw error
+      })
+
+    projectIconSourceCache.set(filename, sourceRequest)
+  }
+
+  return projectIconSourceCache.get(filename)
+}
 
 function toImageSource(project) {
-  const image = project.image || project.image_data || project.icon || ''
+  const image = project.image_data || project.icon || (isImagePath(getProjectIconFilename(project)) ? '' : project.image || '')
 
   if (!image) {
     return ''
@@ -58,12 +90,23 @@ function toImageSource(project) {
   return `data:${contentType};base64,${image}`
 }
 
-function normalizeProject(project, index) {
+async function normalizeProject(project, index) {
+  const imagePath = getProjectIconFilename(project)
+  let icon = toImageSource(project)
+
+  if (isImagePath(imagePath)) {
+    try {
+      icon = await getProjectIconSource(imagePath)
+    } catch (error) {
+      icon = ''
+    }
+  }
+
   return {
     projectId: project.project_id || project.id,
     name: project.name,
     description: project.description,
-    icon: toImageSource(project),
+    icon,
     accent: PROJECT_ACCENTS[index % PROJECT_ACCENTS.length]
   }
 }
@@ -129,14 +172,14 @@ function normalizeProofUploadResult(response) {
 /**
  * 获取当前赛季可选项目。
  *
- * 后端返回项目名称、描述和图片数据。图片不是 URL，
- * 当前前端按 base64 图片字符串或 data URL 进行适配。
+ * 后端列表返回项目图标相对路径，前端再通过受鉴权保护的图片接口获取 PNG。
+ * 对象 URL 会在当前页面会话内按文件名复用，避免首页与历史页重复拉取相同图标。
  */
 export async function getProjects() {
   const response = await request.get('/project/list')
   const projects = Array.isArray(response) ? response : response.projects
 
-  return (projects || []).map(normalizeProject)
+  return Promise.all((projects || []).map(normalizeProject))
 }
 
 function normalizeLockedProject(project) {

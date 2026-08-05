@@ -84,23 +84,28 @@
         class="launch-cover"
         aria-hidden="true"
       >
-        <img
-          class="launch-cover-image"
-          :src="launchCoverSource"
-          alt=""
-          decoding="sync"
-          fetchpriority="high"
-          :class="{ 'is-ready': isLaunchCoverImageLoaded }"
-          @load="handleLaunchCoverLoaded"
-          @error="handleLaunchCoverLoadError"
-        >
+        <picture class="launch-cover-picture">
+          <!-- WebP 显著降低首屏传输量；旧版 WebView 无法解码时会自动回退到原 PNG。 -->
+          <source :srcset="launchCoverWebpSource" type="image/webp">
+          <img
+            class="launch-cover-image"
+            :src="launchCoverPngSource"
+            alt=""
+            decoding="sync"
+            fetchpriority="high"
+            :class="{ 'is-ready': isLaunchCoverImageLoaded }"
+            @load="handleLaunchCoverLoaded"
+            @error="handleLaunchCoverLoadError"
+          >
+        </picture>
       </section>
     </Transition>
   </div>
 </template>
 
 <script>
-import launchCoverSource from './assets/cover.png'
+import launchCoverPngSource from './assets/cover.png'
+import launchCoverWebpSource from './assets/cover.webp'
 import HeaderBar from './components/HeaderBar.vue'
 import BottomNav from './components/BottomNav.vue'
 import UserHealthProfilePanel from './components/UserHealthProfilePanel.vue'
@@ -116,7 +121,7 @@ const navItems = [
   { key: 'history', label: '历史', icon: '◷', routeName: 'history' },
   { key: 'shop', label: '商城', icon: '🛍', routeName: 'shop' }
 ]
-const LAUNCH_COVER_MIN_DURATION = 1500
+const LAUNCH_COVER_MIN_DURATION = 1000
 
 export default {
   name: 'App',
@@ -129,7 +134,8 @@ export default {
     return {
       navItems,
       isLaunchCoverImageLoaded: false,
-      launchCoverSource,
+      launchCoverPngSource,
+      launchCoverWebpSource,
       isLaunchCoverImageReady: false,
       isLaunchCoverMinimumElapsed: false,
       launchCoverTimer: null,
@@ -476,12 +482,16 @@ button {
     linear-gradient(145deg, #f8f8f2, #eef4e7);
 }
 
+.launch-cover-picture,
 .launch-cover-image {
   width: 100%;
   height: 100%;
+  display: block;
+}
+
+.launch-cover-image {
   object-fit: cover;
   object-position: center;
-  display: block;
   visibility: hidden;
 }
 

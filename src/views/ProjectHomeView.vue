@@ -25,7 +25,6 @@ import { getCurrentSeason, getSeasonParticipationStatus, isNoActiveSeasonError }
 import ProjectHome from '../components/ProjectHome.vue'
 import { addUploadRecord, appState, setCurrentSeason, setLockedProjects, setMaxLockedTasks, setProjectTasks, setSeasonAvailability, setSeasonParticipationStatus, setSelectedChallengeLevel } from '../state/appState'
 
-const SEASON_PARTICIPATION_CHECK_DELAY = 2000
 const CHALLENGE_LEVEL_QUERY_DELAY = 2000
 
 function wait(ms) {
@@ -190,7 +189,6 @@ export default {
       this.isSeasonParticipationLoading = true
 
       try {
-        await wait(SEASON_PARTICIPATION_CHECK_DELAY)
         const participation = await getSeasonParticipationStatus(this.currentSeason.seasonId)
         setSeasonParticipationStatus(participation)
       } catch {

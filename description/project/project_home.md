@@ -90,8 +90,7 @@ GET /project/list
     "project_id": "running",
     "name": "跑步/快走",
     "description": "记录有氧强度，持续拉高身体活力曲线。",
-    "image": "base64图片字符串",
-    "image_content_type": "image/png"
+    "image": "/跑步.png"
   }
 ]
 ```
@@ -107,8 +106,10 @@ GET /project/list
 前端处理：
 
 - `project_id` 归一化为 `projectId`
-- `image` 支持 data URL 或纯 base64
-- 纯 base64 会按 `image_content_type` 拼成图片 src
+- `image` 为项目图标在后端图标目录中的相对路径，例如 `/跑步.png`
+- 前端使用携带 `Authorization` 的 `GET /image/project_icon?filename=/跑步.png` 获取图标 Blob，再转换为对象 URL 供项目卡片显示；不能直接在 `<img>` 中请求该接口，否则无法附加鉴权请求头
+- 对象 URL 在当前应用会话内按图标路径复用，首页、历史页不会重复请求同一图标；单个图标加载失败不会阻断项目列表或报名流程
+- 当前项目图标均为含 Alpha 通道的 RGBA PNG；项目卡片不再为图标容器绘制白色或彩色底板，透明区域直接透出卡片背景，并仅按图标 Alpha 轮廓添加轻微投影
 - 项目数据写入 `appState.projectTasks`
 
 ## 获取已锁定项目
@@ -150,7 +151,7 @@ GET /project/lock_check?season_id=2026-07
 
 项目网格会在全部后端项目卡片之后固定展示一张“意见收集”卡片：
 
-- 图标使用本地 `src/assets/xinxiang.png`，不请求后端；
+- 图标使用带 Alpha 通道的本地 `src/assets/xinxiang.png`，不请求后端；容器保持透明，不额外绘制粉色底板。该 PNG 体积较小，当前会内联进带内容哈希的 JavaScript 构建产物，并随脚本使用长期缓存；
 - 该卡片不属于运动项目，不参与赛季报名、锁定数量、项目规则或上传凭证流程；
 - 当前仅展示“敬请期待”，尚未接入意见提交入口。
 

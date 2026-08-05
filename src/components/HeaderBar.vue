@@ -149,6 +149,7 @@ export default {
 .brand-logo {
   width: 38px;
   height: auto;
+  background: transparent;
   display: block;
   filter: drop-shadow(0 8px 14px rgba(45, 61, 49, 0.1));
 }

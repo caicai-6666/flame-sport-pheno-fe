@@ -1383,18 +1383,19 @@ export default {
   flex: 0 0 auto;
   width: 44px;
   height: 44px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.58);
-  box-shadow: inset 0 0 0 1px rgba(23, 33, 27, 0.05);
+  background: transparent;
+  box-shadow: none;
   display: grid;
   place-items: center;
   pointer-events: none;
 }
 
 .task-illustration img {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
+  background: transparent;
   display: block;
+  filter: drop-shadow(0 5px 8px rgba(23, 33, 27, 0.12));
   object-fit: contain;
 }
 
@@ -1519,7 +1520,7 @@ export default {
 }
 
 .feedback-card .task-illustration {
-  background: rgba(255, 239, 250, 0.78);
+  background: transparent;
 }
 
 .feedback-card .task-link {
