@@ -41,7 +41,7 @@
 
       <p class="upload-daily-hint">
         <span aria-hidden="true">i</span>
-        当日内多次上传仅以最后一次为准
+        同一项目同一运动日期仅以最后一次上传为准
       </p>
 
       <form
@@ -74,7 +74,8 @@
           </template>
           <template v-else>
             <span class="upload-icon">＋</span>
-            <strong>点击上传图片（最多 2 张）</strong>
+            <strong>点击上传图片</strong>
+            <small class="upload-selection-hint">拍照仅支持 1 张 · 选择图片最多 5 张</small>
             <small>{{ uploadHelpText }}</small>
           </template>
         </label>
@@ -100,14 +101,50 @@
 
         </div>
 
+        <div v-if="!isWeightLossChallenge" class="proof-note">
+          <span>运动日期</span>
+          <div class="proof-date-wheel-shell" :class="{ 'is-disabled': isProofUploading || !hasLegalProofDate }">
+            <div class="proof-date-wheel-highlight" aria-hidden="true"></div>
+            <span class="proof-date-wheel-marker" aria-hidden="true"></span>
+            <div
+              ref="proofDateWheel"
+              class="proof-date-wheel"
+              role="listbox"
+              tabindex="0"
+              aria-label="选择运动日期"
+              @scroll="handleProofDateWheelScroll"
+            >
+              <div class="proof-date-wheel-spacer"></div>
+            <button
+              v-for="date in availableProofDates"
+              :key="date"
+              type="button"
+              class="proof-date-option"
+              :class="{ 'is-selected': proofDate === date }"
+              :data-proof-date="date"
+              role="option"
+              :aria-selected="proofDate === date"
+              :disabled="isProofUploading"
+              @click="selectProofDate(date)"
+            >
+              <strong>{{ formatProofDateDay(date) }}</strong>
+              <span>{{ formatProofDateWeekday(date) }}</span>
+              </button>
+              <div class="proof-date-wheel-spacer"></div>
+            </div>
+          </div>
+        </div>
+
         <label class="proof-note">
           <span>备注</span>
           <textarea
             v-model.trim="proofNote"
             maxlength="80"
             :placeholder="proofNotePlaceholder"
+            required
+            @input="resetProofSubmitConfirm"
           ></textarea>
-          <small class="proof-note-hint">请尽量写明时长、距离、次数、步数等具体指标；描述越具体、越便于核验，越有助于通过初审。</small>
+          <small class="proof-note-hint">请填写时长、距离、次数、步数等具体指标；描述越具体、越便于核验，越有助于通过初审。</small>
         </label>
         </div>
 
@@ -140,18 +177,20 @@
 <script>
 import { getProjectUploadConfig, uploadProjectProof } from '../api/projects'
 
-const MAX_PROOF_IMAGE_BYTES = 1024 * 1024
-const MAX_PROOF_IMAGE_COUNT = 2
+const MAX_PROOF_IMAGE_BYTES = 5 * 1024 * 1024
+const MAX_PROOF_IMAGE_COUNT = 5
 const INITIAL_IMAGE_MAX_EDGE = 1920
 const MIN_IMAGE_MAX_EDGE = 320
 const JPEG_QUALITY_STEPS = [0.9, 0.82, 0.74, 0.66, 0.58, 0.5, 0.42]
+const LONG_PROOF_JPEG_QUALITY_STEPS = [0.94, 0.9, 0.86, 0.82, 0.78, 0.74]
 const MIN_PROOF_UPLOADING_DURATION = 1800
 const PROOF_UPLOAD_FAILURE_DURATION = 1400
-const COLLAGE_SIZE = 1920
-const COLLAGE_PADDING = 24
-const COLLAGE_GAP = 24
-const COLLAGE_CELL_WIDTH = (COLLAGE_SIZE - COLLAGE_PADDING * 2 - COLLAGE_GAP) / 2
-const COLLAGE_CELL_HEIGHT = COLLAGE_SIZE - COLLAGE_PADDING * 2
+const LONG_PROOF_MAX_WIDTH = 1440
+const LONG_PROOF_MIN_WIDTH = 960
+const LONG_PROOF_MAX_HEIGHT = 16000
+const LONG_PROOF_PADDING = 16
+const LONG_PROOF_GAP = 16
+const PROOF_DATE_WHEEL_OPTION_HEIGHT = 34
 
 const defaultUploadConfig = {
   uploadConfigId: '',
@@ -177,6 +216,43 @@ function sanitizeProofFileBaseName(value) {
 
 function toProofJpgFileName(baseName) {
   return `${sanitizeProofFileBaseName(baseName) || 'proof'}.jpg`
+}
+
+function getLocalDateString() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function normalizeDateString(value) {
+  const normalizedValue = String(value || '').slice(0, 10)
+
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalizedValue) ? normalizedValue : ''
+}
+
+function getLocalDateFromString(value) {
+  const [year, month, day] = String(value).split('-').map(Number)
+
+  return new Date(year, month - 1, day)
+}
+
+function getDateRange(startDate, endDate) {
+  const dates = []
+  const cursor = getLocalDateFromString(startDate)
+  const end = getLocalDateFromString(endDate)
+
+  while (cursor <= end) {
+    const year = cursor.getFullYear()
+    const month = String(cursor.getMonth() + 1).padStart(2, '0')
+    const day = String(cursor.getDate()).padStart(2, '0')
+    dates.push(`${year}-${month}-${day}`)
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return dates
 }
 
 function getImageSizeForMaxEdge(width, height, maxEdge) {
@@ -271,19 +347,7 @@ async function compressImageToJpeg(file) {
   )
 }
 
-function drawImageContain(context, image, x, y, width, height) {
-  const imageWidth = image.naturalWidth || image.width
-  const imageHeight = image.naturalHeight || image.height
-  const scale = Math.min(width / imageWidth, height / imageHeight)
-  const drawWidth = imageWidth * scale
-  const drawHeight = imageHeight * scale
-  const drawX = x + (width - drawWidth) / 2
-  const drawY = y + (height - drawHeight) / 2
-
-  context.drawImage(image, drawX, drawY, drawWidth, drawHeight)
-}
-
-async function composeProofImagesToJpeg(files) {
+function createLongProofCanvas(images, canvasWidth) {
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
 
@@ -291,23 +355,72 @@ async function composeProofImagesToJpeg(files) {
     throw new Error('当前浏览器无法处理图片，请更换浏览器后重试')
   }
 
-  canvas.width = COLLAGE_SIZE
-  canvas.height = COLLAGE_SIZE
+  const contentWidth = canvasWidth - LONG_PROOF_PADDING * 2
+  const layout = images.map(image => {
+    const imageWidth = image.naturalWidth || image.width
+    const imageHeight = image.naturalHeight || image.height
+    // 不放大原图，优先保留截图的原始文字像素，避免五图拼接后变糊。
+    const scale = Math.min(1, contentWidth / imageWidth)
+
+    return {
+      image,
+      width: Math.round(imageWidth * scale),
+      height: Math.round(imageHeight * scale)
+    }
+  })
+  const contentHeight = layout.reduce((total, item) => total + item.height, 0) + LONG_PROOF_GAP * Math.max(layout.length - 1, 0)
+  const canvasHeight = contentHeight + LONG_PROOF_PADDING * 2
+
+  if (canvasHeight > LONG_PROOF_MAX_HEIGHT) {
+    return null
+  }
+
+  canvas.width = canvasWidth
+  canvas.height = canvasHeight
+  context.imageSmoothingQuality = 'high'
   context.fillStyle = '#fff'
   context.fillRect(0, 0, canvas.width, canvas.height)
 
-  // 两张图片按选择顺序左右排布，只等比缩放，绝不裁切或拉伸凭证内容。
-  for (const [index, file] of files.entries()) {
-    const image = await loadImage(file)
-    const cellX = COLLAGE_PADDING + index * (COLLAGE_CELL_WIDTH + COLLAGE_GAP)
-    const cellY = COLLAGE_PADDING
-
-    context.fillStyle = '#f5f7f4'
-    context.fillRect(cellX, cellY, COLLAGE_CELL_WIDTH, COLLAGE_CELL_HEIGHT)
-    drawImageContain(context, image, cellX, cellY, COLLAGE_CELL_WIDTH, COLLAGE_CELL_HEIGHT)
+  let y = LONG_PROOF_PADDING
+  for (const item of layout) {
+    const x = Math.round((canvas.width - item.width) / 2)
+    context.drawImage(item.image, x, y, item.width, item.height)
+    y += item.height + LONG_PROOF_GAP
   }
 
-  return compressDrawableToJpeg(canvas, canvas.width, canvas.height)
+  return canvas
+}
+
+async function composeProofImagesToJpeg(files) {
+  const images = await Promise.all(files.map(loadImage))
+  const widestImage = Math.max(...images.map(image => image.naturalWidth || image.width))
+  const initialWidth = Math.min(LONG_PROOF_MAX_WIDTH, widestImage + LONG_PROOF_PADDING * 2)
+  const minimumWidth = Math.min(initialWidth, LONG_PROOF_MIN_WIDTH)
+  let canvasWidth = initialWidth
+
+  while (canvasWidth >= minimumWidth) {
+    const canvas = createLongProofCanvas(images, canvasWidth)
+
+    if (canvas) {
+      for (const quality of LONG_PROOF_JPEG_QUALITY_STEPS) {
+        const blob = await canvasToJpegBlob(canvas, quality)
+
+        if (blob.size <= MAX_PROOF_IMAGE_BYTES) {
+          return blob
+        }
+      }
+    }
+
+    const nextWidth = Math.max(Math.floor(canvasWidth * 0.9), minimumWidth)
+
+    if (nextWidth === canvasWidth) {
+      break
+    }
+
+    canvasWidth = nextWidth
+  }
+
+  throw new Error('多张凭证在保持清晰度后仍超过 5MB，请减少图片数量或选择更清晰的截图')
 }
 
 function wait(ms) {
@@ -333,11 +446,16 @@ export default {
     seasonId: {
       type: [String, Number],
       default: ''
+    },
+    season: {
+      type: Object,
+      default: null
     }
   },
   data() {
     return {
       proofNote: '',
+      proofDate: '',
       proofRecordType: '',
       proofPreviewUrl: '',
       proofFileBaseName: '',
@@ -351,6 +469,7 @@ export default {
       proofSelectionToken: 0,
       isProofSubmitConfirming: false,
       proofSubmitConfirmTimer: null,
+      proofDateWheelTimer: null,
       uploadTouchStartX: 0,
       uploadTouchStartY: 0,
       uploadConfigs: [],
@@ -361,12 +480,62 @@ export default {
     }
   },
   created() {
+    this.setDefaultProofDate()
     this.loadUploadConfig()
   },
   mounted() {
     this.lockPageScroll()
+    if (!this.isWeightLossChallenge) {
+      this.$nextTick(() => this.scrollProofDateIntoView('auto'))
+    }
   },
   computed: {
+    proofDateMin() {
+      const seasonStartDate = normalizeDateString(this.season?.startDate)
+      const seasonEndDate = normalizeDateString(this.season?.endDate)
+      const today = getLocalDateString()
+
+      if (!seasonStartDate || !seasonEndDate) {
+        return ''
+      }
+
+      // 上传仅允许本月记录；赛季边界继续作为额外保护，不能让滚轮越过有效赛季。
+      const currentMonthStart = `${today.slice(0, 7)}-01`
+      return seasonStartDate > currentMonthStart ? seasonStartDate : currentMonthStart
+    },
+    proofDateMax() {
+      const seasonEndDate = normalizeDateString(this.season?.endDate)
+      const today = getLocalDateString()
+
+      if (!seasonEndDate) {
+        return ''
+      }
+
+      return seasonEndDate < today ? seasonEndDate : today
+    },
+    hasLegalProofDate() {
+      return Boolean(
+        this.proofDateMin &&
+        this.proofDateMax &&
+        this.proofDateMin <= this.proofDateMax
+      )
+    },
+    availableProofDates() {
+      if (!this.hasLegalProofDate) {
+        return []
+      }
+
+      return getDateRange(this.proofDateMin, this.proofDateMax)
+    },
+    proofDateMonthLabel() {
+      const date = this.availableProofDates[0] || getLocalDateString()
+      const [year, month] = date.split('-')
+
+      return `${year}年${Number(month)}月`
+    },
+    isWeightLossChallenge() {
+      return this.task?.name === '减重挑战'
+    },
     selectedUploadConfig() {
       return this.uploadConfigs.find(config => config.recordType === this.proofRecordType) || this.uploadConfigs[0] || defaultUploadConfig
     },
@@ -385,7 +554,7 @@ export default {
     uploadHelpText() {
       if (this.isProofProcessing) {
         return this.selectedProofCount > 1
-          ? `正在等比拼接 ${this.selectedProofCount} 张图片并压缩到 1MB 以内...`
+          ? `正在纵向拼接 ${this.selectedProofCount} 张图片，优先保持文字清晰...`
           : '正在转换为 JPG 并压缩到 1MB 以内...'
       }
 
@@ -406,6 +575,10 @@ export default {
         !this.isProofProcessing &&
         !this.isProofUploading &&
         !this.isProofUploadFailed &&
+        this.hasLegalProofDate &&
+        this.proofDate >= this.proofDateMin &&
+        this.proofDate <= this.proofDateMax &&
+        this.proofNote.trim() &&
         this.selectedUploadConfig.uploadConfigId &&
         this.compressedProofBlob &&
         sanitizeProofFileBaseName(this.proofFileBaseName)
@@ -463,6 +636,88 @@ export default {
     },
     setDefaultProofRecordType() {
       this.proofRecordType = this.uploadConfigs[0]?.recordType || defaultUploadConfig.recordType
+    },
+    setDefaultProofDate() {
+      if (!this.hasLegalProofDate) {
+        this.proofDate = ''
+        return
+      }
+
+      const today = getLocalDateString()
+      // 当前激活赛季内默认定位今天；仅在今天不属于可选范围时才退回最近有效日期。
+      this.proofDate = this.availableProofDates.includes(today) ? today : this.proofDateMax
+
+      if (!this.isWeightLossChallenge) {
+        this.$nextTick(() => this.scrollProofDateIntoView('auto'))
+      }
+    },
+    selectProofDate(date) {
+      if (this.isProofUploading || !this.availableProofDates.includes(date)) {
+        return
+      }
+
+      this.proofDate = date
+      this.resetProofSubmitConfirm()
+      this.$nextTick(() => this.scrollProofDateIntoView())
+    },
+    handleProofDateWheelScroll() {
+      if (this.isProofUploading) {
+        return
+      }
+
+      if (this.proofDateWheelTimer) {
+        window.clearTimeout(this.proofDateWheelTimer)
+      }
+
+      this.proofDateWheelTimer = window.setTimeout(() => {
+        this.proofDateWheelTimer = null
+        this.syncProofDateWheel()
+      }, 90)
+    },
+    syncProofDateWheel() {
+      const wheel = this.$refs.proofDateWheel
+
+      if (!wheel || !this.availableProofDates.length) {
+        return
+      }
+
+      const selectedIndex = Math.min(
+        Math.max(Math.round(wheel.scrollTop / PROOF_DATE_WHEEL_OPTION_HEIGHT), 0),
+        this.availableProofDates.length - 1
+      )
+      const selectedDate = this.availableProofDates[selectedIndex]
+
+      if (this.proofDate !== selectedDate) {
+        this.proofDate = selectedDate
+        this.resetProofSubmitConfirm()
+      }
+
+      this.scrollProofDateToIndex(selectedIndex)
+    },
+    scrollProofDateIntoView(behavior = 'smooth') {
+      const selectedIndex = this.availableProofDates.indexOf(this.proofDate)
+
+      if (selectedIndex >= 0) {
+        this.scrollProofDateToIndex(selectedIndex, behavior)
+      }
+    },
+    scrollProofDateToIndex(index, behavior = 'smooth') {
+      const wheel = this.$refs.proofDateWheel
+
+      if (!wheel) {
+        return
+      }
+
+      wheel.scrollTo({
+        top: index * PROOF_DATE_WHEEL_OPTION_HEIGHT,
+        behavior
+      })
+    },
+    formatProofDateDay(date) {
+      return `${Number(date.slice(-2))}日`
+    },
+    formatProofDateWeekday(date) {
+      return `周${['日', '一', '二', '三', '四', '五', '六'][getLocalDateFromString(date).getDay()]}`
     },
     selectUploadConfig(config) {
       this.proofRecordType = config.recordType
@@ -576,6 +831,7 @@ export default {
           seasonId: this.seasonId,
           projectId: this.task.projectId,
           projectUploadConfigId: this.selectedUploadConfig.uploadConfigId,
+          proofDate: this.proofDate,
           note: this.proofNote,
           imageFile: proofFile
         })
@@ -589,6 +845,7 @@ export default {
           recordType: this.selectedUploadConfig.recordType,
           note: this.proofNote,
           reviewStatus: 'pending',
+          proofDate: uploadedRecord?.proofDate || this.proofDate,
           uploadedAt: uploadedRecord?.createdAt || new Date().toISOString()
         })
         this.resetProofForm()
@@ -658,6 +915,7 @@ export default {
       }
 
       this.proofNote = ''
+      this.setDefaultProofDate()
       this.setDefaultProofRecordType()
       this.proofPreviewUrl = ''
       this.proofFileBaseName = ''
@@ -756,6 +1014,10 @@ export default {
 
     if (this.proofUploadFailureTimer) {
       window.clearTimeout(this.proofUploadFailureTimer)
+    }
+
+    if (this.proofDateWheelTimer) {
+      window.clearTimeout(this.proofDateWheelTimer)
     }
   },
   emits: ['close', 'submit-proof']
@@ -1011,6 +1273,11 @@ export default {
   line-height: 1.45;
 }
 
+.upload-dropzone .upload-selection-hint {
+  color: #4e5b53;
+  font-weight: 850;
+}
+
 .upload-dropzone.has-preview {
   border-style: solid;
   background: #17211b;
@@ -1127,6 +1394,137 @@ export default {
   line-height: 1.45;
   outline: none;
   resize: none;
+}
+
+.proof-date-wheel-shell {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.22)),
+    rgba(224, 239, 224, 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 8px 18px rgba(23, 53, 31, 0.07);
+}
+
+.proof-date-wheel-shell::before,
+.proof-date-wheel-shell::after {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  left: 0;
+  height: 27px;
+  pointer-events: none;
+  content: '';
+}
+
+.proof-date-wheel-shell::before {
+  top: 0;
+  background: linear-gradient(180deg, rgba(246, 251, 245, 0.96), rgba(246, 251, 245, 0));
+}
+
+.proof-date-wheel-shell::after {
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(246, 251, 245, 0.96), rgba(246, 251, 245, 0));
+}
+
+.proof-date-wheel-highlight {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 7px;
+  left: 7px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--accent), #fff 72%);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--accent), transparent 88%);
+  transform: translateY(-50%);
+}
+
+.proof-date-wheel-marker {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  left: 10px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid var(--accent);
+  filter: drop-shadow(0 1px 2px rgba(23, 33, 27, 0.16));
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.proof-date-wheel {
+  position: relative;
+  z-index: 3;
+  height: 88px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+
+.proof-date-wheel::-webkit-scrollbar {
+  display: none;
+}
+
+.proof-date-wheel:focus-within {
+  outline: 3px solid color-mix(in srgb, var(--accent), transparent 78%);
+  outline-offset: -3px;
+}
+
+.proof-date-wheel-shell.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.proof-date-wheel-spacer {
+  height: 27px;
+}
+
+.proof-date-option {
+  width: 100%;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: rgba(23, 33, 27, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  scroll-snap-align: center;
+  transform: scale(0.92);
+  transition:
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.proof-date-option strong {
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.proof-date-option span {
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.proof-date-option.is-selected {
+  color: #17211b;
+  transform: scale(1);
+}
+
+@supports (backdrop-filter: blur(8px)) {
+  .proof-date-wheel-shell {
+    backdrop-filter: blur(12px) saturate(1.12);
+  }
 }
 
 .proof-note textarea:focus {

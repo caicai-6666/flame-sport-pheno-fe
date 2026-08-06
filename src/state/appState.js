@@ -102,6 +102,14 @@ export function lockTask(task) {
 
 export function addUploadRecord(proof) {
   const task = findTaskByName(proof.taskName)
+  const proofDate = proof.proofDate || ''
+  const projectId = String(proof.projectId || '')
+  // 后端按“项目 + 运动日期”重传覆盖，前端即时记录也必须同步替换旧项。
+  const remainingRecords = appState.uploadRecords.filter(record => !(
+    proofDate &&
+    String(record.projectId || '') === projectId &&
+    record.proofDate === proofDate
+  ))
 
   appState.uploadRecords = [
     {
@@ -109,8 +117,9 @@ export function addUploadRecord(proof) {
       ...proof,
       reviewStatus: proof.reviewStatus || 'pending',
       accent: task?.accent || '#72d84f',
+      proofDate,
       uploadedAt: proof.uploadedAt || new Date().toISOString()
     },
-    ...appState.uploadRecords
+    ...remainingRecords
   ]
 }

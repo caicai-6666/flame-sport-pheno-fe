@@ -81,7 +81,7 @@ export default {
   },
   computed: {
     sortedRecords() {
-      return [...this.records].sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
+      return [...this.records].sort((a, b) => new Date(b.proofDate || b.uploadedAt) - new Date(a.proofDate || a.uploadedAt))
     }
   },
   methods: {

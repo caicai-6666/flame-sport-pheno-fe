@@ -47,9 +47,10 @@ GET /proof/current
     "seasonName": "2026年7月赛季",
     "projectName": "健身",
     "reviewStatus": "pending",
-    "reviewComment": "初审已通过，等待终审。",
+    "reviewComment": "",
     "note": "力量训练 45 分钟，包含深蹲、卧推和拉伸。",
     "imageName": "健身.jpg",
+    "proofDate": "2026-07-19",
     "createdAt": "2026-07-19T15:30:00"
   }
 ]
@@ -67,13 +68,14 @@ GET /proof/current
 
 | 后端字段 | 前端字段 | 说明 |
 | -------- | -------- | ---- |
-| seasonName | seasonName | 赛季名称 |
-| projectName | taskName | 项目名称 |
-| reviewStatus | reviewStatus | 审核状态 |
-| reviewComment | reviewComment | 审核人员意见；非空时单独展示，不能覆盖用户备注 |
-| note | note | 用户备注 |
-| imageName | fileName | 上传图片名称 |
-| createdAt | uploadedAt | 上传时间 |
+| seasonName | seasonName | 赛季名称，对应 `season.name` |
+| projectName | taskName | 项目名称，对应 `project.name` |
+| reviewStatus | reviewStatus | 审核状态，取值见下方枚举 |
+| reviewComment | reviewComment | 审核意见；初审后可返回通过依据或失败原因，未填写时为空字符串；非空时单独展示，不能覆盖用户备注 |
+| note | note | 用户上传备注，对应 `proof_record.note`；未填写时为空字符串 |
+| imageName | fileName | 凭证文件名，仅包含 `{上传文件主名}.jpg`，不含系统生成前缀 |
+| proofDate | proofDate | 实际运动日期，对应 `proof_record.proof_date`，格式 `YYYY-MM-DD`；用于历史排序和同日重传识别 |
+| createdAt | uploadedAt | 上传时间，对应 `proof_record.created_at` |
 
 `reviewStatus` 展示：
 
@@ -87,7 +89,7 @@ rejected               = 终审失败
 
 未知状态会降级展示为“待初审”，避免接口枚举扩展时出现空标签。
 
-`createdAt` 表示上传时间。
+`proofDate` 表示实际运动日期，卡片日期与列表排序优先使用该字段；`createdAt` 表示实际上传时间，卡片右上角明确展示为 `YYYY.MM.DD HH:mm`。
 
 ## 页面展示
 

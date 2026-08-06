@@ -44,4 +44,4 @@ const avatarBlob = await getAvatarImage()
 const avatarUrl = URL.createObjectURL(avatarBlob)
 ```
 
-失败时不阻塞页面，头像保持默认占位文本 `CA`。
+接口超时后会由公共请求层在 400ms、800ms 后各自动重试一次；三次均超时或发生其他错误时不阻塞页面，头像保持默认占位文本 `PH`。

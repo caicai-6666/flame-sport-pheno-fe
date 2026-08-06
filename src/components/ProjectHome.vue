@@ -1,6 +1,15 @@
 <template>
   <section class="project-home" aria-label="项目任务">
     <div class="hero-card">
+      <button
+        type="button"
+        class="activity-detail-trigger"
+        @click="openActivityDetail"
+      >
+        <span class="activity-detail-trigger-label">活动详情</span>
+        <span class="activity-detail-trigger-arrow" aria-hidden="true">↗</span>
+      </button>
+
       <span class="eyebrow">{{ seasonLabel }}</span>
       <h1>{{ heroTitle }}</h1>
       <p>{{ heroDescription }}</p>
@@ -161,7 +170,7 @@
       </button>
 
       <!-- 意见收集不属于后端项目，不参与项目锁定与赛季状态判断，固定排在全部项目之后。 -->
-      <article class="task-card feedback-card" style="--accent: #ee55b8">
+      <button type="button" class="task-card feedback-card" style="--accent: #ee55b8" @click="openSuggestionPanel">
         <span class="task-card-header">
           <span class="task-name">意见收集</span>
           <span class="task-illustration" aria-hidden="true">
@@ -171,30 +180,82 @@
         <span class="task-description-frame">
           <span class="task-description">你的每一条建议，都能让燃动现象变得更好。</span>
         </span>
-        <span class="task-link">敬请期待</span>
-      </article>
+        <span class="task-link">提交建议 →</span>
+      </button>
     </div>
 
     <Transition name="upload-panel">
       <UploadProofPanel
         v-if="activeUploadTask"
         :task="activeUploadTask"
+        :season="season"
         :season-id="seasonId"
         @close="closeUploadPanel"
         @submit-proof="$emit('submit-proof', $event)"
       />
     </Transition>
+
+    <SuggestionPanel v-if="isSuggestionPanelOpen" @close="closeSuggestionPanel" />
+
+    <Teleport to="body">
+      <Transition name="activity-detail-panel">
+        <div
+          v-if="isActivityDetailOpen"
+          class="activity-detail-overlay"
+          role="presentation"
+          @click.self="closeActivityDetail"
+        >
+          <section
+            class="activity-detail-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="activity-detail-title"
+          >
+            <header class="activity-detail-header">
+              <div>
+                <span>ACTIVITY GUIDE</span>
+                <h2 id="activity-detail-title">活动详情</h2>
+              </div>
+              <button type="button" aria-label="关闭活动详情" @click="closeActivityDetail">×</button>
+            </header>
+
+            <div class="activity-rule-scroll">
+              <div v-if="!isActivityRuleImageLoaded && !isActivityRuleImageError" class="activity-rule-loading">
+                <span aria-hidden="true"></span>
+                <p>正在加载活动规则…</p>
+              </div>
+              <div v-else-if="isActivityRuleImageError" class="activity-rule-error">
+                <strong>活动规则加载失败</strong>
+                <button type="button" @click="reloadActivityRuleImage">重新加载</button>
+              </div>
+              <img
+                :key="activityRuleImageKey"
+                :src="activityRuleImage"
+                alt="燃动现象运动季活动规则"
+                decoding="async"
+                :class="{ 'is-visible': isActivityRuleImageLoaded }"
+                @load="handleActivityRuleImageLoad"
+                @error="handleActivityRuleImageError"
+              >
+            </div>
+          </section>
+        </div>
+      </Transition>
+    </Teleport>
   </section>
 </template>
 
 <script>
 import UploadProofPanel from './UploadProofPanel.vue'
+import activityRuleImage from '../assets/活动规则.webp'
 import feedbackIcon from '../assets/xinxiang.png'
+import SuggestionPanel from './SuggestionPanel.vue'
 
 export default {
   name: 'ProjectHome',
   components: {
-    UploadProofPanel
+    UploadProofPanel,
+    SuggestionPanel
   },
   data() {
     return {
@@ -202,6 +263,7 @@ export default {
       recoveringTask: '',
       pendingTask: null,
       activeUploadTask: null,
+      isSuggestionPanelOpen: false,
       confirmingChallengeLevel: '',
       pendingChallengeLevel: '',
       failedChallengeLevel: '',
@@ -213,6 +275,12 @@ export default {
       isLevelCompletionAnimating: false,
       levelCompletionTimer: null,
       levelProgressParticles: [],
+      isActivityDetailOpen: false,
+      isActivityRuleImageLoaded: false,
+      isActivityRuleImageError: false,
+      activityRuleImageKey: 0,
+      activityDetailPreviousBodyOverflow: '',
+      activityRuleImage,
       feedbackIcon
     }
   },
@@ -648,6 +716,52 @@ export default {
     closeUploadPanel() {
       this.activeUploadTask = null
     },
+    openSuggestionPanel() {
+      this.isSuggestionPanelOpen = true
+    },
+    closeSuggestionPanel() {
+      this.isSuggestionPanelOpen = false
+    },
+    openActivityDetail() {
+      if (this.isActivityDetailOpen) {
+        return
+      }
+
+      this.isActivityRuleImageLoaded = false
+      this.isActivityRuleImageError = false
+      this.activityRuleImageKey += 1
+      this.isActivityDetailOpen = true
+      this.activityDetailPreviousBodyOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      window.addEventListener('keydown', this.handleActivityDetailKeydown)
+    },
+    closeActivityDetail() {
+      if (!this.isActivityDetailOpen) {
+        return
+      }
+
+      this.isActivityDetailOpen = false
+      document.body.style.overflow = this.activityDetailPreviousBodyOverflow
+      window.removeEventListener('keydown', this.handleActivityDetailKeydown)
+    },
+    handleActivityDetailKeydown(event) {
+      if (event.key === 'Escape') {
+        this.closeActivityDetail()
+      }
+    },
+    handleActivityRuleImageLoad() {
+      this.isActivityRuleImageLoaded = true
+      this.isActivityRuleImageError = false
+    },
+    handleActivityRuleImageError() {
+      this.isActivityRuleImageLoaded = false
+      this.isActivityRuleImageError = true
+    },
+    reloadActivityRuleImage() {
+      this.isActivityRuleImageLoaded = false
+      this.isActivityRuleImageError = false
+      this.activityRuleImageKey += 1
+    },
     playLevelCompletionAnimation() {
       this.isLevelLockingHolding = false
       this.pendingChallengeLevel = this.selectedChallengeLevel
@@ -737,7 +851,18 @@ export default {
       }
     }
   },
+  deactivated() {
+    // 首页被 KeepAlive 暂存时关闭 Teleport 弹层，避免切换底部导航后仍遮挡其他页面。
+    this.closeActivityDetail()
+    this.closeSuggestionPanel()
+  },
   beforeUnmount() {
+    if (this.isActivityDetailOpen) {
+      document.body.style.overflow = this.activityDetailPreviousBodyOverflow
+    }
+
+    window.removeEventListener('keydown', this.handleActivityDetailKeydown)
+
     if (this.challengeLevelConfirmTimer) {
       window.clearTimeout(this.challengeLevelConfirmTimer)
     }
@@ -793,15 +918,18 @@ export default {
 }
 
 .eyebrow {
+  max-width: calc(100% - 96px);
   color: #2f8f32;
+  display: block;
   font-size: 11px;
   font-weight: 900;
+  line-height: 1.35;
   letter-spacing: 0.16em;
 }
 
 .hero-card h1 {
   max-width: 100%;
-  margin: 10px 0 8px;
+  margin: 20px 0 8px;
   font-size: clamp(26px, 7.2vw, 30px);
   line-height: 1.14;
   letter-spacing: -0.03em;
@@ -828,6 +956,114 @@ export default {
 .season-target-card {
   position: relative;
   z-index: 1;
+}
+
+.activity-detail-trigger {
+  position: absolute;
+  z-index: 3;
+  top: 18px;
+  right: 18px;
+  isolation: isolate;
+  overflow: hidden;
+  min-width: 82px;
+  padding: 9px 9px 9px 11px;
+  border: 1px solid rgba(47, 143, 50, 0.2);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 78% 10%, rgba(114, 216, 79, 0.3), transparent 44%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(235, 248, 230, 0.9)),
+    #f3faef;
+  box-shadow:
+    0 11px 24px rgba(47, 89, 55, 0.14),
+    0 2px 6px rgba(47, 89, 55, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    inset 0 -1px 0 rgba(47, 143, 50, 0.08);
+  color: #287b2d;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.2;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.activity-detail-trigger::before {
+  position: absolute;
+  z-index: -1;
+  top: 1px;
+  right: 8px;
+  left: 8px;
+  height: 42%;
+  border-top: 1px solid rgba(255, 255, 255, 0.94);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent);
+  content: '';
+  pointer-events: none;
+}
+
+.activity-detail-trigger-label,
+.activity-detail-trigger-arrow {
+  position: relative;
+  z-index: 1;
+}
+
+.activity-detail-trigger-arrow {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(47, 143, 50, 0.12);
+  border-radius: 7px;
+  background: rgba(114, 216, 79, 0.13);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+  transition:
+    background 0.18s ease,
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.activity-detail-trigger:focus-visible {
+  outline: 3px solid rgba(114, 216, 79, 0.24);
+  outline-offset: 2px;
+}
+
+.activity-detail-trigger:active {
+  box-shadow:
+    0 5px 12px rgba(47, 89, 55, 0.1),
+    inset 0 2px 5px rgba(47, 89, 55, 0.08);
+  transform: translateY(2px) scale(0.98);
+}
+
+.activity-detail-trigger:active .activity-detail-trigger-arrow {
+  transform: translate(1px, -1px);
+}
+
+@media (hover: hover) {
+  .activity-detail-trigger:hover {
+    border-color: rgba(47, 143, 50, 0.3);
+    background:
+      radial-gradient(circle at 78% 10%, rgba(114, 216, 79, 0.4), transparent 46%),
+      linear-gradient(145deg, #fff, rgba(230, 247, 224, 0.94));
+    box-shadow:
+      0 14px 28px rgba(47, 89, 55, 0.17),
+      0 3px 7px rgba(47, 89, 55, 0.08),
+      inset 0 1px 0 #fff;
+    transform: translateY(-1px);
+  }
+
+  .activity-detail-trigger:hover .activity-detail-trigger-arrow {
+    background: rgba(114, 216, 79, 0.2);
+    transform: translate(1px, -1px);
+  }
 }
 
 .signup-progress {
@@ -1331,6 +1567,170 @@ export default {
   }
 }
 
+.activity-detail-overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  width: min(100vw, 430px);
+  margin: 0 auto;
+  padding:
+    max(14px, env(safe-area-inset-top))
+    14px
+    max(14px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  background: rgba(18, 27, 21, 0.42);
+  display: flex;
+  backdrop-filter: blur(6px);
+}
+
+.activity-detail-panel {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 30px;
+  background: #f7fbf4;
+  box-shadow: 0 26px 64px rgba(23, 33, 27, 0.3);
+  color: #17211b;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.activity-detail-header {
+  flex: 0 0 auto;
+  padding: 17px 18px 14px;
+  border-bottom: 1px solid rgba(23, 33, 27, 0.07);
+  background:
+    radial-gradient(circle at 84% 12%, rgba(114, 216, 79, 0.24), transparent 32%),
+    rgba(255, 255, 255, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.activity-detail-header span {
+  color: #2f8f32;
+  display: block;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+}
+
+.activity-detail-header h2 {
+  margin: 4px 0 0;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.activity-detail-header button {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(23, 33, 27, 0.06);
+  color: #17211b;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.activity-rule-scroll {
+  position: relative;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.activity-rule-scroll img {
+  width: 100%;
+  height: auto;
+  background: #fff;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.activity-rule-scroll img.is-visible {
+  opacity: 1;
+}
+
+.activity-rule-loading,
+.activity-rule-error {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  min-height: 220px;
+  padding: 24px;
+  box-sizing: border-box;
+  background: #f7fbf4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.activity-rule-loading > span {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(47, 143, 50, 0.16);
+  border-top-color: #39b54a;
+  border-radius: 50%;
+  animation: season-check-spin 760ms linear infinite;
+}
+
+.activity-rule-loading p {
+  margin: 0;
+  color: #68766d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.activity-rule-error strong {
+  font-size: 14px;
+}
+
+.activity-rule-error button {
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 13px;
+  background: #39b54a;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.activity-detail-panel-enter-active,
+.activity-detail-panel-leave-active {
+  transition: opacity 0.24s ease;
+}
+
+.activity-detail-panel-enter-active .activity-detail-panel,
+.activity-detail-panel-leave-active .activity-detail-panel {
+  transition:
+    opacity 0.24s ease,
+    transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.activity-detail-panel-enter-from,
+.activity-detail-panel-leave-to {
+  opacity: 0;
+}
+
+.activity-detail-panel-enter-from .activity-detail-panel,
+.activity-detail-panel-leave-to .activity-detail-panel {
+  opacity: 0;
+  transform: translateY(18px) scale(0.98);
+}
+
 .task-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1510,13 +1910,13 @@ export default {
     radial-gradient(circle at 88% 14%, rgba(255, 131, 209, 0.2), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 247, 253, 0.82)),
     #fff;
-  cursor: default;
+  cursor: pointer;
 }
 
 .feedback-card:hover {
   border-color: color-mix(in srgb, var(--accent), #fff 60%);
-  box-shadow: 0 14px 34px rgba(38, 64, 45, 0.08);
-  transform: none;
+  box-shadow: 0 18px 40px rgba(238, 85, 184, 0.14);
+  transform: translateY(-2px);
 }
 
 .feedback-card .task-illustration {
@@ -1614,6 +2014,14 @@ export default {
   .level-picker button.is-confirming,
   .level-picker button.is-selected,
   .level-picker button.is-selected::after,
+  .activity-rule-scroll img,
+  .activity-rule-loading > span,
+  .activity-detail-panel-enter-active,
+  .activity-detail-panel-leave-active,
+  .activity-detail-panel-enter-active .activity-detail-panel,
+  .activity-detail-panel-leave-active .activity-detail-panel,
+  .activity-detail-trigger,
+  .activity-detail-trigger-arrow,
   .task-description-frame,
   .task-description-enter-active,
   .task-description-leave-active {

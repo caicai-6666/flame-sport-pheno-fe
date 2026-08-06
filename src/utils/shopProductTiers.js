@@ -61,7 +61,8 @@ export const PRODUCT_TIERS = [
   },
   {
     key: 'tier-550',
-    title: '200+奖品',
+    title: '积分200+',
+    pointsTitle: '200+',
     maxExclusive: 550
   }
 ]

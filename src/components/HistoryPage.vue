@@ -68,8 +68,8 @@
               :style="{ '--accent': record.accent || '#72d84f' }"
             >
               <div class="record-date">
-                <strong>{{ formatDay(record.uploadedAt) }}</strong>
-                <span>{{ formatMonth(record.uploadedAt) }}</span>
+                <strong>{{ formatDay(record.proofDate || record.uploadedAt) }}</strong>
+                <span>{{ formatMonth(record.proofDate || record.uploadedAt) }}</span>
               </div>
 
               <div class="record-body">
@@ -78,7 +78,7 @@
                     <strong>{{ record.taskName }}</strong>
                     <span>{{ recordTitle(record) }}</span>
                   </div>
-                  <em>{{ formatTime(record.uploadedAt) }}</em>
+                  <em>{{ formatDateTime(record.uploadedAt) }}</em>
                 </div>
 
                 <p v-if="record.note">{{ record.note }}</p>
@@ -230,10 +230,10 @@ export default {
         : '查看已归档赛季的上传记录与审核结果。'
     },
     sortedRecords() {
-      return [...this.records].sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
+      return [...this.records].sort((a, b) => new Date(b.proofDate || b.uploadedAt) - new Date(a.proofDate || a.uploadedAt))
     },
     sortedPastSeasonReviewRecords() {
-      return [...this.pastSeasonReviewRecords].sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
+      return [...this.pastSeasonReviewRecords].sort((a, b) => new Date(b.proofDate || b.uploadedAt) - new Date(a.proofDate || a.uploadedAt))
     },
     heroEyebrow() {
       return this.isShowingPastRecords ? 'PAST SEASONS' : 'CURRENT SEASON'
@@ -275,10 +275,6 @@ export default {
     formatDay(value) {
       const date = new Date(value)
       return `${date.getDate()}日`
-    },
-    formatTime(value) {
-      const date = new Date(value)
-      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
     },
     formatDateTime(value) {
       const date = new Date(value)
@@ -733,6 +729,7 @@ export default {
   font-size: 11px;
   font-style: normal;
   font-weight: 850;
+  white-space: nowrap;
 }
 
 .record-body p {

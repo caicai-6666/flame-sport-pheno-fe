@@ -165,7 +165,8 @@ function normalizeUploadConfig(config) {
 
 function normalizeProofUploadResult(response) {
   return {
-    createdAt: response?.created_at || response?.createdAt || ''
+    createdAt: response?.created_at || response?.createdAt || '',
+    proofDate: response?.proof_date || response?.proofDate || ''
   }
 }
 
@@ -367,15 +368,16 @@ export async function getProjectUploadConfig(projectId) {
 /**
  * 上传项目凭证。
  *
- * 前端会在提交前把用户选择的图片统一转换为 jpg 并压缩到 1MB 以内，
- * 再通过 multipart/form-data 提交赛季 ID、项目 ID、上传配置 ID、备注和图片文件。
+ * 前端会在提交前把用户选择的图片统一转换为 jpg 并压缩到 5MB 以内，
+ * 再通过 multipart/form-data 提交赛季 ID、项目 ID、上传配置 ID、运动日期、备注和图片文件。
  */
-export async function uploadProjectProof({ seasonId, projectId, projectUploadConfigId, note, imageFile }) {
+export async function uploadProjectProof({ seasonId, projectId, projectUploadConfigId, proofDate, note, imageFile }) {
   const formData = new FormData()
 
   formData.append('season_id', seasonId)
   formData.append('project_id', projectId)
   formData.append('project_upload_config_id', projectUploadConfigId)
+  formData.append('proof_date', proofDate)
   formData.append('note', note || '')
   formData.append('image', imageFile, imageFile.name)
 

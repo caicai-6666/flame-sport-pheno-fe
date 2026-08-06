@@ -5,7 +5,9 @@
 ```text
 src/views/ProjectHomeView.vue
 src/components/ProjectHome.vue
+src/components/SuggestionPanel.vue
 src/api/projects.js
+src/api/suggestion.js
 src/api/season.js
 src/state/appState.js
 ```
@@ -20,6 +22,7 @@ ProjectHome 当前已接入真实接口：
 - `GET /project/lock_check`
 - `GET /project/rules`
 - `POST /project/lock_level`
+- `POST /suggestion/remark`
 
 上传记录弹窗由 `project/upload_proof.md` 单独描述。
 
@@ -34,6 +37,8 @@ ProjectHome 当前已接入真实接口：
 4. 如果满足条件，加载挑战等级选项
 5. 已确认挑战等级时，为每个项目加载该等级对应的规则要求并展示到项目卡片
 ```
+
+上述读取请求均使用公共请求层的超时重试：每次最多等待 15 秒，超时后依次等待 400ms、800ms 并重试，最多共请求 3 次。只有最终仍超时才执行各步骤已有的降级处理；业务状态响应（如报名状态的 `409`、`403`）不会重试。
 
 ## 项目卡片等级要求
 
@@ -153,7 +158,42 @@ GET /project/lock_check?season_id=2026-07
 
 - 图标使用带 Alpha 通道的本地 `src/assets/xinxiang.png`，不请求后端；容器保持透明，不额外绘制粉色底板。该 PNG 体积较小，当前会内联进带内容哈希的 JavaScript 构建产物，并随脚本使用长期缓存；
 - 该卡片不属于运动项目，不参与赛季报名、锁定数量、项目规则或上传凭证流程；
-- 当前仅展示“敬请期待”，尚未接入意见提交入口。
+- 点击卡片会打开意见输入弹窗，不受当前赛季、报名状态或项目锁定状态限制；弹窗打开时锁定背景滚动，支持点击遮罩、关闭按钮和 `Escape` 退出。
+
+接口：
+
+```http
+POST /suggestion/remark
+Authorization: <auth_code>
+Content-Type: application/json
+```
+
+请求体：
+
+```json
+{
+  "remark": "希望增加活动提醒功能"
+}
+```
+
+成功响应：`201 Created`
+
+```json
+{
+  "id": 1,
+  "created_at": "2026-08-06T10:00:00"
+}
+```
+
+字段映射：`id` 保持原值，`created_at` 归一化为前端模型的 `createdAt`。
+
+前端先去除首尾空白；空字符串或仅含空白字符不可提交。提交按钮采用与其他写操作一致的二次确认，确认后进入提交中状态；`POST` 不自动重试，避免网络超时导致重复创建建议。成功时弹窗展示感谢反馈后自动关闭；服务端的非 `2xx` 响应（包括内容校验失败）会显示响应 `message`，保留原始输入并允许重新提交。
+
+## 活动详情
+
+ProjectHome hero 卡片右上角固定展示“活动详情”按钮，不依赖赛季状态、报名进度或目标等级，页面首次渲染后即可点击。点击后打开全屏弹层，用户可纵向滚动查看完整的 `src/assets/活动规则.webp` 长图；图片按原始宽高比展示，不裁剪、不放大插值，关闭按钮、点击遮罩和 `Escape` 均可退出弹层。
+
+活动规则图片通过 `import` 进入 Vue 构建流程，生产构建会输出带内容哈希的 WebP 文件。容器 Nginx 对该文件返回 `Cache-Control: public, max-age=31536000, immutable`，钉钉 WebView 首次获取后可长期复用；图片更新时文件哈希及 URL 自动变化。弹层提供图片加载状态和失败后重新加载入口，打开期间锁定页面背景滚动。
 
 ## 首页交互规则
 
