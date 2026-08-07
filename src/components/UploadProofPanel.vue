@@ -1102,6 +1102,7 @@ export default {
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
   transition: transform 560ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -1128,14 +1129,24 @@ export default {
   overflow: hidden;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  will-change: transform, opacity;
+  transition: opacity 120ms ease;
 }
 
 .upload-panel-face.is-front {
   touch-action: pan-y;
+  transform: translateZ(1px);
 }
 
 .upload-panel-face.is-back {
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) translateZ(1px);
+}
+
+/* 钉钉部分 WebView 会在 3D 翻面后误绘制背向内容，显式隐藏非活动面防止“提交记录”透出。 */
+.upload-panel-flipper:not(.is-previewing-proof) .upload-panel-face.is-back,
+.upload-panel-flipper.is-previewing-proof .upload-panel-face.is-front {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .upload-panel-header {
