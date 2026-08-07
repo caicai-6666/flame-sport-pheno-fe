@@ -64,6 +64,7 @@ export function setSelectedChallengeLevel(challengeLevel) {
 }
 
 export function setUploadRecords(uploadRecords) {
+  // 接口刷新后的记录只使用后端 imageUrl，临时上传 Blob 不跨刷新或重新拉取保留。
   appState.uploadRecords = uploadRecords
 }
 
@@ -116,6 +117,8 @@ export function addUploadRecord(proof) {
       id: proof.id || `proof-${Date.now()}`,
       ...proof,
       reviewStatus: proof.reviewStatus || 'pending',
+      // 仅当前页面会话保留，供后端尚未返回 imageUrl 的新记录直接预览原始提交图片。
+      temporaryImageBlob: proof.temporaryImageBlob || null,
       accent: task?.accent || '#72d84f',
       proofDate,
       uploadedAt: proof.uploadedAt || new Date().toISOString()

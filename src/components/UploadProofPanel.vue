@@ -6,15 +6,21 @@
     @click="$emit('close')"
   >
     <aside
-      class="upload-panel"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="upload-panel-title"
-      @click.stop
-      @touchstart.passive="startUploadSwipe"
-      @touchend.passive="finishUploadSwipe"
-    >
-      <header class="upload-panel-header">
+    class="upload-panel"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="isProofPreviewing ? '查看处理后的图片' : uploadPanelTitle"
+    @click.stop
+  >
+    <div class="upload-panel-flipper" :class="{ 'is-previewing-proof': isProofPreviewing }">
+      <section
+        class="upload-panel-face is-front"
+        :aria-hidden="isProofPreviewing"
+        :inert="isProofPreviewing"
+        @touchstart.passive="startUploadSwipe"
+        @touchend.passive="finishUploadSwipe"
+      >
+        <header class="upload-panel-header">
         <div>
           <span class="upload-kicker">UPLOAD PROOF</span>
           <h2 id="upload-panel-title">{{ uploadPanelTitle }}</h2>
@@ -24,18 +30,16 @@
 
       <div class="upload-summary">
         <span>{{ uploadSummaryLabel }}</span>
-        <label v-if="compressedProofBlob" class="proof-name-editor">
-          <input
-            v-model="proofFileBaseName"
-            type="text"
-            maxlength="60"
-            aria-label="重命名上传图片"
-            :disabled="isProofUploading"
-            @blur="sanitizeProofFileName"
-            @input="resetProofSubmitConfirm"
-          >
-          <em>.jpg</em>
-        </label>
+        <button
+          v-if="compressedProofBlob"
+          class="proof-preview-trigger"
+          type="button"
+          :disabled="isProofUploading"
+          @click="openProofPreview"
+        >
+          <strong>{{ selectedProofCount > 1 ? `查看已拼接的 ${selectedProofCount} 张图片` : '查看处理后的图片' }}</strong>
+          <em aria-hidden="true">↗</em>
+        </button>
         <strong v-else>{{ isProofProcessing ? '正在处理图片' : '未选择图片' }}</strong>
       </div>
 
@@ -170,6 +174,33 @@
         </button>
         </div>
       </form>
+      </section>
+
+      <section
+        class="upload-panel-face is-back"
+        :aria-hidden="!isProofPreviewing"
+        :inert="!isProofPreviewing"
+      >
+        <header class="upload-panel-header">
+          <div>
+            <span class="upload-kicker">PROOF PREVIEW</span>
+            <h2>查看处理后的图片</h2>
+          </div>
+          <div class="proof-preview-actions">
+            <button class="proof-preview-return" type="button" @click="closeProofPreview">
+              <span aria-hidden="true">←</span>
+              返回编辑
+            </button>
+            <button class="upload-close" type="button" aria-label="关闭上传弹窗" @click="$emit('close')">×</button>
+          </div>
+        </header>
+
+        <div class="proof-preview-viewer" aria-label="处理后的凭证图片">
+          <img v-if="proofPreviewUrl" :src="proofPreviewUrl" :alt="`${task.name}处理后的完整凭证图片`">
+        </div>
+        <p class="proof-preview-hint">上下滑动可查看完整长图</p>
+      </section>
+    </div>
     </aside>
   </div>
 </template>
@@ -476,7 +507,8 @@ export default {
       isUploadConfigLoading: false,
       uploadConfigError: null,
       lockedPageScrollY: 0,
-      originalPageScrollStyle: null
+      originalPageScrollStyle: null,
+      isProofPreviewing: false
     }
   },
   created() {
@@ -555,7 +587,7 @@ export default {
       if (this.isProofProcessing) {
         return this.selectedProofCount > 1
           ? `正在纵向拼接 ${this.selectedProofCount} 张图片，优先保持文字清晰...`
-          : '正在转换为 JPG 并压缩到 1MB 以内...'
+          : '正在转换为 JPG 并压缩到 5MB 以内...'
       }
 
       return this.isUploadConfigLoading ? '正在加载上传要求...' : this.selectedUploadConfig.uploadHint
@@ -604,6 +636,14 @@ export default {
     }
   },
   methods: {
+    openProofPreview() {
+      if (this.proofPreviewUrl && !this.isProofProcessing && !this.isProofUploading) {
+        this.isProofPreviewing = true
+      }
+    },
+    closeProofPreview() {
+      this.isProofPreviewing = false
+    },
     async loadUploadConfig() {
       if (!this.task?.projectId) {
         this.uploadConfigs = [defaultUploadConfig]
@@ -753,6 +793,8 @@ export default {
 
       const [firstFile] = files
 
+      this.closeProofPreview()
+
       if (this.proofPreviewUrl) {
         URL.revokeObjectURL(this.proofPreviewUrl)
       }
@@ -845,6 +887,8 @@ export default {
           recordType: this.selectedUploadConfig.recordType,
           note: this.proofNote,
           reviewStatus: 'pending',
+          // 后端上传响应暂不返回 imageUrl；保留本次已提交的 JPG 供当前会话历史即时预览。
+          temporaryImageBlob: this.compressedProofBlob,
           proofDate: uploadedRecord?.proofDate || this.proofDate,
           uploadedAt: uploadedRecord?.createdAt || new Date().toISOString()
         })
@@ -909,6 +953,7 @@ export default {
     },
     resetProofForm() {
       this.proofSelectionToken += 1
+      this.closeProofPreview()
 
       if (this.proofPreviewUrl) {
         URL.revokeObjectURL(this.proofPreviewUrl)
@@ -1049,6 +1094,24 @@ export default {
   right: 16px;
   bottom: calc(var(--upload-bottom-nav-space) + var(--upload-panel-header-gap));
   width: min(330px, calc(100% - 58px));
+  perspective: 1200px;
+}
+
+.upload-panel-flipper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 560ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.upload-panel-flipper.is-previewing-proof {
+  transform: rotateY(180deg);
+}
+
+.upload-panel-face {
+  position: absolute;
+  inset: 0;
   padding: 16px;
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 30px;
@@ -1063,7 +1126,16 @@ export default {
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.upload-panel-face.is-front {
   touch-action: pan-y;
+}
+
+.upload-panel-face.is-back {
+  transform: rotateY(180deg);
 }
 
 .upload-panel-header {
@@ -1125,39 +1197,112 @@ export default {
   white-space: nowrap;
 }
 
-.proof-name-editor {
+.proof-preview-trigger {
   min-width: 0;
+  min-height: 34px;
   padding: 6px 8px;
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.72);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  color: #17211b;
+  cursor: pointer;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 4px;
+  text-align: left;
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1), background 160ms ease, box-shadow 160ms ease;
 }
 
-.proof-name-editor input {
+.proof-preview-trigger strong {
   min-width: 0;
-  border: 0;
-  background: transparent;
-  color: #17211b;
-  font: inherit;
   font-size: 12px;
   font-weight: 900;
-  outline: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
-.proof-name-editor em {
-  color: #758078;
-  font-size: 12px;
+.proof-preview-trigger em {
+  flex-shrink: 0;
+  color: var(--accent, #2f8f32);
+  font-size: 16px;
   font-style: normal;
   font-weight: 900;
 }
 
-.proof-name-editor:focus-within {
+.proof-preview-trigger:not(:disabled):hover {
+  background: color-mix(in srgb, var(--accent), #fff 90%);
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--accent), transparent 84%);
+  transform: translateY(-1px);
+}
+
+.proof-preview-trigger:not(:disabled):active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.proof-preview-trigger:focus-visible,
+.proof-preview-return:focus-visible {
   border-color: color-mix(in srgb, var(--accent), #fff 18%);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent), transparent 84%);
+  outline: none;
+}
+
+.proof-preview-trigger:disabled {
+  color: rgba(23, 33, 27, 0.45);
+  cursor: wait;
+}
+
+.proof-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.proof-preview-return {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(23, 33, 27, 0.06);
+  color: #344238;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.proof-preview-return span {
+  margin-right: 3px;
+  font-size: 15px;
+}
+
+.proof-preview-viewer {
+  min-height: 0;
+  padding: 9px;
+  border: 1px solid rgba(23, 33, 27, 0.08);
+  border-radius: 22px;
+  background: rgba(225, 234, 225, 0.72);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  flex: 1;
+}
+
+.proof-preview-viewer img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 15px;
+  background: #fff;
+}
+
+.proof-preview-hint {
+  flex-shrink: 0;
+  margin: 0;
+  color: #68766d;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .upload-daily-hint {
@@ -1731,7 +1876,7 @@ export default {
     --upload-panel-edge-gap: 10px;
   }
 
-  .upload-panel {
+  .upload-panel-face {
     gap: 9px;
     padding: 14px;
   }
@@ -1767,6 +1912,13 @@ export default {
 
   .submit-proof {
     min-height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-panel-flipper,
+  .proof-preview-trigger {
+    transition: none;
   }
 }
 </style>

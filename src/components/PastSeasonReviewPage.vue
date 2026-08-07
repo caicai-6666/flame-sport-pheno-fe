@@ -23,11 +23,20 @@
       </div>
 
       <div v-if="sortedRecords.length" class="review-list">
-        <article
+        <div
           v-for="record in sortedRecords"
           :key="record.id"
+          class="review-card-entry"
+        >
+          <article
           class="review-card"
+          :class="{ 'is-previewable': canPreviewProof(record) }"
           :style="{ '--accent': record.accent || '#72d84f' }"
+          :role="canPreviewProof(record) ? 'button' : undefined"
+          :tabindex="canPreviewProof(record) ? 0 : undefined"
+          @click="openProofImage(record)"
+          @keydown.enter.prevent="openProofImage(record)"
+          @keydown.space.prevent="openProofImage(record)"
         >
           <div class="review-card-top">
             <div>
@@ -42,14 +51,15 @@
           <dl class="review-meta">
             <div>
               <dt>上传文件</dt>
-              <dd>{{ record.fileName }}</dd>
+              <dd>{{ record.fileName }}<em v-if="canPreviewProof(record)"> · 点击查看原图</em></dd>
             </div>
             <div>
               <dt>上传时间</dt>
               <dd>{{ formatDateTime(record.uploadedAt) }}</dd>
             </div>
           </dl>
-        </article>
+          </article>
+        </div>
       </div>
 
       <div v-else class="empty-review">
@@ -57,14 +67,26 @@
         <p>完成月末统一审核后，已归档的赛季记录会展示在这里。</p>
       </div>
     </section>
+
+    <ProofImageViewer
+      v-if="previewRecord"
+      :image-url="previewRecord.imageUrl"
+      :image-blob="previewRecord.temporaryImageBlob"
+      :file-name="previewRecord.fileName"
+      @close="closeProofImage"
+    />
   </section>
 </template>
 
 <script>
+import ProofImageViewer from './ProofImageViewer.vue'
 import { getReviewStatusText } from '../utils/proofReview'
 
 export default {
   name: 'PastSeasonReviewPage',
+  components: {
+    ProofImageViewer
+  },
   props: {
     records: {
       type: Array,
@@ -82,6 +104,11 @@ export default {
   computed: {
     sortedRecords() {
       return [...this.records].sort((a, b) => new Date(b.proofDate || b.uploadedAt) - new Date(a.proofDate || a.uploadedAt))
+    }
+  },
+  data() {
+    return {
+      previewRecord: null
     }
   },
   methods: {
@@ -104,7 +131,21 @@ export default {
     },
     openCurrentSeasonHistory() {
       this.$router.push({ name: 'history' })
+    },
+    openProofImage(record) {
+      if (this.canPreviewProof(record)) {
+        this.previewRecord = record
+      }
+    },
+    canPreviewProof(record) {
+      return Boolean(record?.imageUrl || record?.temporaryImageBlob?.size)
+    },
+    closeProofImage() {
+      this.previewRecord = null
     }
+  },
+  beforeUnmount() {
+    this.closeProofImage()
   }
 }
 </script>
@@ -234,6 +275,7 @@ export default {
 }
 
 .review-card {
+  position: relative;
   flex-shrink: 0;
   padding: 16px;
   border: 1px solid rgba(23, 33, 27, 0.08);
@@ -242,6 +284,39 @@ export default {
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.72)),
     #fff;
   box-shadow: 0 16px 38px rgba(38, 64, 45, 0.08);
+}
+
+.review-card-entry {
+  flex-shrink: 0;
+}
+
+.review-card.is-previewable {
+  cursor: pointer;
+  border-color: color-mix(in srgb, var(--accent), #fff 72%);
+  box-shadow:
+    0 3px 0 color-mix(in srgb, var(--accent), #fff 80%),
+    0 16px 38px rgba(38, 64, 45, 0.08);
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.review-card.is-previewable:hover {
+  border-color: color-mix(in srgb, var(--accent), #fff 48%);
+  box-shadow:
+    0 5px 0 color-mix(in srgb, var(--accent), #fff 80%),
+    0 22px 42px rgba(38, 64, 45, 0.14);
+  transform: translateY(-3px);
+}
+
+.review-card.is-previewable:active {
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--accent), #fff 82%),
+    0 8px 18px rgba(38, 64, 45, 0.1);
+  transform: translateY(2px) scale(0.988);
+}
+
+.review-card.is-previewable:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent), #fff 42%);
+  outline-offset: 3px;
 }
 
 .review-card-top {
@@ -351,6 +426,12 @@ export default {
   white-space: nowrap;
 }
 
+.review-meta dd em {
+  color: #2f8f32;
+  font-style: normal;
+  font-weight: 950;
+}
+
 .empty-review {
   min-height: 0;
   padding: 28px 22px;
@@ -376,4 +457,5 @@ export default {
   font-size: 13px;
   line-height: 1.65;
 }
+
 </style>

@@ -50,6 +50,7 @@ GET /proof/current
     "reviewComment": "",
     "note": "力量训练 45 分钟，包含深蹲、卧推和拉伸。",
     "imageName": "健身.jpg",
+    "imageUrl": "/flame/api/image/proof_record/18",
     "proofDate": "2026-07-19",
     "createdAt": "2026-07-19T15:30:00"
   }
@@ -74,6 +75,7 @@ GET /proof/current
 | reviewComment | reviewComment | 审核意见；初审后可返回通过依据或失败原因，未填写时为空字符串；非空时单独展示，不能覆盖用户备注 |
 | note | note | 用户上传备注，对应 `proof_record.note`；未填写时为空字符串 |
 | imageName | fileName | 凭证文件名，仅包含 `{上传文件主名}.jpg`，不含系统生成前缀 |
+| imageUrl | imageUrl | 受鉴权保护的凭证原图读取地址；点击记录后以 Blob 发起 GET 请求并在弹层展示 |
 | proofDate | proofDate | 实际运动日期，对应 `proof_record.proof_date`，格式 `YYYY-MM-DD`；用于历史排序和同日重传识别 |
 | createdAt | uploadedAt | 上传时间，对应 `proof_record.created_at` |
 
@@ -97,6 +99,10 @@ rejected               = 终审失败
 
 - 展示本赛季上传历史
 - `reviewComment` 非空时，在用户上传备注下方以“审核意见”单独展示
+- 含 `imageUrl` 的记录整卡可点击（键盘 Enter / Space 同样可用）；点击后会从该地址提取 `/image/proof_record/{id}` 相对接口，再由当前环境的 API 前缀请求原图并在弹层展示。图片请求复用全局 `Authorization`、超时重试与 401 重登，关闭弹层会释放 Blob 对象 URL。
+- 原图弹层使用与上传面板一致的遮罩淡入、内容框从右侧滑入/滑出过渡；系统开启“减少动态效果”时直接显示或关闭。
+- 可查看原图的记录卡以浮起阴影表达可按压状态，按下会下沉。
+- 刚上传成功而后端尚未返回 `imageUrl` 的即时记录，会在当前会话内复用提交时保留的 JPG Blob 直接展示原图；刷新页面或重新拉取当前赛季记录后，该临时 Blob 自动丢弃并改用后端地址。
 - 展示赛季进度条
 - 过往赛季上传记录通过按钮进入独立页面
 

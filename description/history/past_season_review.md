@@ -29,6 +29,7 @@ GET /proof/history
     "reviewStatus": "approved",
     "reviewComment": "审核通过：健身上传图片清晰，训练记录符合本项目打卡要求。",
     "imageName": "健身1.jpg",
+    "imageUrl": "/flame/api/image/proof_record/18",
     "proofDate": "2026-06-01",
     "createdAt": "2026-06-01T09:00:00"
   }
@@ -52,6 +53,7 @@ GET /proof/history
 | reviewStatus | result | 审核状态，取值见下方枚举 |
 | reviewComment | note | 审核意见；前端展示为记录说明 |
 | imageName | fileName | 凭证文件名，仅包含上传文件主名和 `.jpg` 后缀 |
+| imageUrl | imageUrl | 受鉴权保护的凭证原图读取地址；前端点击该条记录后以 Blob 发起 GET 请求 |
 | proofDate | proofDate | 实际运动日期，格式 `YYYY-MM-DD` |
 | createdAt | uploadedAt | 上传时间 |
 
@@ -70,5 +72,11 @@ rejected               = 终审失败
 ## 页面展示
 
 前端会按 `proofDate`（缺失时回退 `uploadedAt`）降序展示过往赛季上传记录。
+
+有 `imageUrl` 的记录整卡可按压查看原图。前端会从返回地址提取 `GET /image/proof_record/{proof_record_id}` 相对接口，不能直接使用 `<img src>`；而是通过带 `Authorization` 的 Blob 请求获取并在弹层展示，关闭弹层后释放对象 URL。
+
+原图弹层采用与上传面板一致的遮罩淡入、内容框从右侧滑入与滑出过渡；系统开启“减少动态效果”时不播放过渡。
+
+可查看原图的记录卡使用抬起式按钮反馈，按下时下沉。
 
 `HistoryPage` 在用户未参与本赛季时，会直接复用 `PastSeasonReviewPage` 展示过往赛季上传记录，并隐藏“返回本赛季”按钮。

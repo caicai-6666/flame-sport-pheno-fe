@@ -60,12 +60,21 @@
             </button>
           </div>
 
-          <div class="history-list" v-if="sortedRecords.length">
-            <article
+          <div class="history-list" v-if="!isShowingPastRecords && sortedRecords.length">
+            <div
               v-for="record in sortedRecords"
               :key="record.id"
+              class="history-card-entry"
+            >
+              <article
               class="history-card"
+              :class="{ 'is-previewable': canPreviewProof(record) }"
               :style="{ '--accent': record.accent || '#72d84f' }"
+              :role="canPreviewProof(record) ? 'button' : undefined"
+              :tabindex="canPreviewProof(record) ? 0 : undefined"
+              @click="openProofImage(record)"
+              @keydown.enter.prevent="openProofImage(record)"
+              @keydown.space.prevent="openProofImage(record)"
             >
               <div class="record-date">
                 <strong>{{ formatDay(record.proofDate || record.uploadedAt) }}</strong>
@@ -88,16 +97,17 @@
                 </p>
 
                 <div class="record-footer">
-                  <span class="proof-file">{{ record.fileName }}</span>
+                  <span class="proof-file">{{ record.fileName }}<em v-if="canPreviewProof(record)"> · 点击查看原图</em></span>
                   <span class="proof-status" :class="`is-${reviewStatus(record)}`">
                     {{ reviewStatusText(record) }}
                   </span>
                 </div>
               </div>
-            </article>
+              </article>
+            </div>
           </div>
 
-          <div v-else class="empty-history">
+          <div v-else-if="!isShowingPastRecords" class="empty-history">
             <span>暂无记录</span>
             <p>锁定运动并完成上传后，会在这里看到当前赛季的上传历史。</p>
           </div>
@@ -120,12 +130,21 @@
             </button>
           </div>
 
-          <div class="past-record-list" v-if="sortedPastSeasonReviewRecords.length">
-            <article
+          <div class="past-record-list" v-if="isShowingPastRecords && sortedPastSeasonReviewRecords.length">
+            <div
               v-for="record in sortedPastSeasonReviewRecords"
               :key="record.id"
+              class="past-record-card-entry"
+            >
+              <article
               class="past-record-card"
+              :class="{ 'is-previewable': canPreviewProof(record) }"
               :style="{ '--accent': record.accent || '#72d84f' }"
+              :role="canPreviewProof(record) ? 'button' : undefined"
+              :tabindex="canPreviewProof(record) ? 0 : undefined"
+              @click="openProofImage(record)"
+              @keydown.enter.prevent="openProofImage(record)"
+              @keydown.space.prevent="openProofImage(record)"
             >
               <div class="past-record-top">
                 <div>
@@ -140,41 +159,53 @@
               <dl class="past-record-meta">
                 <div>
                   <dt>上传文件</dt>
-                  <dd>{{ record.fileName }}</dd>
+                  <dd>{{ record.fileName }}<em v-if="canPreviewProof(record)"> · 点击查看原图</em></dd>
                 </div>
                 <div>
                   <dt>上传时间</dt>
                   <dd>{{ formatDateTime(record.uploadedAt) }}</dd>
                 </div>
               </dl>
-            </article>
+              </article>
+            </div>
           </div>
 
-          <div v-else class="empty-history">
+          <div v-else-if="isShowingPastRecords" class="empty-history">
             <span>暂无过往赛季上传</span>
             <p>完成月末统一审核后，已归档的赛季记录会展示在这里。</p>
           </div>
         </section>
       </div>
     </section>
+
+    <ProofImageViewer
+      v-if="previewRecord"
+      :image-url="previewRecord.imageUrl"
+      :image-blob="previewRecord.temporaryImageBlob"
+      :file-name="previewRecord.fileName"
+      @close="closeProofImage"
+    />
   </section>
 </template>
 
 <script>
 import PastSeasonReviewPage from './PastSeasonReviewPage.vue'
+import ProofImageViewer from './ProofImageViewer.vue'
 import { getReviewStatusText } from '../utils/proofReview'
 
 export default {
   name: 'HistoryPage',
   components: {
-    PastSeasonReviewPage
+    PastSeasonReviewPage,
+    ProofImageViewer
   },
   data() {
     return {
       isShowingPastRecords: false,
       displayedProgressByProjectId: {},
       hasPlayedProgressAnimation: false,
-      progressAnimationFrame: null
+      progressAnimationFrame: null,
+      previewRecord: null
     }
   },
   props: {
@@ -307,6 +338,17 @@ export default {
     resultText(result) {
       return getReviewStatusText(result)
     },
+    openProofImage(record) {
+      if (this.canPreviewProof(record)) {
+        this.previewRecord = record
+      }
+    },
+    canPreviewProof(record) {
+      return Boolean(record?.imageUrl || record?.temporaryImageBlob?.size)
+    },
+    closeProofImage() {
+      this.previewRecord = null
+    },
     animateProjectProgress() {
       if (this.progressAnimationFrame) {
         window.cancelAnimationFrame(this.progressAnimationFrame)
@@ -369,6 +411,8 @@ export default {
     if (this.progressAnimationFrame) {
       window.cancelAnimationFrame(this.progressAnimationFrame)
     }
+
+    this.closeProofImage()
   }
 }
 </script>
@@ -664,6 +708,44 @@ export default {
   gap: 12px;
 }
 
+.history-card-entry,
+.past-record-card-entry {
+  flex-shrink: 0;
+}
+
+.history-card.is-previewable,
+.past-record-card.is-previewable {
+  cursor: pointer;
+  border-color: color-mix(in srgb, var(--accent), #fff 72%);
+  box-shadow:
+    0 3px 0 color-mix(in srgb, var(--accent), #fff 80%),
+    0 16px 38px rgba(38, 64, 45, 0.08);
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.history-card.is-previewable:hover,
+.past-record-card.is-previewable:hover {
+  border-color: color-mix(in srgb, var(--accent), #fff 48%);
+  box-shadow:
+    0 5px 0 color-mix(in srgb, var(--accent), #fff 80%),
+    0 22px 42px rgba(38, 64, 45, 0.14);
+  transform: translateY(-3px);
+}
+
+.history-card.is-previewable:active,
+.past-record-card.is-previewable:active {
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--accent), #fff 82%),
+    0 8px 18px rgba(38, 64, 45, 0.1);
+  transform: translateY(2px) scale(0.988);
+}
+
+.history-card.is-previewable:focus-visible,
+.past-record-card.is-previewable:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent), #fff 42%);
+  outline-offset: 3px;
+}
+
 .history-card::before {
   position: absolute;
   inset: 14px auto 14px 74px;
@@ -771,6 +853,13 @@ export default {
   white-space: nowrap;
 }
 
+.proof-file em,
+.past-record-meta dd em {
+  color: #2f8f32;
+  font-style: normal;
+  font-weight: 950;
+}
+
 .proof-status {
   flex-shrink: 0;
   box-sizing: border-box;
@@ -811,6 +900,7 @@ export default {
 }
 
 .past-record-card {
+  position: relative;
   flex-shrink: 0;
   padding: 16px;
   border: 1px solid rgba(23, 33, 27, 0.08);

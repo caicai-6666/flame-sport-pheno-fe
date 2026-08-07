@@ -10,6 +10,21 @@ const HISTORY_ACCENTS = [
   '#4f9cff'
 ]
 
+const API_PATH = '/flame/api'
+
+function toApiRelativePath(imageUrl) {
+  const url = String(imageUrl || '').trim()
+  const apiPathIndex = url.indexOf(API_PATH)
+
+  if (apiPathIndex < 0) {
+    return url
+  }
+
+  // Axios 会把以 / 开头的地址仍与 baseURL 合并；剥离后统一由 request 的
+  // /flame/api（生产）或 /dev/flame/api（开发）baseURL 添加唯一一次前缀。
+  return url.slice(apiPathIndex + API_PATH.length) || '/'
+}
+
 function getProofFileName(record) {
   const fileName = record.imageName || record.image_name || record.file_name || record.fileName || record.filename
 
@@ -37,6 +52,7 @@ function normalizeCurrentSeasonRecord(record, index) {
     projectId: String(record.project_id || project.id || ''),
     taskName: projectName,
     fileName: record.imageName || record.image_name || getProofFileName(record),
+    imageUrl: String(record.imageUrl || record.image_url || '').trim(),
     note: record.note || '',
     recordType: record.record_type || uploadConfig.record_type || record.recordType || '',
     reviewStatus: normalizeReviewStatus(record.reviewStatus || record.review_status),
@@ -80,6 +96,7 @@ function normalizePastSeasonRecord(record, index) {
     seasonName,
     taskName: projectName,
     fileName: record.imageName || record.image_name || getProofFileName(record),
+    imageUrl: String(record.imageUrl || record.image_url || '').trim(),
     note: reviewComment || record.note || '',
     result: normalizePastSeasonResult(record),
     accent: record.accent || HISTORY_ACCENTS[index % HISTORY_ACCENTS.length],
@@ -110,4 +127,26 @@ export async function getPastSeasonProofHistory() {
   const records = Array.isArray(response) ? response : response.records
 
   return (records || []).map(normalizePastSeasonRecord)
+}
+
+/**
+ * 获取历史接口下发的单条凭证原图。
+ *
+ * imageUrl 已由记录接口按登录用户及有效状态授权，必须以 Blob 请求以携带
+ * Authorization；不能直接交给 img 标签请求。
+ */
+export async function getProofRecordImage(imageUrl) {
+  if (!imageUrl) {
+    throw new Error('凭证图片地址不存在')
+  }
+
+  const imageBlob = await request.get(toApiRelativePath(imageUrl), {
+    responseType: 'blob'
+  })
+
+  if (!imageBlob?.size) {
+    throw new Error('凭证图片内容为空')
+  }
+
+  return imageBlob
 }

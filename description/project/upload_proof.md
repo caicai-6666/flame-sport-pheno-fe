@@ -18,8 +18,10 @@ src/api/projects.js
 
 无激活赛季时，首页不会打开上传弹窗；即使通过旧页面缓存或异常入口绕过前端，后端也必须拒绝没有有效当前赛季的 `POST /proof/upload`。
 
-上传成功后，前端会即时追加一条记录到 `appState.uploadRecords`，因此当前会话中进入 `HistoryPage` 能立即看到新上传内容。
+上传成功后，前端会即时追加一条记录到 `appState.uploadRecords`，因此当前会话中进入 `HistoryPage` 能立即看到新上传内容。即时记录会仅在内存中保留本次提交的 JPG Blob；后端尚未返回 `imageUrl` 时可直接查看这张临时原图。
 进入 `HistoryPage` 时，前端会重新查询当前赛季上传历史；即时追加只用于上传成功后的当前会话反馈。
+
+用户完成图片处理后，可点击上传摘要中的“查看处理后的图片”翻转上传面板至背面，在独立的可滚动区域查看完整 JPG 长图；点击“返回编辑”翻回表单，上传字段和已选图片保持不变。
 
 ## 获取项目上传配置
 
@@ -137,15 +139,9 @@ Content-Type: image/jpeg
 文件后缀 = .jpg
 ```
 
-## 重命名规则
+## 文件命名规则
 
-`upload-summary` 中展示可编辑文件名：
-
-- 默认使用原文件主名
-- 后缀固定为 `.jpg`
-- 用户只能编辑主名
-- 提交前清理不适合文件名的字符
-- 空文件名不能提交
+前端不再向用户展示或开放图片重命名。提交文件名由前端内部生成：单图采用原文件主名，多图采用首图主名加“`-N张凭证`”，统一清理不适合文件名的字符并追加 `.jpg` 后缀。
 
 ## 按钮状态
 
@@ -173,5 +169,6 @@ Content-Type: image/jpeg
 - `reviewStatus = pending`
 - `proofDate = proof_date`
 - `uploadedAt = created_at`
+- `temporaryImageBlob = 本次提交的 JPG Blob`，仅当前页面会话用于查看刚上传的原图，不持久化；刷新页面或历史接口重新拉取后自动丢弃，改用后端返回的 `imageUrl`
 
 这里的 `recordType` 仅用于前端展示，后端写库依据是 `project_upload_config_id`；`proofDate` 用于在即时历史中替换同项目同日期的旧记录。
