@@ -126,10 +126,13 @@ image=steps-20260719.webp
 1. 读取任意 `image/*` 图片
 2. 绘制到 `canvas`
 3. 透明区域先铺白底
-4. 导出为 `image/webp`，并校验 Blob MIME，防止旧 WebView 悄然回退为 PNG
-5. 单图从长边 1920px 开始压缩；多图长图按宽度优先保留清晰度
-6. 逐步降低 WebP quality，必要时仅缩小长图宽度
-7. 确保最终文件小于 5MB
+4. 优先通过 Canvas 原生编码导出 `image/webp`
+5. 同时校验 Blob MIME 和 `RIFF...WEBP` 文件头；原生编码不受支持或悄然回退为 PNG 时，按需加载 `@jsquash/webp` 的 libwebp WebAssembly 编码器重新生成 WebP
+6. 单图从长边 1920px 开始压缩；多图长图按宽度优先保留清晰度
+7. 逐步降低 WebP quality，必要时仅缩小长图宽度
+8. 确保最终文件小于 5MB
+
+WASM 编码器仅在当前 WebView 无法原生编码 WebP 时动态下载和初始化，兼容设备不会承担额外加载成本。编码器提供普通版和 SIMD 版，由运行时自动选择；若钉钉 WebView 连 WebAssembly 也不支持，或编码器资源加载、执行失败，前端会停止提交并提示用户重试或升级钉钉，不会把伪装成 `.webp` 的 PNG 上传给后端。
 
 最终上传文件满足：
 

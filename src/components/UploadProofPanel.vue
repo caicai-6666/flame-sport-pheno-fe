@@ -224,6 +224,9 @@ const LONG_PROOF_PADDING = 16
 const LONG_PROOF_GAP = 16
 const PROOF_DATE_WHEEL_OPTION_HEIGHT = 34
 
+let nativeWebpEncodingSupported = null
+let wasmWebpEncoderPromise = null
+
 const defaultUploadConfig = {
   uploadConfigId: '',
   recordType: '日常记录',
@@ -322,23 +325,103 @@ function loadImage(file) {
   })
 }
 
-function canvasToWebpBlob(canvas, quality) {
+function hasWebpSignature(buffer) {
+  const bytes = new Uint8Array(buffer)
+
+  return bytes.length >= 12 &&
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+}
+
+function readBlobHeader(blob) {
   return new Promise((resolve, reject) => {
-    canvas.toBlob(blob => {
-      if (!blob) {
-        reject(new Error('图片转换失败，请重新选择图片'))
-        return
-      }
+    const reader = new FileReader()
 
-      // 旧 WebView 可能忽略 WebP 类型并悄然回退为 PNG，必须拦截伪 WebP 文件。
-      if (blob.type !== PROOF_IMAGE_MIME_TYPE) {
-        reject(new Error('当前浏览器不支持 WebP 图片转换，请升级钉钉后重试'))
-        return
-      }
-
-      resolve(blob)
-    }, PROOF_IMAGE_MIME_TYPE, quality)
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(new Error('图片转换结果读取失败，请重新选择图片'))
+    reader.readAsArrayBuffer(blob.slice(0, 12))
   })
+}
+
+async function isWebpBlob(blob) {
+  if (!blob || blob.type !== PROOF_IMAGE_MIME_TYPE) {
+    return false
+  }
+
+  return hasWebpSignature(await readBlobHeader(blob))
+}
+
+function canvasToNativeWebpBlob(canvas, quality) {
+  return new Promise(resolve => {
+    if (typeof canvas.toBlob !== 'function') {
+      resolve(null)
+      return
+    }
+
+    canvas.toBlob(resolve, PROOF_IMAGE_MIME_TYPE, quality)
+  })
+}
+
+async function loadWasmWebpEncoder() {
+  if (typeof WebAssembly !== 'object' || typeof WebAssembly.instantiate !== 'function') {
+    throw new Error('当前钉钉不支持 WebP 兼容转换，请升级钉钉后重试')
+  }
+
+  if (!wasmWebpEncoderPromise) {
+    // 仅在原生 Canvas 无法编码 WebP 时加载 WASM，避免兼容设备承担额外下载和初始化成本。
+    wasmWebpEncoderPromise = import(/* webpackChunkName: "webp-encoder" */ '@jsquash/webp/encode.js')
+      .then(module => module.default)
+      .catch(error => {
+        wasmWebpEncoderPromise = null
+        throw error
+      })
+  }
+
+  return wasmWebpEncoderPromise
+}
+
+async function canvasToWasmWebpBlob(canvas, quality) {
+  const context = canvas.getContext('2d')
+
+  if (!context) {
+    throw new Error('当前浏览器无法处理图片，请更换浏览器后重试')
+  }
+
+  try {
+    const encodeWebp = await loadWasmWebpEncoder()
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+    const buffer = await encodeWebp(imageData, {
+      quality: Math.round(quality * 100)
+    })
+
+    if (!hasWebpSignature(buffer)) {
+      throw new Error('WASM 编码结果不是有效的 WebP 图片')
+    }
+
+    return new Blob([buffer], { type: PROOF_IMAGE_MIME_TYPE })
+  } catch (error) {
+    if (error?.message?.startsWith('当前')) {
+      throw error
+    }
+
+    throw new Error('WebP 兼容转换失败，请重试或升级钉钉')
+  }
+}
+
+async function canvasToWebpBlob(canvas, quality) {
+  if (nativeWebpEncodingSupported !== false) {
+    const nativeBlob = await canvasToNativeWebpBlob(canvas, quality)
+
+    if (await isWebpBlob(nativeBlob)) {
+      nativeWebpEncodingSupported = true
+      return nativeBlob
+    }
+
+    // HTML 标准允许不支持指定编码时回退 PNG；钉钉旧 WebView 命中后统一切换 WASM。
+    nativeWebpEncodingSupported = false
+  }
+
+  return canvasToWasmWebpBlob(canvas, quality)
 }
 
 async function compressDrawableToWebp(drawable, sourceWidth, sourceHeight) {

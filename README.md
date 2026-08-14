@@ -77,7 +77,7 @@ npm run lint
 
 开发环境通过 `.env` 配置带 `/flame/api` 前缀的普通后端基础地址、登录模式及钉钉 H5 参数。`VUE_APP_MODE=development` 时，请求层会自动在标准 `/flame/api` 路径前插入 `/dev`。云服务器上的 Vue CLI 开发服务固定监听 `127.0.0.1:8080`，由宿主机 Nginx 通过 `https://www.phenosolar.cloud/dev/flame/` 对外提供访问；开发 API 经 `/dev/flame/api` 转发到 `http://127.0.0.1:8000/flame/api`，因此浏览器不会产生跨域请求。
 
-应用静态位图统一使用 WebP。启动时会展示约 80 KB 的 `src/assets/cover.webp` 全屏封面，图片完整显示后至少停留 1 秒再淡出；登录和首屏业务请求在封面显示期间照常执行。生产环境会对带内容哈希的图片、脚本和样式设置一年不可变缓存，资源更新后通过新哈希 URL 自动失效。
+应用静态位图统一使用 WebP。启动时会展示约 80 KB 的 `src/assets/cover.webp` 全屏封面，图片完整显示后至少停留 1 秒再淡出；登录和首屏业务请求在封面显示期间照常执行。上传凭证优先使用浏览器原生 Canvas WebP 编码；钉钉 WebView 不具备该编码能力时，会按需加载基于 libwebp 的 WebAssembly 编码器，最终接口格式保持不变。生产环境会对带内容哈希的图片、脚本、样式和 WASM 设置一年不可变缓存，资源更新后通过新哈希 URL 自动失效。
 
 推荐将浏览器联调配置放入 `.env.development`。通过 `VUE_APP_MODE` 指定登录模式：`development` 会直接使用 `VUE_APP_AUTH_CODE` 调用后端登录接口，不会向钉钉请求免登码；`production` 会走钉钉免登。修改环境变量后需要重启开发服务。
 
@@ -133,4 +133,4 @@ docker build \
 
 ## 浏览器支持
 
-目标运行环境为现代移动端浏览器及钉钉 H5 WebView。项目会在不支持 CSS `color-mix()` 的旧版 Android WebView 中自动降级为实色卡片并关闭背景模糊，避免未知颜色函数导致整块背景声明失效、内容透出；支持这些能力的设备保持原有玻璃质感和动画。
+目标运行环境为现代移动端浏览器及钉钉 H5 WebView。项目会在不支持 CSS `color-mix()` 的旧版 Android WebView 中自动降级为实色卡片并关闭背景模糊，避免未知颜色函数导致整块背景声明失效、内容透出；支持这些能力的设备保持原有玻璃质感和动画。仅支持 WebP 解码、无法通过 Canvas 编码 WebP 的钉钉 WebView 会自动使用 WebAssembly 兼容编码；若运行环境不支持 WebAssembly，则上传面板会显示明确错误并阻止提交无效文件。
