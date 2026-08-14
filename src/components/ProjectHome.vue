@@ -248,7 +248,7 @@
 <script>
 import UploadProofPanel from './UploadProofPanel.vue'
 import activityRuleImage from '../assets/活动规则.webp'
-import feedbackIcon from '../assets/xinxiang.png'
+import feedbackIcon from '../assets/xinxiang.webp'
 import SuggestionPanel from './SuggestionPanel.vue'
 
 export default {

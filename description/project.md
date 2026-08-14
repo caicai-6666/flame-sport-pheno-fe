@@ -46,7 +46,7 @@ Flame Winter Pheno 是一个面向企业员工健康挑战的移动端 Web 应�
 - 用户锁定足够数量的项目后，才能锁定青铜、白银或黄金挑战等级并完成赛季报名。
 - 赛季参与状态由 `/season/participate_check` 表达：`200` 为已参与，`409` 为报名中，`403` 为报名已截止。
 - 项目锁定后才允许上传该项目的运动凭证。
-- 上传表单由后端项目上传配置驱动；每次可选择 1～5 张图片，多图按选择顺序纵向等比完整拼为一张 JPG 长图，优先保留截图文字清晰度并压缩到 5 MB 以内提交；处理完成后可在上传面板背面滚动查看完整长图，后端仍只接收单个 `image` 文件。
+- 上传表单由后端项目上传配置驱动；每次可选择 1～5 张图片，多图按选择顺序纵向等比完整拼为一张 WebP 长图，优先保留截图文字清晰度并压缩到 5 MB 以内提交；处理完成后可在上传面板背面滚动查看完整长图，后端仍只接收单个 `image` 文件。
 - 当前赛季历史只在用户已参与该赛季时查询和展示；过往赛季记录独立查询。
 - 当前赛季项目进度由 `/project/progress?season_id` 返回的 `completion_progress` 提供，后端以 0～1 的比例返回，前端展示为百分比。
 - `/season/current` 返回约定的 404 表示当前没有激活赛季，不是普通网络错误；前端以独立的 `seasonAvailability` 状态处理，不能与报名状态混用。
@@ -54,7 +54,7 @@ Flame Winter Pheno 是一个面向企业员工健康挑战的移动端 Web 应�
 - 商城可用积分取最新一条积分流水的 `points_after`，兑换成功后使用接口返回余额更新页面。
 - 商城兑换仅在赛季开始后的前 N 个自然日开放，前端默认 N 为 7 且可通过 `VUE_APP_SHOP_REDEEM_WINDOW_DAYS` 配置；后端必须执行同样的最终校验。
 - 登录模式由 `VUE_APP_MODE` 唯一决定：`development` 直接读取 `VUE_APP_AUTH_CODE`，`production` 走钉钉免登；两者都通过同一个 `/auth/login` 换取后续业务会话。未配置或值无效时，按 Vue CLI 的 `NODE_ENV` 回退，兼容既有构建。
-- 应用启动时优先显示约 80 KB 的 `src/assets/cover.webp` 全屏封面，不支持 WebP 的旧版 WebView 自动回退到 `src/assets/cover.png`。图片资源与登录并行加载，加载完成前保持同色背景，避免出现图片逐步绘制；图片完整显示后才开始计算最少 1 秒的停留时间。常规屏幕以等比裁切铺满；比例小于 `9:17` 的超长屏以完整展示为优先，并使用同色背景填充留白、上下遮罩羽化，避免裁掉 Logo 或主标题且减弱画面边界。登录成功后路由页会在封面下方创建并加载赛季、项目等首屏数据，封面随后淡出。生产容器为带内容哈希的图片、脚本、样式和字体设置一年不可变缓存，入口等非哈希资源保持重新校验。
+- `src/assets/` 下的静态位图统一使用 WebP；Logo 和意见图标使用无损 WebP 保留 Alpha 透明通道，封面与活动规则使用已压缩的 WebP 以减少传输体积。应用启动时显示约 80 KB 的 `src/assets/cover.webp` 全屏封面；图片资源与登录并行加载，加载完成前保持同色背景，避免出现图片逐步绘制；图片完整显示后才开始计算最少 1 秒的停留时间。常规屏幕以等比裁切铺满；比例小于 `9:17` 的超长屏以完整展示为优先，并使用同色背景填充留白、上下遮罩羽化，避免裁掉 Logo 或主标题且减弱画面边界。登录成功后路由页会在封面下方创建并加载赛季、项目等首屏数据，封面随后淡出。生产容器为带内容哈希的图片、脚本、样式和字体设置一年不可变缓存，入口等非哈希资源保持重新校验。
 - 页面视觉对不支持 CSS `color-mix()` 的旧版 Android WebView 提供实色回退，并关闭背景模糊，避免未知颜色函数使完整背景声明失效而出现内容透出。
 
 ## 前端编排
@@ -143,13 +143,14 @@ src/main.js
 
 | 业务域 | 相关文档 |
 | --- | --- |
-| 用户与部门 | `db/user.md`、`db/department.md` |
-| 赛季报名 | `db/season.md`、`db/season_user.md` |
-| 项目与等级 | `db/project.md`、`db/project_level.md`、`db/project_rule.md` |
-| 用户锁定项目 | `db/season_user_project.md` |
-| 上传配置与凭证 | `db/project_upload_config.md`、`db/proof_record.md` |
-| 排行榜 | `db/leaderboard_snapshot.md` |
-| 商城与积分 | `db/product.md`、`db/point_record.md` |
+| 用户与部门 | [`db/user.md`](./db/user.md)、[`db/department.md`](./db/department.md) |
+| 用户意见 | [`db/user-suggestion.md`](./db/user-suggestion.md) |
+| 赛季报名 | [`db/season.md`](./db/season.md)、[`db/season-user.md`](./db/season-user.md) |
+| 项目与等级 | [`db/project.md`](./db/project.md)、[`db/project-level.md`](./db/project-level.md)、[`db/project-rule.md`](./db/project-rule.md) |
+| 用户锁定项目 | [`db/season-user-project.md`](./db/season-user-project.md) |
+| 上传配置与凭证 | [`db/project-upload-config.md`](./db/project-upload-config.md)、[`db/proof-record.md`](./db/proof-record.md) |
+| 排行榜 | [`db/leaderboard-snapshot.md`](./db/leaderboard-snapshot.md) |
+| 商城与积分 | [`db/product.md`](./db/product.md)、[`db/point-record.md`](./db/point-record.md) |
 
 ## 视觉资料
 

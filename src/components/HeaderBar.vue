@@ -10,7 +10,7 @@
       >
         ←
       </button>
-      <img class="brand-logo" src="../assets/logo.png" alt="pheno" />
+      <img class="brand-logo" src="../assets/logo.webp" alt="pheno" />
     </div>
 
     <div class="header-meta">

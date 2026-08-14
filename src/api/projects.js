@@ -368,7 +368,7 @@ export async function getProjectUploadConfig(projectId) {
 /**
  * 上传项目凭证。
  *
- * 前端会在提交前把用户选择的图片统一转换为 jpg 并压缩到 5MB 以内，
+ * 前端会在提交前把用户选择的图片统一转换为 WebP 并压缩到 5MB 以内，
  * 再通过 multipart/form-data 提交赛季 ID、项目 ID、上传配置 ID、运动日期、备注和图片文件。
  */
 export async function uploadProjectProof({ seasonId, projectId, projectUploadConfigId, proofDate, note, imageFile }) {

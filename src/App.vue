@@ -84,28 +84,24 @@
         class="launch-cover"
         aria-hidden="true"
       >
-        <picture class="launch-cover-picture">
-          <!-- WebP 显著降低首屏传输量；旧版 WebView 无法解码时会自动回退到原 PNG。 -->
-          <source :srcset="launchCoverWebpSource" type="image/webp">
-          <img
-            class="launch-cover-image"
-            :src="launchCoverPngSource"
-            alt=""
-            decoding="sync"
-            fetchpriority="high"
-            :class="{ 'is-ready': isLaunchCoverImageLoaded }"
-            @load="handleLaunchCoverLoaded"
-            @error="handleLaunchCoverLoadError"
-          >
-        </picture>
+        <!-- 静态位图统一使用 WebP，减少首屏传输量和重复的回退资源。 -->
+        <img
+          class="launch-cover-image"
+          :src="launchCoverSource"
+          alt=""
+          decoding="sync"
+          fetchpriority="high"
+          :class="{ 'is-ready': isLaunchCoverImageLoaded }"
+          @load="handleLaunchCoverLoaded"
+          @error="handleLaunchCoverLoadError"
+        >
       </section>
     </Transition>
   </div>
 </template>
 
 <script>
-import launchCoverPngSource from './assets/cover.png'
-import launchCoverWebpSource from './assets/cover.webp'
+import launchCoverSource from './assets/cover.webp'
 import HeaderBar from './components/HeaderBar.vue'
 import BottomNav from './components/BottomNav.vue'
 import UserHealthProfilePanel from './components/UserHealthProfilePanel.vue'
@@ -134,8 +130,7 @@ export default {
     return {
       navItems,
       isLaunchCoverImageLoaded: false,
-      launchCoverPngSource,
-      launchCoverWebpSource,
+      launchCoverSource,
       isLaunchCoverImageReady: false,
       isLaunchCoverMinimumElapsed: false,
       launchCoverTimer: null,
@@ -482,7 +477,6 @@ button {
     linear-gradient(145deg, #f8f8f2, #eef4e7);
 }
 
-.launch-cover-picture,
 .launch-cover-image {
   width: 100%;
   height: 100%;

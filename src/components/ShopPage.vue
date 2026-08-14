@@ -148,7 +148,7 @@
             <div class="reward-info">
               <strong>{{ item.name }}</strong>
               <span>{{ item.description }}</span>
-              <em v-if="!tier.pointsTitle">{{ item.pointsRequired }} 分</em>
+              <em v-if="tier.showItemPoints || !tier.pointsTitle">{{ item.pointsRequired }} 分</em>
             </div>
 
             <button

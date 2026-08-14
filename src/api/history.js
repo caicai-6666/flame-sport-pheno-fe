@@ -36,7 +36,7 @@ function getProofFileName(record) {
   const [pathWithoutQuery] = imageUrl.split('?')
   const segments = pathWithoutQuery.split('/').filter(Boolean)
 
-  return segments[segments.length - 1] || 'proof.jpg'
+  return segments[segments.length - 1] || 'proof.webp'
 }
 
 function normalizeCurrentSeasonRecord(record, index) {

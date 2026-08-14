@@ -77,7 +77,7 @@ npm run lint
 
 开发环境通过 `.env` 配置带 `/flame/api` 前缀的普通后端基础地址、登录模式及钉钉 H5 参数。`VUE_APP_MODE=development` 时，请求层会自动在标准 `/flame/api` 路径前插入 `/dev`。云服务器上的 Vue CLI 开发服务固定监听 `127.0.0.1:8080`，由宿主机 Nginx 通过 `https://www.phenosolar.cloud/dev/flame/` 对外提供访问；开发 API 经 `/dev/flame/api` 转发到 `http://127.0.0.1:8000/flame/api`，因此浏览器不会产生跨域请求。
 
-应用启动会优先展示约 80 KB 的 `src/assets/cover.webp` 全屏封面，不支持 WebP 的旧版 WebView 自动回退到 `src/assets/cover.png`。图片完整显示后至少停留 1 秒再淡出；登录和首屏业务请求在封面显示期间照常执行。生产环境会对带内容哈希的图片、脚本和样式设置一年不可变缓存，资源更新后通过新哈希 URL 自动失效。
+应用静态位图统一使用 WebP。启动时会展示约 80 KB 的 `src/assets/cover.webp` 全屏封面，图片完整显示后至少停留 1 秒再淡出；登录和首屏业务请求在封面显示期间照常执行。生产环境会对带内容哈希的图片、脚本和样式设置一年不可变缓存，资源更新后通过新哈希 URL 自动失效。
 
 推荐将浏览器联调配置放入 `.env.development`。通过 `VUE_APP_MODE` 指定登录模式：`development` 会直接使用 `VUE_APP_AUTH_CODE` 调用后端登录接口，不会向钉钉请求免登码；`production` 会走钉钉免登。修改环境变量后需要重启开发服务。
 

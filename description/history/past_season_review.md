@@ -52,7 +52,7 @@ GET /proof/history
 | projectName | taskName | 项目名称 |
 | reviewStatus | result | 审核状态，取值见下方枚举 |
 | reviewComment | note | 审核意见；前端展示为记录说明 |
-| imageName | fileName | 凭证文件名，仅包含上传文件主名和 `.jpg` 后缀 |
+| imageName | fileName | 凭证文件名，保留实际存储后缀；新记录为 `.webp`，历史 `.jpg` 记录仍可正常返回 |
 | imageUrl | imageUrl | 受鉴权保护的凭证原图读取地址；前端点击该条记录后以 Blob 发起 GET 请求 |
 | proofDate | proofDate | 实际运动日期，格式 `YYYY-MM-DD` |
 | createdAt | uploadedAt | 上传时间 |

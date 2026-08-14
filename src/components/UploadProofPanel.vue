@@ -212,8 +212,9 @@ const MAX_PROOF_IMAGE_BYTES = 5 * 1024 * 1024
 const MAX_PROOF_IMAGE_COUNT = 5
 const INITIAL_IMAGE_MAX_EDGE = 1920
 const MIN_IMAGE_MAX_EDGE = 320
-const JPEG_QUALITY_STEPS = [0.9, 0.82, 0.74, 0.66, 0.58, 0.5, 0.42]
-const LONG_PROOF_JPEG_QUALITY_STEPS = [0.94, 0.9, 0.86, 0.82, 0.78, 0.74]
+const PROOF_IMAGE_MIME_TYPE = 'image/webp'
+const WEBP_QUALITY_STEPS = [0.9, 0.82, 0.74, 0.66, 0.58, 0.5, 0.42]
+const LONG_PROOF_WEBP_QUALITY_STEPS = [0.94, 0.9, 0.86, 0.82, 0.78, 0.74]
 const MIN_PROOF_UPLOADING_DURATION = 1800
 const PROOF_UPLOAD_FAILURE_DURATION = 1400
 const LONG_PROOF_MAX_WIDTH = 1440
@@ -245,8 +246,8 @@ function sanitizeProofFileBaseName(value) {
     .slice(0, 60)
 }
 
-function toProofJpgFileName(baseName) {
-  return `${sanitizeProofFileBaseName(baseName) || 'proof'}.jpg`
+function toProofWebpFileName(baseName) {
+  return `${sanitizeProofFileBaseName(baseName) || 'proof'}.webp`
 }
 
 function getLocalDateString() {
@@ -321,7 +322,7 @@ function loadImage(file) {
   })
 }
 
-function canvasToJpegBlob(canvas, quality) {
+function canvasToWebpBlob(canvas, quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(blob => {
       if (!blob) {
@@ -329,12 +330,18 @@ function canvasToJpegBlob(canvas, quality) {
         return
       }
 
+      // 旧 WebView 可能忽略 WebP 类型并悄然回退为 PNG，必须拦截伪 WebP 文件。
+      if (blob.type !== PROOF_IMAGE_MIME_TYPE) {
+        reject(new Error('当前浏览器不支持 WebP 图片转换，请升级钉钉后重试'))
+        return
+      }
+
       resolve(blob)
-    }, 'image/jpeg', quality)
+    }, PROOF_IMAGE_MIME_TYPE, quality)
   })
 }
 
-async function compressDrawableToJpeg(drawable, sourceWidth, sourceHeight) {
+async function compressDrawableToWebp(drawable, sourceWidth, sourceHeight) {
   let maxEdge = INITIAL_IMAGE_MAX_EDGE
 
   while (maxEdge >= MIN_IMAGE_MAX_EDGE) {
@@ -349,13 +356,13 @@ async function compressDrawableToJpeg(drawable, sourceWidth, sourceHeight) {
     canvas.width = imageSize.width
     canvas.height = imageSize.height
 
-    // PNG 等透明图片转 JPG 时先铺白底，避免透明区域被浏览器渲染成黑色。
+    // 凭证统一铺白底，避免透明原图在审核端的深色背景上变得难以辨认。
     context.fillStyle = '#fff'
     context.fillRect(0, 0, canvas.width, canvas.height)
     context.drawImage(drawable, 0, 0, canvas.width, canvas.height)
 
-    for (const quality of JPEG_QUALITY_STEPS) {
-      const blob = await canvasToJpegBlob(canvas, quality)
+    for (const quality of WEBP_QUALITY_STEPS) {
+      const blob = await canvasToWebpBlob(canvas, quality)
 
       if (blob.size <= MAX_PROOF_IMAGE_BYTES) {
         return blob
@@ -365,13 +372,13 @@ async function compressDrawableToJpeg(drawable, sourceWidth, sourceHeight) {
     maxEdge = Math.floor(maxEdge * 0.82)
   }
 
-  throw new Error('图片压缩后仍超过 1MB，请更换图片')
+  throw new Error('图片压缩后仍超过 5MB，请更换图片')
 }
 
-async function compressImageToJpeg(file) {
+async function compressImageToWebp(file) {
   const image = await loadImage(file)
 
-  return compressDrawableToJpeg(
+  return compressDrawableToWebp(
     image,
     image.naturalWidth || image.width,
     image.naturalHeight || image.height
@@ -422,7 +429,7 @@ function createLongProofCanvas(images, canvasWidth) {
   return canvas
 }
 
-async function composeProofImagesToJpeg(files) {
+async function composeProofImagesToWebp(files) {
   const images = await Promise.all(files.map(loadImage))
   const widestImage = Math.max(...images.map(image => image.naturalWidth || image.width))
   const initialWidth = Math.min(LONG_PROOF_MAX_WIDTH, widestImage + LONG_PROOF_PADDING * 2)
@@ -433,8 +440,8 @@ async function composeProofImagesToJpeg(files) {
     const canvas = createLongProofCanvas(images, canvasWidth)
 
     if (canvas) {
-      for (const quality of LONG_PROOF_JPEG_QUALITY_STEPS) {
-        const blob = await canvasToJpegBlob(canvas, quality)
+      for (const quality of LONG_PROOF_WEBP_QUALITY_STEPS) {
+        const blob = await canvasToWebpBlob(canvas, quality)
 
         if (blob.size <= MAX_PROOF_IMAGE_BYTES) {
           return blob
@@ -587,7 +594,7 @@ export default {
       if (this.isProofProcessing) {
         return this.selectedProofCount > 1
           ? `正在纵向拼接 ${this.selectedProofCount} 张图片，优先保持文字清晰...`
-          : '正在转换为 JPG 并压缩到 5MB 以内...'
+          : '正在转换为 WebP 并压缩到 5MB 以内...'
       }
 
       return this.isUploadConfigLoading ? '正在加载上传要求...' : this.selectedUploadConfig.uploadHint
@@ -617,7 +624,7 @@ export default {
       )
     },
     finalProofFileName() {
-      return toProofJpgFileName(this.proofFileBaseName)
+      return toProofWebpFileName(this.proofFileBaseName)
     },
     submitProofButtonText() {
       if (this.isProofProcessing) {
@@ -814,8 +821,8 @@ export default {
 
       try {
         const compressedBlob = files.length === 1
-          ? await compressImageToJpeg(firstFile)
-          : await composeProofImagesToJpeg(files)
+          ? await compressImageToWebp(firstFile)
+          : await composeProofImagesToWebp(files)
 
         if (selectionToken !== this.proofSelectionToken) {
           return
@@ -866,7 +873,7 @@ export default {
 
       try {
         const proofFile = new File([this.compressedProofBlob], this.finalProofFileName, {
-          type: 'image/jpeg',
+          type: PROOF_IMAGE_MIME_TYPE,
           lastModified: Date.now()
         })
         const uploadedRecord = await uploadProjectProof({
@@ -887,7 +894,7 @@ export default {
           recordType: this.selectedUploadConfig.recordType,
           note: this.proofNote,
           reviewStatus: 'pending',
-          // 后端上传响应暂不返回 imageUrl；保留本次已提交的 JPG 供当前会话历史即时预览。
+          // 后端上传响应暂不返回 imageUrl；保留本次已提交的 WebP 供当前会话历史即时预览。
           temporaryImageBlob: this.compressedProofBlob,
           proofDate: uploadedRecord?.proofDate || this.proofDate,
           uploadedAt: uploadedRecord?.createdAt || new Date().toISOString()

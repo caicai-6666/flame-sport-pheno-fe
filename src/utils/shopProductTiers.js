@@ -63,6 +63,8 @@ export const PRODUCT_TIERS = [
     key: 'tier-550',
     title: '积分200+',
     pointsTitle: '200+',
+    // 该档位包含多个实际积分值，标题无法代替单品兑换价。
+    showItemPoints: true,
     maxExclusive: 550
   }
 ]

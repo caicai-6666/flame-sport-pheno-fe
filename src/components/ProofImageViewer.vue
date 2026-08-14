@@ -71,7 +71,7 @@ export default {
       this.revokeImageUrl()
 
       if (this.imageBlob?.size) {
-        // 刚上传成功时后端尚未下发 imageUrl，直接复用已提交的本地 JPG，避免无意义的查询失败。
+        // 刚上传成功时后端尚未下发 imageUrl，直接复用已提交的本地 WebP，避免无意义的查询失败。
         this.imageSrc = URL.createObjectURL(this.imageBlob)
         this.isLoading = false
         return
