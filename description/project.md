@@ -2,7 +2,7 @@
 
 本文档是新会话 Agent 理解项目的首要入口。阅读本文后，应先根据任务所属业务域继续阅读对应文档，再开始修改代码。
 
-项目的对外介绍、页面预览和启动命令位于仓库根目录的 [`README.md`](../README.md)。本文重点说明当前业务逻辑、前端编排、实现状态和文档导航。
+项目的对外介绍、页面预览和启动命令位于仓库根目录的 [`README.md`](../README.md)。本文重点说明当前业务逻辑、前端编排和实现状态；文档入口与推荐阅读顺序统一维护在 [`description/README.md`](./README.md)。
 
 ## 项目定位
 
@@ -22,6 +22,8 @@ Flame Winter Pheno 是一个面向企业员工健康挑战的移动端 Web 应�
   -> 获取积分并在商城兑换商品
 ```
 
+---
+
 ## 当前实现状态
 
 项目已经从 UI 原型阶段进入真实接口联调阶段。以下流程已接入后端数据：
@@ -36,8 +38,11 @@ Flame Winter Pheno 是一个面向企业员工健康挑战的移动端 Web 应�
 - 商城商品、商品图片、积分流水和商品兑换。
 - 用户意见收集与提交。
 - 无激活赛季时的只读浏览：项目与规则、过往审核、商品和积分流水仍可访问；赛季报名、锁定、上传、兑换与当前赛季排行会展示“敬请期待”并阻断。
+- 赛季开始后的配置保护期只读体验：依据当前赛季接口提供的服务端时间轴展示预计开放时间，阻止项目锁定、等级锁定、凭证上传和商品兑换，同时保留项目内容浏览；健康资料和意见提交不受影响。
 
 历史记录状态初始为空，仅使用真实接口结果或用户本次上传成功后的即时反馈写入；页面首屏不会展示原型示例记录。
+
+---
 
 ## 关键业务规则
 
@@ -46,16 +51,19 @@ Flame Winter Pheno 是一个面向企业员工健康挑战的移动端 Web 应�
 - 用户锁定足够数量的项目后，才能锁定青铜、白银或黄金挑战等级并完成赛季报名。
 - 赛季参与状态由 `/season/participate_check` 表达：`200` 为已参与，`409` 为报名中，`403` 为报名已截止。
 - 项目锁定后才允许上传该项目的运动凭证。
-- 上传表单由后端项目上传配置驱动；每次可选择 1～5 张图片，多图按选择顺序纵向等比完整拼为一张 WebP 长图，优先保留截图文字清晰度并压缩到 5 MB 以内提交。前端优先使用 Canvas 原生 WebP 编码；钉钉 WebView 仅能解码、不能编码 WebP 时，按需加载 libwebp WebAssembly 编码器兜底，并校验实际 WebP 文件头。处理完成后可在上传面板背面滚动查看完整长图，后端仍只接收单个 `image` 文件。
+- 上传表单由后端项目上传配置驱动；每次可选择 1 ～ 5 张图片，多图按选择顺序纵向等比完整拼为一张 WebP 长图，优先保留截图文字清晰度并压缩到 5 MB 以内提交。前端优先使用 Canvas 原生 WebP 编码；钉钉 WebView 仅能解码、不能编码 WebP 时，按需加载 libwebp WebAssembly 编码器兜底，并校验实际 WebP 文件头。处理完成后可在上传面板背面滚动查看完整长图，后端仍只接收单个 `image` 文件。
 - 当前赛季历史只在用户已参与该赛季时查询和展示；过往赛季记录独立查询。
-- 当前赛季项目进度由 `/project/progress?season_id` 返回的 `completion_progress` 提供，后端以 0～1 的比例返回，前端展示为百分比。
+- 当前赛季项目进度由 `/project/progress?season_id` 返回的 `completion_progress` 提供，后端以 0 ～ 1 的比例返回，前端展示为百分比。
 - `/season/current` 返回约定的 404 表示当前没有激活赛季，不是普通网络错误；前端以独立的 `seasonAvailability` 状态处理，不能与报名状态混用。
+- 前端通过 `VUE_APP_ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS` 和当前赛季开始日计算配置保护期，并使用 `/season/current` 的服务端时间校准时间轴；该值应与后端 `ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS` 一致，后端事务内校验仍是最终权限依据。
 - 排行榜仅按当前赛季通过初审的打卡次数 `checkin_count` 排序，并根据 `is_current_user` 定位当前用户。
 - 商城可用积分取最新一条积分流水的 `points_after`，兑换成功后使用接口返回余额更新页面。
 - 商城兑换仅在赛季开始后的前 N 个自然日开放，前端默认 N 为 7 且可通过 `VUE_APP_SHOP_REDEEM_WINDOW_DAYS` 配置；后端必须执行同样的最终校验。
 - 登录模式由 `VUE_APP_MODE` 唯一决定：`development` 直接读取 `VUE_APP_AUTH_CODE`，`production` 走钉钉免登；两者都通过同一个 `/auth/login` 换取后续业务会话。未配置或值无效时，按 Vue CLI 的 `NODE_ENV` 回退，兼容既有构建。
 - `src/assets/` 下的静态位图统一使用 WebP；Logo 和意见图标使用无损 WebP 保留 Alpha 透明通道，封面与活动规则使用已压缩的 WebP 以减少传输体积。应用启动时显示约 80 KB 的 `src/assets/cover.webp` 全屏封面；图片资源与登录并行加载，加载完成前保持同色背景，避免出现图片逐步绘制；图片完整显示后才开始计算最少 1 秒的停留时间。常规屏幕以等比裁切铺满；比例小于 `9:17` 的超长屏以完整展示为优先，并使用同色背景填充留白、上下遮罩羽化，避免裁掉 Logo 或主标题且减弱画面边界。登录成功后路由页会在封面下方创建并加载赛季、项目等首屏数据，封面随后淡出。生产容器为带内容哈希的图片、脚本、样式、字体和按需加载的 WebP 编码 WASM 设置一年不可变缓存，入口等非哈希资源保持重新校验。
 - 页面视觉对不支持 CSS `color-mix()` 的旧版 Android WebView 提供实色回退，并关闭背景模糊，避免未知颜色函数使完整背景声明失效而出现内容透出。
+
+---
 
 ## 前端编排
 
@@ -75,20 +83,22 @@ src/main.js
 
 主要目录职责：
 
-| 目录 | 职责 |
-| --- | --- |
-| `src/api/` | Axios 请求封装、鉴权、各业务域接口及后端数据归一化 |
-| `src/views/` | 路由级数据加载、业务流程编排、错误状态和共享状态写入 |
-| `src/components/` | 页面结构、局部交互、确认流程、动画、加载态和空状态 |
-| `src/state/` | 使用 Vue `reactive` 维护登录、赛季、项目和跨路由业务状态 |
-| `src/router/` | Hash Router、底部导航路由和 `KeepAlive` 页面缓存配置 |
-| `src/utils/` | 不依赖组件的业务辅助逻辑 |
+| 目录              | 职责                                                     |
+| ----------------- | -------------------------------------------------------- |
+| `src/api/`        | Axios 请求封装、鉴权、各业务域接口及后端数据归一化       |
+| `src/views/`      | 路由级数据加载、业务流程编排、错误状态和共享状态写入     |
+| `src/components/` | 页面结构、局部交互、确认流程、动画、加载态和空状态       |
+| `src/state/`      | 使用 Vue `reactive` 维护登录、赛季、项目和跨路由业务状态 |
+| `src/router/`     | Hash Router、底部导航路由和 `KeepAlive` 页面缓存配置     |
+| `src/utils/`      | 不依赖组件的业务辅助逻辑                                 |
 
 通常由 View 调用 API，再通过 props 向组件下发数据，组件通过事件通知 View。允许功能内聚的例外，例如上传面板自行加载上传配置并提交凭证、Header 自行获取头像、App 自行提交全局健康资料。
 
+---
+
 ## 接口约定
 
-- 生产构建的静态资源使用 `/flame/` 前缀；云服务器上的 `npm run serve` 使用 `/dev/flame/` 前缀并经宿主机 Nginx 转发到 `127.0.0.1:8080`。`VUE_APP_API_BASE_URL` 统一填写普通 `/flame/api` 地址，开发模式由 `src/api/apiBaseUrl.js` 自动插入 `/dev`，再由 Nginx 去除该前缀并转发至本机 8000 端口；生产模式不改写。`src/api/request.js` 会自动添加 `Authorization: <auth_code>`，不使用 `Bearer` 前缀。
+- 生产构建的静态资源使用 `/flame/` 前缀；云服务器上的 `npm run serve` 使用 `/dev/flame/` 前缀并经宿主机 Nginx 转发到 `127.0.0.1:8080`。Vue Dev Server 通过 `devServer.allowedHosts` 仅接受 `pheno.szkl.com` 等明确配置的开发代理域名。`VUE_APP_API_BASE_URL` 统一填写普通 `/flame/api` 地址，开发模式由 `src/api/apiBaseUrl.js` 自动插入 `/dev`，再由 Nginx 去除该前缀并转发至本机 8000 端口；生产模式不改写。`src/api/request.js` 会自动添加 `Authorization: <auth_code>`，不使用 `Bearer` 前缀。
 - 非登录接口返回 401 时，前端重新登录并自动重试原请求一次。
 - 请求参数及推荐后端响应字段使用 snake_case。
 - `src/api/` 将后端数据归一化为组件使用的 camelCase 模型。
@@ -96,67 +106,23 @@ src/main.js
 - 页面组件不应重复解析后端字段；字段兼容和转换优先放在对应 API 模块。
 - 统一错误对象包含 `message`、`status`、`data` 和 `originalError`。
 
-完整约定参阅 [`conventions/api_response.md`](./conventions/api_response.md)。
+完整约定参阅 [通用接口约定](./conventions/api-response.md)。
+
+---
 
 ## 文档导航
 
-新 Agent 应先阅读本文和通用接口约定，再根据任务选择下面的业务文档，不需要无差别读取全部数据库文档。
+完整文档地图已迁移至 [`description/README.md`](./README.md)。新 Agent 阅读本文后，应根据地图中的推荐顺序继续阅读通用约定和当前任务所属的业务文档。
 
-### 登录与用户资料
-
-1. [`auth/login.md`](./auth/login.md)：钉钉免登、开发登录、启动流程和 401 重登。
-2. [`auth/health_profile.md`](./auth/health_profile.md)：健康资料检查、采集字段与保存交互。
-3. [`auth/header_bar.md`](./auth/header_bar.md)：当前用户头像获取与资源释放。
-
-### 赛季与运动项目
-
-建议按以下顺序阅读：
-
-1. [`season/current_season.md`](./season/current_season.md)：当前赛季及要求项目数量。
-2. [`season/participation.md`](./season/participation.md)：报名中、已参与和报名截止状态。
-3. [`project/project_home.md`](./project/project_home.md)：项目首页数据加载与完整报名流程。
-4. [`project/project_detail.md`](./project/project_detail.md)：项目规则、项目状态和锁定操作。
-5. [`season/lock_level.md`](./season/lock_level.md)：统一挑战等级的业务前置条件。
-6. [`project/upload_proof.md`](./project/upload_proof.md)：上传配置、图片处理和凭证提交。
-
-### 上传历史
-
-1. [`history/README.md`](./history/README.md)：历史模块当前状态。
-2. [`history/current_season_history.md`](./history/current_season_history.md)：当前赛季记录和展示条件。
-3. [`history/past_season_review.md`](./history/past_season_review.md)：过往赛季审核记录。
-
-### 排行榜
-
-1. [`rank/README.md`](./rank/README.md)：排行榜模块当前状态与交互要求。
-2. [`rank/leaderboard.md`](./rank/leaderboard.md)：排行榜接口、排序和当前用户展示规则。
-
-### 积分商城
-
-1. [`shop/README.md`](./shop/README.md)：商城模块当前状态。
-2. [`shop/product_list.md`](./shop/product_list.md)：商品列表、积分分档和图片加载。
-3. [`shop/point_flow.md`](./shop/point_flow.md)：积分流水和可用余额计算。
-4. [`shop/exchange.md`](./shop/exchange.md)：兑换确认、提交和页面即时更新。
-
-### 数据库设计
-
-`description/db/` 按数据库表拆分文档。只有在修改接口字段、数据关系或后端契约时才需要阅读相关表：
-
-| 业务域 | 相关文档 |
-| --- | --- |
-| 用户与部门 | [`db/user.md`](./db/user.md)、[`db/department.md`](./db/department.md) |
-| 用户意见 | [`db/user-suggestion.md`](./db/user-suggestion.md) |
-| 赛季报名 | [`db/season.md`](./db/season.md)、[`db/season-user.md`](./db/season-user.md) |
-| 项目与等级 | [`db/project.md`](./db/project.md)、[`db/project-level.md`](./db/project-level.md)、[`db/project-rule.md`](./db/project-rule.md) |
-| 用户锁定项目 | [`db/season-user-project.md`](./db/season-user-project.md) |
-| 上传配置与凭证 | [`db/project-upload-config.md`](./db/project-upload-config.md)、[`db/proof-record.md`](./db/proof-record.md) |
-| 排行榜 | [`db/leaderboard-snapshot.md`](./db/leaderboard-snapshot.md) |
-| 商城与积分 | [`db/product.md`](./db/product.md)、[`db/point-record.md`](./db/point-record.md) |
+---
 
 ## 视觉资料
 
 - `description/preview-image/` 保存当前主要页面预览图，适合快速确认整体视觉与页面结构。
 - `concept/` 保存项目早期线框和挑战规则图，用于理解原始产品意图，不代表当前页面的最终像素实现。
 - 修改页面时应以当前组件、业务文档和最新预览图共同作为依据。
+
+---
 
 ## Agent 工作约定
 

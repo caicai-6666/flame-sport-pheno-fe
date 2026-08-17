@@ -102,7 +102,8 @@ request.interceptors.response.use(
     }
 
     const normalizedError = {
-      message: error.response?.data?.message || error.message || '请求失败',
+      // FastAPI 的业务拒绝默认使用 detail，保留 message 兼容旧接口。
+      message: error.response?.data?.message || error.response?.data?.detail || error.message || '请求失败',
       status: error.response?.status,
       data: error.response?.data,
       originalError: error

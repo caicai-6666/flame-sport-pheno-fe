@@ -1,6 +1,6 @@
-# 赛季表：season
+# 赛季表：`season`
 
-## 表作用
+## 表介绍
 
 `season` 表用于存储企业运动平台中的赛季信息。
 
@@ -11,22 +11,20 @@
 
 ---
 
-## 字段说明
+## 字段介绍
 
-| 字段名     | 类型             | 是否必填 | 默认值 | 说明                                               |
-| ---------- | ---------------- | -------: | -----: | -------------------------------------------------- |
-| id         | BIGINT UNSIGNED  |       是 |   自增 | 赛季主键 ID                                        |
-| name       | VARCHAR(64)      |       是 |     无 | 赛季名称，例如“2026年7月赛季”                      |
-| start_date | DATE             |       是 |     无 | 赛季开始日期                                       |
-| end_date   | DATE             |       是 |     无 | 赛季结束日期                                       |
-| required_project_count | TINYINT UNSIGNED |       是 |      3 | 当前赛季要求用户固定选择的项目数量                 |
-| status     | TINYINT UNSIGNED |       是 |      0 | 赛季状态：`0` 未开始，`1` 进行中，`2` 结算中，`3` 已结束 |
+| 字段名                   | 类型               | 是否必填 | 默认值 | 说明                                                     |
+| ------------------------ | ------------------ | -------: | -----: | -------------------------------------------------------- |
+| `id`                     | `BIGINT UNSIGNED`  |       是 |   自增 | 赛季主键 ID                                              |
+| `name`                   | `VARCHAR(64)`      |       是 |     无 | 赛季名称，例如“2026 年 7 月赛季”                         |
+| `start_date`             | `DATE`             |       是 |     无 | 赛季开始日期                                             |
+| `end_date`               | `DATE`             |       是 |     无 | 赛季结束日期                                             |
+| `required_project_count` | `TINYINT UNSIGNED` |       是 |      3 | 当前赛季要求用户固定选择的项目数量                       |
+| `status`                 | `TINYINT UNSIGNED` |       是 |      0 | 赛季状态：`0` 未开始，`1` 进行中，`2` 结算中，`3` 已结束 |
 
----
+### 字段设计说明
 
-## 字段设计说明
-
-### id
+#### `id`
 
 赛季的唯一标识。
 
@@ -34,6 +32,7 @@
 平台内其他业务表会通过 `season_id` 关联到该字段。
 
 例如：
+
 ```text
 season_user.season_id
 user_season_project.season_id
@@ -44,49 +43,47 @@ exchange_order.season_id
 
 其中 `leaderboard_snapshot` 通过 `season_user_id` 间接关联赛季，不直接保存 `season_id`。
 
----
-
-### name
+#### `name`
 
 赛季名称。
 
 用于前端展示和后台管理识别。
 
 示例：
+
 ```text
 2026年7月赛季
 2026年8月赛季
 2026年9月赛季
 ```
+
 当前业务倾向于一个赛季对应一个月，因此赛季名称建议包含年份和月份，避免跨年后产生歧义。
 
----
-
-### start_date
+#### `start_date`
 
 赛季开始日期。
 
 用于判断当前日期是否处于赛季周期内，也用于限制用户参与、上传凭证和统计数据。
 
 示例：
+
 ```text
 2026-07-01
 ```
----
 
-### end_date
+#### `end_date`
 
 赛季结束日期。
 
 用于判断赛季结束时间，也用于停止普通用户继续上传凭证、冻结排行榜或进入后续结算流程。
 
 示例：
+
 ```text
 2026-07-31
 ```
----
 
-### required_project_count
+#### `required_project_count`
 
 当前赛季要求用户固定选择的项目数量。
 
@@ -109,9 +106,7 @@ required_project_count = 4 表示该赛季强制选择 4 个运动项目
 required_project_count = 3
 ```
 
----
-
-### status
+#### `status`
 
 赛季状态。
 
@@ -149,7 +144,7 @@ required_project_count = 3
 
 ---
 
-## MySQL 建表语句
+## 建表语句
 
 ```sql
 CREATE TABLE season (

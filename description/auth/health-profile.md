@@ -1,5 +1,7 @@
 # 健康信息采集
 
+本文说明登录后的健康资料完整性检查、资料保存接口和采集面板交互规则。
+
 ## 相关文件
 
 ```text
@@ -11,21 +13,31 @@ src/components/UserHealthProfilePanel.vue
 src/App.vue
 ```
 
+---
+
 ## 触发时机
 
 登录成功后调用 `checkProfileComplete()`。
 
 如果后端返回资料未完成且 `missing_fields` 非空，`App` 会展示 `UserHealthProfilePanel`。
 
-## 完成度检查接口
+---
+
+## `GET /auth/profile_complete_check` 检查资料完整性
+
+### 接口定义
 
 ```http
 GET /auth/profile_complete_check
 ```
 
-请求参数：无。
+### 请求参数
 
-推荐响应：
+无。
+
+### 成功响应
+
+推荐响应如下：
 
 ```json
 {
@@ -35,24 +47,34 @@ GET /auth/profile_complete_check
 }
 ```
 
-字段映射：
+字段映射如下：
 
-| 后端字段 | 前端字段 | 说明 |
-| -------- | -------- | ---- |
-| is_complete | isComplete | 健康基础信息是否已完整 |
-| height_cm_completed | heightCmCompleted | 身高是否已填写 |
-| missing_fields | missingFields | 缺失字段列表 |
+| 后端字段              | 前端字段            | 说明                   |
+| --------------------- | ------------------- | ---------------------- |
+| `is_complete`         | `isComplete`        | 健康基础信息是否已完整 |
+| `height_cm_completed` | `heightCmCompleted` | 身高是否已填写         |
+| `missing_fields`      | `missingFields`     | 缺失字段列表           |
 
 采集面板只渲染 `missing_fields` 中返回的指标。当前后端只返回 `height_cm` 时，面板只展示身高滚轮。
 
+### 异常处理
+
+接口失败时不应把资料误判为完整；页面保留检查状态并交由现有错误恢复流程处理。
+
+---
+
 ## 当前采集字段
 
-| 字段 | 前端字段 | 说明 |
-| ---- | -------- | ---- |
-| 身高 | heightCm | 单位 cm，当前范围 `120.00-220.00`，步进 `0.25`，保存为小数点后两位 |
-| 年龄 | age | 整数，当前范围 `18-99`，仅当后端返回年龄缺失字段时展示 |
+| 字段 | 前端字段   | 说明                                                               |
+| ---- | ---------- | ------------------------------------------------------------------ |
+| 身高 | `heightCm` | 单位 cm，当前范围 `120.00-220.00`，步进 `0.25`，保存为小数点后两位 |
+| 年龄 | `age`      | 整数，当前范围 `18-99`，仅当后端返回年龄缺失字段时展示             |
 
-## 当前保存方式
+---
+
+## `POST /user/profile` 保存健康资料
+
+### 接口定义
 
 采集结果提交到后端：
 
@@ -60,17 +82,21 @@ GET /auth/profile_complete_check
 POST /user/profile
 ```
 
+### 请求参数
+
 请求体按本次实际渲染并提交的字段生成。
 
 示例：
 
 ```json
 {
-  "height_cm": 170.00
+  "height_cm": 170.0
 }
 ```
 
-提交成功后写入内存状态，并尽量写入本地存储：
+### 成功响应
+
+前端以 HTTP `2xx` 作为保存成功依据，不依赖特定响应字段。提交成功后写入内存状态，并尽量写入本地存储：
 
 ```text
 flame_sport_pheno_user_health_profile
@@ -82,11 +108,17 @@ flame_sport_pheno_user_health_profile
 
 ```json
 {
-  "heightCm": 170.00,
+  "heightCm": 170.0,
   "age": 30,
   "collectedAt": "2026-07-20T14:30:00.000Z"
 }
 ```
+
+### 异常处理
+
+提交失败时保留采集面板和用户当前输入，按钮短暂展示“保存失败”，允许用户再次提交。
+
+---
 
 ## 页面交互
 

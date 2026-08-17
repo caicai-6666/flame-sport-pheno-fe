@@ -162,6 +162,14 @@ export default {
       type: Boolean,
       default: false
     },
+    isSeasonWriteFrozen: {
+      type: Boolean,
+      default: false
+    },
+    seasonWriteMessage: {
+      type: String,
+      default: ''
+    },
     selectedChallengeLevel: {
       type: String,
       default: ''
@@ -183,6 +191,10 @@ export default {
 
       if (this.isNoActiveSeason) {
         return '赛季敬请期待'
+      }
+
+      if (this.isSeasonWriteFrozen) {
+        return '即将开始'
       }
 
       if (this.isLocked) {
@@ -216,6 +228,10 @@ export default {
         return '当前暂无进行中的赛季，开放后即可锁定项目'
       }
 
+      if (this.isSeasonWriteFrozen) {
+        return this.seasonWriteMessage
+      }
+
       if (this.isLocked) {
         return '该运动已加入本赛季挑战'
       }
@@ -235,6 +251,10 @@ export default {
         return '新赛季敬请期待，当前仅支持浏览挑战规则。'
       }
 
+      if (this.isSeasonWriteFrozen) {
+        return '赛季正式开始前，挑战内容可提前查看。'
+      }
+
       if (this.isRegistrationClosed) {
         return '已超过本赛季报名时间，不能再锁定项目。'
       }
@@ -245,7 +265,7 @@ export default {
       return !this.isLocked
     },
     isLockButtonDisabled() {
-      return this.isLocked || this.isRegistrationClosed || this.isNoActiveSeason || this.isSeasonContextLoading || this.isLocking || this.isLockFailed || this.remainingLockSlots <= 0
+      return this.isLocked || this.isRegistrationClosed || this.isNoActiveSeason || this.isSeasonContextLoading || this.isSeasonWriteFrozen || this.isLocking || this.isLockFailed || this.remainingLockSlots <= 0
     }
   },
   watch: {
@@ -258,6 +278,16 @@ export default {
     lockError(error) {
       if (error) {
         this.showLockFailure()
+      }
+    },
+    isSeasonWriteFrozen(isFrozen) {
+      if (isFrozen) {
+        this.isLockConfirming = false
+
+        if (this.lockConfirmTimer) {
+          window.clearTimeout(this.lockConfirmTimer)
+          this.lockConfirmTimer = null
+        }
       }
     }
   },

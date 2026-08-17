@@ -1,6 +1,7 @@
-# 排行榜快照表：leaderboard_snapshot
+# 排行榜快照表：`leaderboard_snapshot`
 
-## 表作用
+## 表介绍
+
 `leaderboard_snapshot` 表用于存储当前赛季的排行榜快照数据。
 当前平台中，排行榜按照用户在当前赛季的打卡次数进行排名。  
 排行榜数据由定时任务每天固定时间统计并写入本表，前端排行榜页面直接读取本表，避免每次访问时实时统计凭证记录。
@@ -13,27 +14,23 @@
 
 ---
 
-## 字段说明
+## 字段介绍
 
-| 字段名         | 类型            | 是否必填 |            默认值 | 说明                                   |
-| -------------- | --------------- | -------: | ----------------: | -------------------------------------- |
-| id             | BIGINT UNSIGNED |       是 |              自增 | 排行榜快照记录主键 ID                  |
-| season_user_id | BIGINT UNSIGNED |       是 |                无 | 赛季用户记录 ID，关联 `season_user.id` |
-| checkin_count  | INT UNSIGNED    |       是 |                 0 | 当前赛季累计打卡次数                   |
+| 字段名           | 类型              | 是否必填 | 默认值 | 说明                                   |
+| ---------------- | ----------------- | -------: | -----: | -------------------------------------- |
+| `id`             | `BIGINT UNSIGNED` |       是 |   自增 | 排行榜快照记录主键 ID                  |
+| `season_user_id` | `BIGINT UNSIGNED` |       是 |     无 | 赛季用户记录 ID，关联 `season_user.id` |
+| `checkin_count`  | `INT UNSIGNED`    |       是 |      0 | 当前赛季累计打卡次数                   |
 
----
+### 字段设计说明
 
-## 字段设计说明
-
-### id
+#### `id`
 
 排行榜快照记录的唯一标识。
 
 使用 `BIGINT UNSIGNED AUTO_INCREMENT` 作为主键。
 
----
-
-### season_user_id
+#### `season_user_id`
 
 赛季用户记录 ID。
 
@@ -56,9 +53,7 @@ user_id
 用户部门
 ```
 
----
-
-### checkin_count
+#### `checkin_count`
 
 当前赛季累计打卡次数。
 
@@ -96,7 +91,7 @@ LeaderboardRuntime.calculated_at
 
 ---
 
-## MySQL 建表语句
+## 建表语句
 
 ```sql
 CREATE TABLE leaderboard_snapshot (
@@ -113,7 +108,7 @@ CREATE TABLE leaderboard_snapshot (
 
 ---
 
-## 旧表结构调整 SQL
+## 现有数据库迁移
 
 如果数据库中已经存在旧版字段，可以执行：
 

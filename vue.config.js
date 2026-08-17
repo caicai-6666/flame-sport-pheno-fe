@@ -20,6 +20,8 @@ module.exports = defineConfig({
     // 开发服务只向本机 Nginx 开放，外部统一通过 HTTPS 反向代理访问。
     host: '127.0.0.1',
     port: 8080,
+    // 仅放行实际开发代理域名，保留 Host 校验以防止 DNS rebinding。
+    allowedHosts: ['pheno.szkl.com', 'www.phenosolar.cloud'],
     client: {
       webSocketURL: {
         pathname: '/dev/flame/ws',

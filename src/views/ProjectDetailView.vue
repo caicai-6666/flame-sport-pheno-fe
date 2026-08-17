@@ -12,6 +12,8 @@
     :is-registration-closed="isSeasonRegistrationClosed"
     :is-no-active-season="isNoActiveSeason"
     :is-season-context-loading="isSeasonContextLoading"
+    :is-season-write-frozen="seasonWriteAvailability.isFrozen"
+    :season-write-message="seasonWriteAvailability.message"
     @lock-task="lockTask"
   />
 
@@ -30,6 +32,7 @@ import { getProjectLevels, getProjects, lockProject } from '../api/projects'
 import { getCurrentSeason, getSeasonParticipationStatus, isNoActiveSeasonError } from '../api/season'
 import ProjectDetail from '../components/ProjectDetail.vue'
 import { appState, findTaskByName, isTaskLocked, lockTask as markTaskLocked, remainingLockSlots, setCurrentSeason, setProjectTasks, setSeasonAvailability, setSeasonParticipationStatus } from '../state/appState'
+import { getSeasonWriteAvailability, getSeasonWriteUpdateDelay } from '../utils/seasonWriteAvailability'
 
 const MIN_LOCKING_DURATION = 900
 
@@ -57,13 +60,24 @@ export default {
       isChallengeLoading: true,
       isLocking: false,
       lockError: null,
-      isSeasonContextLoading: true
+      isSeasonContextLoading: true,
+      seasonWriteAvailability: getSeasonWriteAvailability(null),
+      seasonWriteTimer: null
     }
   },
   async created() {
     await this.ensureProjectTasks()
     this.loadProjectLevels()
     this.loadSeasonContext()
+  },
+  activated() {
+    this.updateSeasonWriteAvailability()
+  },
+  deactivated() {
+    this.clearSeasonWriteTimer()
+  },
+  beforeUnmount() {
+    this.clearSeasonWriteTimer()
   },
   computed: {
     task() {
@@ -132,7 +146,10 @@ export default {
         const season = await getCurrentSeason()
         setCurrentSeason(season)
         setSeasonAvailability('active')
+        this.updateSeasonWriteAvailability()
       } catch (error) {
+        this.seasonWriteAvailability = getSeasonWriteAvailability(null)
+        this.clearSeasonWriteTimer()
         if (isNoActiveSeasonError(error)) {
           setCurrentSeason(null)
           setSeasonAvailability('unavailable')
@@ -157,8 +174,28 @@ export default {
         this.isSeasonContextLoading = false
       }
     },
+    updateSeasonWriteAvailability() {
+      this.seasonWriteAvailability = getSeasonWriteAvailability(appState.currentSeason)
+      this.clearSeasonWriteTimer()
+
+      if (!this.seasonWriteAvailability.nextChangeAt) {
+        return
+      }
+
+      const delay = getSeasonWriteUpdateDelay(this.seasonWriteAvailability.nextChangeAt)
+      this.seasonWriteTimer = window.setTimeout(() => {
+        this.seasonWriteTimer = null
+        this.updateSeasonWriteAvailability()
+      }, delay)
+    },
+    clearSeasonWriteTimer() {
+      if (this.seasonWriteTimer) {
+        window.clearTimeout(this.seasonWriteTimer)
+        this.seasonWriteTimer = null
+      }
+    },
     async lockTask(task) {
-      if (this.isLocking || this.isLocked || this.isSeasonRegistrationClosed || this.isNoActiveSeason || this.isSeasonContextLoading) {
+      if (this.isLocking || this.isLocked || this.isSeasonRegistrationClosed || this.isNoActiveSeason || this.isSeasonContextLoading || this.seasonWriteAvailability.isFrozen) {
         return
       }
 

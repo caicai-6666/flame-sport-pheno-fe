@@ -67,7 +67,7 @@
             type="file"
             accept="image/*"
             multiple
-            :disabled="isProofProcessing || isProofUploading"
+            :disabled="isWriteFrozen || isProofProcessing || isProofUploading"
             @change="handleProofUpload"
           >
           <template v-if="proofPreviewUrl">
@@ -97,6 +97,7 @@
               :key="config.recordType"
               type="button"
               :class="{ 'is-active': proofRecordType === config.recordType }"
+              :disabled="isWriteFrozen"
               @click="selectUploadConfig(config)"
             >
               <strong>{{ config.recordType }}</strong>
@@ -128,7 +129,7 @@
               :data-proof-date="date"
               role="option"
               :aria-selected="proofDate === date"
-              :disabled="isProofUploading"
+              :disabled="isWriteFrozen || isProofUploading"
               @click="selectProofDate(date)"
             >
               <strong>{{ formatProofDateDay(date) }}</strong>
@@ -146,6 +147,7 @@
             maxlength="80"
             :placeholder="proofNotePlaceholder"
             required
+            :disabled="isWriteFrozen"
             @input="resetProofSubmitConfirm"
           ></textarea>
           <small class="proof-note-hint">请填写时长、距离、次数、步数等具体指标；描述越具体、越便于核验，越有助于通过初审。</small>
@@ -153,6 +155,9 @@
         </div>
 
         <div class="upload-submit-footer">
+        <small v-if="isWriteFrozen" class="proof-write-freeze-hint">
+          本赛季尚未正式开始，当前仅支持查看。
+        </small>
         <button
           class="submit-proof"
           type="submit"
@@ -571,6 +576,10 @@ export default {
     season: {
       type: Object,
       default: null
+    },
+    isWriteFrozen: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
@@ -693,6 +702,7 @@ export default {
     },
     canSubmitProof() {
       return Boolean(
+        !this.isWriteFrozen &&
         !this.isUploadConfigLoading &&
         !this.isProofProcessing &&
         !this.isProofUploading &&
@@ -720,6 +730,10 @@ export default {
 
       if (this.isProofUploadFailed) {
         return '上传失败'
+      }
+
+      if (this.isWriteFrozen) {
+        return '即将开始'
       }
 
       return this.isProofSubmitConfirming ? '确认提交' : '提交记录'
@@ -933,7 +947,7 @@ export default {
       }
     },
     async submitProof() {
-      if (!this.canSubmitProof) {
+      if (this.isWriteFrozen || !this.canSubmitProof) {
         return
       }
 
@@ -1458,6 +1472,16 @@ export default {
 .upload-submit-footer {
   flex: 0 0 auto;
   padding: 12px 0 4px;
+}
+
+.proof-write-freeze-hint {
+  display: block;
+  margin: 0 4px 8px;
+  color: #8a6413;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .upload-dropzone {

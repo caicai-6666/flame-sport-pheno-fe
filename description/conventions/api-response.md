@@ -18,6 +18,8 @@ VUE_APP_API_BASE_URL=/flame/api
 
 例如项目接口路径为 `/project/list` 时，实际请求路径为 `/flame/api/project/list`。本地联调可在 `../../.env` 中覆盖为实际后端地址，但应保留 `/flame/api` 路径前缀。
 
+---
+
 ## 鉴权请求头
 
 除 `/auth/login` 外，业务请求会自动携带：
@@ -32,11 +34,15 @@ Authorization: <auth_code>
 - 请求头值直接使用 `auth_code`
 - 不添加 `Bearer` 前缀
 
+---
+
 ## 响应格式兼容
 
 当前前端处于联调阶段，部分接口同时兼容数组直出和对象包装。
 
 推荐后端逐步收敛为文档中的“推荐格式”。兼容字段只用于降低联调成本，不应作为长期契约。
+
+---
 
 ## 401 自动处理
 
@@ -51,11 +57,15 @@ Authorization: <auth_code>
 
 同一个请求最多自动重试一次，避免死循环。
 
+---
+
 ## 读取请求超时重试
 
-公共请求层对除 `/auth/login` 外的 `GET`、`HEAD`、`OPTIONS` 请求设置 15 秒超时。发生 Axios 超时（`ECONNABORTED`、`ETIMEDOUT` 或超时消息）后，前端会在 400ms、800ms 退避等待后自动重试，最多额外请求 2 次，即单次读取操作最多发起 3 次请求。
+公共请求层对除 `/auth/login` 外的 `GET`、`HEAD`、`OPTIONS` 请求设置 15 秒超时。发生 Axios 超时（`ECONNABORTED`、`ETIMEDOUT` 或超时消息）后，前端会在 400 ms、800 ms 退避等待后自动重试，最多额外请求 2 次，即单次读取操作最多发起 3 次请求。
 
 该机制覆盖头像、当前赛季、赛季报名/目标状态、项目列表及其图片、项目规则等读取接口。普通 `4xx`、`5xx`、断网等非超时错误不会由该机制重试，仍交由页面展示错误或恢复状态。`POST`、`PUT`、`PATCH`、`DELETE` 等写操作不自动重试，避免服务端已完成操作但响应丢失时产生重复报名、兑换或上传。
+
+---
 
 ## 错误响应建议
 
@@ -67,14 +77,19 @@ Authorization: <auth_code>
 }
 ```
 
-前端请求封装会归一化错误对象：
+同时兼容 FastAPI 默认业务异常格式：
+
+```json
+{
+  "detail": "错误原因"
+}
+```
+
+前端优先读取 `message`，其次读取 `detail`，并归一化为统一错误对象：
 
 ```js
 {
-  message,
-  status,
-  data,
-  originalError
+  message, status, data, originalError;
 }
 ```
 

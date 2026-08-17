@@ -11,7 +11,13 @@ function normalizeSeason(season) {
     name: season.name || season.season_name || '',
     startDate: season.start_date || season.startDate || '',
     endDate: season.end_date || season.endDate || '',
-    requiredProjectCount: Number(season.required_project_count || season.requiredProjectCount || 3)
+    requiredProjectCount: Number(season.required_project_count || season.requiredProjectCount || 3),
+    serverTime: season.server_time || season.serverTime || '',
+    userWriteFrozen: Boolean(season.user_write_frozen ?? season.userWriteFrozen),
+    userWriteFreezeStartsAt: season.user_write_freeze_starts_at || season.userWriteFreezeStartsAt || '',
+    userWriteAvailableAt: season.user_write_available_at || season.userWriteAvailableAt || '',
+    // 记录响应抵达时间，后续用服务端时间轴推算保护期边界，不直接信任设备绝对时钟。
+    receivedAt: Date.now()
   }
 }
 

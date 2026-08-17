@@ -1,8 +1,8 @@
-# Shop 页面
+# 商城页面
 
 ## 当前状态
 
-`ShopPage` 已开始接入 real data。
+`ShopPage` 已接入真实数据。
 
 已接入：
 
@@ -13,12 +13,12 @@
 - 可用积分根据最新积分流水计算
 - 商品兑换扣减
 - 赛季开始前 N 个自然日的兑换窗口控制（默认 7 天，由环境变量配置）
-- 页面 keepalive 缓存
+- 页面路由 `KeepAlive` 缓存
+
+---
 
 ## 相关文档
 
-```text
-description/shop/product_list.md
-description/shop/point_flow.md
-description/shop/exchange.md
-```
+- [商品列表](product-list.md)
+- [积分流水](point-flow.md)
+- [商品兑换](exchange.md)

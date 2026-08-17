@@ -1,5 +1,7 @@
 # 锁定挑战等级
 
+本文说明用户完成项目选择后统一锁定赛季挑战等级的前置条件、接口契约和交互状态。
+
 ## 相关文件
 
 ```text
@@ -8,6 +10,8 @@ src/components/ProjectHome.vue
 src/api/projects.js
 src/state/appState.js
 ```
+
+---
 
 ## 业务前置条件
 
@@ -19,13 +23,19 @@ lockedTaskNames.length >= season.required_project_count
 
 前端随后取一个已锁定项目，请求 `/project/rules`，从规则中拿到可选等级的 `project_rule_level_id`。
 
-## 接口
+---
+
+## `POST /project/lock_level` 锁定挑战等级
+
+### 接口定义
 
 ```http
 POST /project/lock_level
 ```
 
-请求体：
+### 请求参数
+
+请求体如下：
 
 ```json
 {
@@ -36,12 +46,12 @@ POST /project/lock_level
 
 字段说明：
 
-| 参数名 | 类型 | 是否必填 | 说明 |
-| ------ | ---- | -------: | ---- |
-| season_id | string / number | 是 | 当前赛季 ID |
-| project_rule_level_id | string / number | 是 | 挑战等级 ID |
+| 参数名                  | 类型              | 是否必填 | 说明        |
+| ----------------------- | ----------------- | -------: | ----------- |
+| `season_id`             | `string / number` |       是 | 当前赛季 ID |
+| `project_rule_level_id` | `string / number` |       是 | 挑战等级 ID |
 
-## 成功响应
+### 成功响应
 
 前端以 HTTP 2xx 作为成功依据，不强依赖响应体。
 
@@ -50,6 +60,12 @@ POST /project/lock_level
 ```http
 204 No Content
 ```
+
+### 异常处理
+
+不满足项目锁定数量、报名已经截止或请求字段无效时，后端应返回非 `2xx` 和明确的 `message`；前端进入“锁定失败”状态后恢复可选。
+
+---
 
 ## 前端交互
 

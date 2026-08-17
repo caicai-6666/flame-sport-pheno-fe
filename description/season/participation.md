@@ -1,5 +1,7 @@
 # 赛季参与状态
 
+本文说明赛季参与状态接口的状态码语义，以及各状态对项目首页和详情页的影响。
+
 ## 相关文件
 
 ```text
@@ -9,21 +11,27 @@ src/api/season.js
 src/state/appState.js
 ```
 
-## 接口
+---
+
+## `GET /season/participate_check` 查询参与状态
+
+### 接口定义
 
 ```http
 GET /season/participate_check
 ```
 
-Query 参数：
+### 请求参数
 
-| 参数名 | 类型 | 是否必填 | 说明 |
-| ------ | ---- | -------: | ---- |
-| season_id | string / number | 是 | 当前赛季 ID |
+Query 参数如下：
 
-## 响应语义
+| 参数名      | 类型              | 是否必填 | 说明        |
+| ----------- | ----------------- | -------: | ----------- |
+| `season_id` | `string / number` |       是 | 当前赛季 ID |
 
-### 200：已经参与
+### 成功响应
+
+#### `200` 已经参与
 
 推荐响应：
 
@@ -39,7 +47,9 @@ Query 参数：
 - 保存 `projectRuleLevelId`
 - 如果尚无等级名称，会在获取 `/project/rules` 后根据 ID 补齐展示名
 
-### 409：报名中
+### 异常处理
+
+#### `409` 报名中
 
 ```http
 409 Conflict
@@ -52,7 +62,7 @@ Query 参数：
 - 允许继续锁定项目
 - 锁定数量达标后允许选择挑战等级
 
-### 403：报名截止
+#### `403` 报名截止
 
 ```http
 403 Forbidden
@@ -63,6 +73,8 @@ Query 参数：
 - 设置 `seasonParticipationStatus = closed`
 - 首页显示报名截止结果卡片
 - 项目详情页锁定按钮不可点击
+
+---
 
 ## 页面影响
 

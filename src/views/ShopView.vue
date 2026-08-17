@@ -32,6 +32,7 @@ import { getCurrentSeason, isNoActiveSeasonError } from '../api/season'
 import { appState, setCurrentSeason, setSeasonAvailability } from '../state/appState'
 import { groupProductsByTier } from '../utils/shopProductTiers'
 import { getShopRedeemAvailability } from '../utils/shopRedeemWindow'
+import { getSeasonWriteAvailability, getSeasonWriteUpdateDelay } from '../utils/seasonWriteAvailability'
 
 export default {
   name: 'ShopView',
@@ -136,7 +137,30 @@ export default {
       }
     },
     updateRedeemAvailability() {
-      this.redeemAvailability = getShopRedeemAvailability(this.currentSeason)
+      const seasonWriteAvailability = getSeasonWriteAvailability(this.currentSeason)
+      const shopRedeemAvailability = getShopRedeemAvailability(this.currentSeason)
+
+      if (seasonWriteAvailability.isFrozen) {
+        this.redeemAvailability = {
+          isAvailable: false,
+          message: seasonWriteAvailability.remainingHours
+            ? `兑换将在 ${seasonWriteAvailability.remainingHours} 小时后开放，商品和积分流水可提前查看。`
+            : '兑换尚未开放，商品和积分流水可提前查看。',
+          nextChangeAt: seasonWriteAvailability.nextChangeAt
+        }
+      } else {
+        // 赛季尚未开始时同时等待保护期起点，确保页面停留跨过零点后立即切为只读。
+        const nextChangeTimes = [
+          seasonWriteAvailability.nextChangeAt,
+          shopRedeemAvailability.nextChangeAt
+        ].filter(Number.isFinite)
+
+        this.redeemAvailability = {
+          ...shopRedeemAvailability,
+          nextChangeAt: nextChangeTimes.length ? Math.min(...nextChangeTimes) : null
+        }
+      }
+
       this.scheduleRedeemWindowUpdate()
     },
     scheduleRedeemWindowUpdate() {
@@ -146,7 +170,7 @@ export default {
         return
       }
 
-      const delay = Math.max(this.redeemAvailability.nextChangeAt - Date.now() + 100, 0)
+      const delay = getSeasonWriteUpdateDelay(this.redeemAvailability.nextChangeAt)
       this.redeemWindowTimer = window.setTimeout(() => {
         this.redeemWindowTimer = null
         this.updateRedeemAvailability()

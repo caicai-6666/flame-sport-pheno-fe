@@ -1,6 +1,6 @@
-# 积分变动记录表：point_record
+# 积分变动记录表：`point_record`
 
-## 表作用
+## 表介绍
 
 `point_record` 表用于记录用户全局积分的每一次变动，并为商品兑换流水保存礼品履约状态。
 
@@ -17,32 +17,30 @@
 
 ---
 
-## 字段说明
+## 字段介绍
 
-| 字段名 | 类型 | 是否必填 | 默认值 | 说明 |
-| --- | --- | ---: | ---: | --- |
-| `id` | `BIGINT UNSIGNED` | 是 | 自增 | 积分变动记录主键 ID |
-| `user_id` | `VARCHAR(64)` | 是 | 无 | 用户 ID，关联 `user.id` |
-| `product_id` | `BIGINT UNSIGNED` | 否 | `NULL` | 商品 ID，关联 `product.id`，商品兑换及其退款流水使用 |
-| `change_type` | `VARCHAR(32)` | 是 | 无 | 积分变动类型 |
-| `change_points` | `INT` | 是 | 无 | 本次积分变动值，正数表示增加，负数表示扣减 |
-| `points_after` | `INT UNSIGNED` | 是 | 无 | 本次变动后的用户积分余额 |
-| `description` | `VARCHAR(255)` | 否 | `NULL` | 积分变动描述 |
-| `status` | `TINYINT UNSIGNED` | 是 | `1` | 记录状态：`1` 有效，`0` 作废 |
-| `gift_distribution_status` | `VARCHAR(16)` | 是 | `pending` | 礼品发放状态：`pending` 待发放，`distributed` 已发放，`rejected` 拒绝发放 |
-| `created_at` | `DATETIME` | 是 | `CURRENT_TIMESTAMP` | 积分变动时间 |
+| 字段名                     | 类型               | 是否必填 |              默认值 | 说明                                                                      |
+| -------------------------- | ------------------ | -------: | ------------------: | ------------------------------------------------------------------------- |
+| `id`                       | `BIGINT UNSIGNED`  |       是 |                自增 | 积分变动记录主键 ID                                                       |
+| `user_id`                  | `VARCHAR(64)`      |       是 |                  无 | 用户 ID，关联 `user.id`                                                   |
+| `product_id`               | `BIGINT UNSIGNED`  |       否 |              `NULL` | 商品 ID，关联 `product.id`，商品兑换及其退款流水使用                      |
+| `change_type`              | `VARCHAR(32)`      |       是 |                  无 | 积分变动类型                                                              |
+| `change_points`            | `INT`              |       是 |                  无 | 本次积分变动值，正数表示增加，负数表示扣减                                |
+| `points_after`             | `INT UNSIGNED`     |       是 |                  无 | 本次变动后的用户积分余额                                                  |
+| `description`              | `VARCHAR(255)`     |       否 |              `NULL` | 积分变动描述                                                              |
+| `status`                   | `TINYINT UNSIGNED` |       是 |                 `1` | 记录状态：`1` 有效，`0` 作废                                              |
+| `gift_distribution_status` | `VARCHAR(16)`      |       是 |           `pending` | 礼品发放状态：`pending` 待发放，`distributed` 已发放，`rejected` 拒绝发放 |
+| `created_at`               | `DATETIME`         |       是 | `CURRENT_TIMESTAMP` | 积分变动时间                                                              |
 
----
+### 字段设计说明
 
-## 字段设计说明
-
-### id
+#### `id`
 
 积分变动记录的唯一标识。
 
 使用 `BIGINT UNSIGNED AUTO_INCREMENT` 作为主键。
 
-### user_id
+#### `user_id`
 
 用户 ID。
 
@@ -50,7 +48,7 @@
 
 当前积分为用户全局积分，跨赛季累积，因此本表直接关联用户，不再关联 `season_user`。
 
-### product_id
+#### `product_id`
 
 商品 ID。
 
@@ -80,7 +78,7 @@ change_type = manual_adjust
 product_id = NULL
 ```
 
-### change_type
+#### `change_type`
 
 积分变动类型。
 
@@ -104,7 +102,7 @@ manual_adjust = 后台人工调整
 
 后续如果需要扩展其他积分来源，可以继续增加类型。
 
-### change_points
+#### `change_points`
 
 本次积分变动值。
 
@@ -126,7 +124,7 @@ manual_adjust = 后台人工调整
 -5   后台扣减异常积分
 ```
 
-### points_after
+#### `points_after`
 
 本次积分变动后的用户积分余额。
 
@@ -152,7 +150,7 @@ points_after = 70
 - 后台排查积分争议
 - 避免每次查询都聚合全部积分记录
 
-### description
+#### `description`
 
 积分变动描述。
 
@@ -169,7 +167,7 @@ points_after = 70
 
 该字段允许为空，但建议业务写入时尽量填写。
 
-### status
+#### `status`
 
 记录状态。
 
@@ -185,17 +183,17 @@ points_after = 70
 如果后台需要撤销某条积分变动记录，可以将其状态改为作废。  
 计算用户积分余额时，只应统计有效记录。
 
-### gift_distribution_status
+#### `gift_distribution_status`
 
 用户兑换礼品的履约状态。该字段本身只描述礼品是否待处理、已经发放或被审核员拒绝发放，不改写原兑换流水的积分字段；进入 `rejected` 时，业务会通过独立退款流水补回积分。
 
 允许值如下：
 
-| 字段值 | 中文状态 | 说明 |
-| --- | --- | --- |
-| `pending` | 待发放 | 用户已经完成兑换，但礼品尚未发放 |
-| `distributed` | 已发放 | 审核员已经确认并完成礼品发放 |
-| `rejected` | 拒绝发放 | 审核员判定本次兑换不予发放礼品 |
+| 字段值        | 中文状态 | 说明                             |
+| ------------- | -------- | -------------------------------- |
+| `pending`     | 待发放   | 用户已经完成兑换，但礼品尚未发放 |
+| `distributed` | 已发放   | 审核员已经确认并完成礼品发放     |
+| `rejected`    | 拒绝发放 | 审核员判定本次兑换不予发放礼品   |
 
 新记录默认为 `pending`。只有满足以下条件的商品兑换流水才允许进入 `distributed` 或 `rejected`：
 
@@ -242,7 +240,7 @@ gift_distribution_status = 'pending'
 
 退款流水的 `description` 使用 `礼品拒绝发放，退还兑换积分`。退款流水自身不是待发放礼品；其 `gift_distribution_status` 保持默认 `pending`，该字段对非 `exchange` 类型没有业务意义。
 
-### created_at
+#### `created_at`
 
 积分变动时间。
 
@@ -250,7 +248,7 @@ gift_distribution_status = 'pending'
 
 ---
 
-## MySQL 建表语句
+## 建表语句
 
 索引设计原则：
 
@@ -292,10 +290,22 @@ CREATE TABLE point_record (
 
 ---
 
-## 迁移注意
+## 现有数据库迁移
 
-旧表无法证明历史兑换礼品是否已经发放或被拒绝，迁移不得自动推断历史记录状态。生产执行前必须先核对历史兑换记录，并按已经确认的业务事实设置终态，避免重复发放或错误拒绝。
+首次增加礼品状态字段的环境使用以下脚本，该脚本已经包含三态约束：
+
+```text
+script/migrate-point-record-gift-distribution-status.sql
+```
+
+已经执行过旧版两态脚本的环境必须改用以下增量迁移，不能重复执行首次迁移：
+
+```text
+script/migrate-point-record-gift-distribution-rejected.sql
+```
+
+由于旧表无法证明历史兑换礼品是否已经发放或被拒绝，迁移不得自动推断历史记录状态。生产执行前必须先核对历史兑换记录，并按已经确认的业务事实设置终态，避免重复发放或错误拒绝。
 
 > **警告**
 >
-> MySQL DDL 会隐式提交。执行结构升级前必须完成数据库备份、停止礼品审核及积分写入，并预留维护窗口。
+> MySQL DDL 会隐式提交。执行三态升级脚本前必须完成数据库备份、停止礼品审核及积分写入并预留维护窗口。本仓库不会自动执行生产迁移。

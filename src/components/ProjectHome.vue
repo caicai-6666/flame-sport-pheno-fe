@@ -30,6 +30,11 @@
             <strong>当前暂无进行中的赛季，你可以先浏览运动项目与挑战规则。</strong>
           </div>
 
+          <div v-else-if="isSeasonWriteFrozen" key="write-frozen" class="season-target-card">
+            <span>赛季即将开始</span>
+            <strong>{{ seasonWriteMessage }}</strong>
+          </div>
+
           <div v-else-if="shouldShowSeasonResultCard" key="target" class="season-target-card">
             <span>{{ seasonResultTitle }}</span>
             <strong v-if="seasonResultDescription">{{ seasonResultDescription }}</strong>
@@ -190,6 +195,7 @@
         :task="activeUploadTask"
         :season="season"
         :season-id="seasonId"
+        :is-write-frozen="isSeasonWriteFrozen"
         @close="closeUploadPanel"
         @submit-proof="$emit('submit-proof', $event)"
       />
@@ -336,6 +342,14 @@ export default {
     challengeLevelError: {
       type: [Object, String],
       default: null
+    },
+    isSeasonWriteFrozen: {
+      type: Boolean,
+      default: false
+    },
+    seasonWriteMessage: {
+      type: String,
+      default: ''
     }
   },
   computed: {
@@ -386,13 +400,13 @@ export default {
       return this.seasonParticipationStatus === 'registering'
     },
     shouldShowSetupGuide() {
-      return !this.isNoActiveSeason && (this.isSeasonRegistering || this.isLevelLockingHolding || this.isLevelCompletionAnimating)
+      return !this.isNoActiveSeason && !this.isSeasonWriteFrozen && (this.isSeasonRegistering || this.isLevelLockingHolding || this.isLevelCompletionAnimating)
     },
     isSeasonRegistrationClosed() {
       return this.seasonParticipationStatus === 'closed'
     },
     shouldShowSeasonChecking() {
-      return !this.isNoActiveSeason && (this.isSeasonParticipationLoading || this.seasonParticipationStatus === 'unknown' || this.isParticipatedLevelResolving)
+      return !this.isNoActiveSeason && !this.isSeasonWriteFrozen && (this.isSeasonParticipationLoading || this.seasonParticipationStatus === 'unknown' || this.isParticipatedLevelResolving)
     },
     isParticipatedLevelResolving() {
       return this.seasonParticipationStatus === 'participated' && !this.selectedChallengeLevel
@@ -496,6 +510,14 @@ export default {
       if (error) {
         this.showChallengeLevelFailure()
       }
+    },
+    isSeasonWriteFrozen(isFrozen) {
+      if (isFrozen) {
+        // 保护期可能在页面停留期间开始，立即收起写入面板并取消尚未提交的确认态。
+        this.closeUploadPanel()
+        this.confirmingChallengeLevel = ''
+        this.pendingChallengeLevel = ''
+      }
     }
   },
   methods: {
@@ -553,6 +575,7 @@ export default {
       return Boolean(
         this.isChallengeLevelLoading ||
         this.isChallengeLevelLocking ||
+        this.isSeasonWriteFrozen ||
         this.pendingChallengeLevel ||
         this.selectedChallengeLevel ||
         this.failedChallengeLevel ||
@@ -650,6 +673,10 @@ export default {
         return '查看挑战 →'
       }
 
+      if (this.isSeasonWriteFrozen) {
+        return '查看挑战 →'
+      }
+
       if (this.isTaskDisabled(task)) {
         return '选择已满'
       }
@@ -703,7 +730,7 @@ export default {
       this.recoveringTask = ''
       this.pendingTask = null
 
-      if (this.isSeasonSetupComplete && this.isTaskLocked(selectedTask)) {
+      if (this.isSeasonSetupComplete && this.isTaskLocked(selectedTask) && !this.isSeasonWriteFrozen) {
         this.openUploadPanel(selectedTask)
         return
       }

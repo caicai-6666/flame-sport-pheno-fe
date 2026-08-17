@@ -1,6 +1,6 @@
-# 赛季用户项目表：season_user_project
+# 赛季用户项目表：`season_user_project`
 
-## 表作用
+## 表介绍
 
 `season_user_project` 表用于记录用户在某个赛季中选择并锁定的运动项目。
 
@@ -18,29 +18,25 @@
 
 ---
 
-## 字段说明
+## 字段介绍
 
-| 字段名         | 类型             | 是否必填 | 默认值 | 说明                                   |
-| -------------- | ---------------- | -------: | -----: | -------------------------------------- |
-| id             | BIGINT UNSIGNED  |       是 |   自增 | 赛季用户项目记录主键 ID                |
-| season_user_id | BIGINT UNSIGNED  |       是 |     无 | 赛季用户记录 ID，关联 `season_user.id` |
-| project_id     | BIGINT UNSIGNED  |       是 |     无 | 项目 ID，关联 `project.id`             |
-| completion_progress | DECIMAL(5,4) | 是 | 0.0000 | 本赛季该项目完成进度，范围 `0`～`1` |
-| status         | TINYINT UNSIGNED |       是 |      1 | 状态：`1` 已锁定，`0` 无效/取消        |
+| 字段名                | 类型               | 是否必填 | 默认值 | 说明                                   |
+| --------------------- | ------------------ | -------: | -----: | -------------------------------------- |
+| `id`                  | `BIGINT UNSIGNED`  |       是 |   自增 | 赛季用户项目记录主键 ID                |
+| `season_user_id`      | `BIGINT UNSIGNED`  |       是 |     无 | 赛季用户记录 ID，关联 `season_user.id` |
+| `project_id`          | `BIGINT UNSIGNED`  |       是 |     无 | 项目 ID，关联 `project.id`             |
+| `completion_progress` | `DECIMAL(5,4)`     |       是 | 0.0000 | 本赛季该项目完成进度，范围 `0`～`1`    |
+| `status`              | `TINYINT UNSIGNED` |       是 |      1 | 状态：`1` 已锁定，`0` 无效/取消        |
 
----
+### 字段设计说明
 
-## 字段设计说明
-
-### id
+#### `id`
 
 赛季用户项目记录的唯一标识。
 
 使用 `BIGINT UNSIGNED AUTO_INCREMENT` 作为主键。
 
----
-
-### season_user_id
+#### `season_user_id`
 
 赛季用户记录 ID。
 
@@ -56,9 +52,7 @@
 
 当用户锁定项目时，如果当前赛季下还没有对应的 `season_user` 记录，后端应先创建该记录，再写入本表。
 
----
-
-### project_id
+#### `project_id`
 
 项目 ID。
 
@@ -75,9 +69,7 @@
 减重挑战
 ```
 
----
-
-### status
+#### `status`
 
 项目选择状态。
 
@@ -97,9 +89,7 @@
 - 用户赛季参与资格被作废
 - 需要保留历史记录但不再视为有效选择
 
----
-
-### completion_progress
+#### `completion_progress`
 
 本赛季该锁定项目的完成进度，范围为：
 
@@ -114,7 +104,7 @@
 
 ---
 
-## MySQL 建表语句
+## 建表语句
 
 ```sql
 CREATE TABLE season_user_project (
@@ -137,7 +127,9 @@ CREATE TABLE season_user_project (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='赛季用户项目表';
 ```
 
-## 现有数据库迁移 SQL
+---
+
+## 现有数据库迁移
 
 ```sql
 ALTER TABLE season_user_project

@@ -1,5 +1,7 @@
 # 过往赛季上传记录
 
+本文说明过往赛季凭证记录的查询契约、字段映射和受鉴权原图查看方式。
+
 ## 相关文件
 
 ```text
@@ -9,17 +11,25 @@ src/api/history.js
 src/state/appState.js
 ```
 
-## 接口
+---
+
+## `GET /proof/history` 获取过往赛季记录
+
+### 接口定义
 
 ```http
 GET /proof/history
 ```
 
-请求参数：无。
+### 请求参数
+
+无。前端只需携带 `Authorization: <auth_code>`。
 
 服务端会自行排除当前激活赛季的上传记录：优先读取运行时的当前赛季缓存，缓存尚未初始化时会先加载当前激活赛季。前端不传 `season_id`，只需携带 `Authorization: <auth_code>`。
 
-推荐响应：
+### 成功响应
+
+推荐响应如下：
 
 ```json
 [
@@ -44,18 +54,18 @@ GET /proof/history
 }
 ```
 
-## 字段映射
+### 字段映射
 
-| 后端字段 | 前端字段 | 说明 |
-| -------- | -------- | ---- |
-| seasonName | seasonName | 赛季名称 |
-| projectName | taskName | 项目名称 |
-| reviewStatus | result | 审核状态，取值见下方枚举 |
-| reviewComment | note | 审核意见；前端展示为记录说明 |
-| imageName | fileName | 凭证文件名，保留实际存储后缀；新记录为 `.webp`，历史 `.jpg` 记录仍可正常返回 |
-| imageUrl | imageUrl | 受鉴权保护的凭证原图读取地址；前端点击该条记录后以 Blob 发起 GET 请求 |
-| proofDate | proofDate | 实际运动日期，格式 `YYYY-MM-DD` |
-| createdAt | uploadedAt | 上传时间 |
+| 后端字段        | 前端字段     | 说明                                                                         |
+| --------------- | ------------ | ---------------------------------------------------------------------------- |
+| `seasonName`    | `seasonName` | 赛季名称                                                                     |
+| `projectName`   | `taskName`   | 项目名称                                                                     |
+| `reviewStatus`  | `result`     | 审核状态，取值见下方枚举                                                     |
+| `reviewComment` | `note`       | 审核意见；前端展示为记录说明                                                 |
+| `imageName`     | `fileName`   | 凭证文件名，保留实际存储后缀；新记录为 `.webp`，历史 `.jpg` 记录仍可正常返回 |
+| `imageUrl`      | `imageUrl`   | 受鉴权保护的凭证原图读取地址；前端点击该条记录后以 Blob 发起 GET 请求        |
+| `proofDate`     | `proofDate`  | 实际运动日期，格式 `YYYY-MM-DD`                                              |
+| `createdAt`     | `uploadedAt` | 上传时间                                                                     |
 
 `reviewStatus` 展示：
 
@@ -68,6 +78,12 @@ rejected               = 终审失败
 ```
 
 `proofDate` 表示实际运动日期；`createdAt` 表示上传时间，不表示审核时间，页面展示为 `YYYY.MM.DD HH:mm`。
+
+### 异常处理
+
+请求失败时页面保留错误恢复入口，不使用模拟记录；空数组表示没有可展示的过往记录。
+
+---
 
 ## 页面展示
 

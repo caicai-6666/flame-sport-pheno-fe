@@ -13,6 +13,8 @@
     :is-challenge-level-loading="isChallengeLevelLoading"
     :is-challenge-level-locking="isChallengeLevelLocking"
     :challenge-level-error="challengeLevelError"
+    :is-season-write-frozen="seasonWriteAvailability.isFrozen"
+    :season-write-message="seasonWriteAvailability.message"
     @select-task="openTask"
     @select-level="selectChallengeLevel"
     @submit-proof="addUploadRecord"
@@ -24,6 +26,7 @@ import { getLockedProjects, getProjectLevels, getProjects, lockProjectLevel } fr
 import { getCurrentSeason, getSeasonParticipationStatus, isNoActiveSeasonError } from '../api/season'
 import ProjectHome from '../components/ProjectHome.vue'
 import { addUploadRecord, appState, setCurrentSeason, setLockedProjects, setMaxLockedTasks, setProjectTasks, setSeasonAvailability, setSeasonParticipationStatus, setSelectedChallengeLevel } from '../state/appState'
+import { getSeasonWriteAvailability, getSeasonWriteUpdateDelay } from '../utils/seasonWriteAvailability'
 
 const CHALLENGE_LEVEL_QUERY_DELAY = 2000
 
@@ -66,11 +69,22 @@ export default {
       isChallengeLevelLoading: false,
       isChallengeLevelLocking: false,
       challengeLevelError: null,
-      challengeRequirementsByProjectId: {}
+      challengeRequirementsByProjectId: {},
+      seasonWriteAvailability: getSeasonWriteAvailability(null),
+      seasonWriteTimer: null
     }
   },
   created() {
     this.loadHomeData()
+  },
+  activated() {
+    this.updateSeasonWriteAvailability()
+  },
+  deactivated() {
+    this.clearSeasonWriteTimer()
+  },
+  beforeUnmount() {
+    this.clearSeasonWriteTimer()
   },
   watch: {
     selectedChallengeLevel(level) {
@@ -171,10 +185,32 @@ export default {
         setCurrentSeason(this.currentSeason)
         setSeasonAvailability('active')
         setMaxLockedTasks(this.currentSeason.requiredProjectCount)
+        this.updateSeasonWriteAvailability()
       } catch (error) {
         this.currentSeason = null
         setCurrentSeason(null)
         setSeasonAvailability(isNoActiveSeasonError(error) ? 'unavailable' : 'error')
+        this.updateSeasonWriteAvailability()
+      }
+    },
+    updateSeasonWriteAvailability() {
+      this.seasonWriteAvailability = getSeasonWriteAvailability(this.currentSeason)
+      this.clearSeasonWriteTimer()
+
+      if (!this.seasonWriteAvailability.nextChangeAt) {
+        return
+      }
+
+      const delay = getSeasonWriteUpdateDelay(this.seasonWriteAvailability.nextChangeAt)
+      this.seasonWriteTimer = window.setTimeout(() => {
+        this.seasonWriteTimer = null
+        this.updateSeasonWriteAvailability()
+      }, delay)
+    },
+    clearSeasonWriteTimer() {
+      if (this.seasonWriteTimer) {
+        window.clearTimeout(this.seasonWriteTimer)
+        this.seasonWriteTimer = null
       }
     },
     async loadSeasonParticipationStatus() {
@@ -289,7 +325,12 @@ export default {
       })
     },
     async selectChallengeLevel(level) {
-      if (!this.isSeasonRegistering || this.isChallengeLevelLocking || appState.selectedChallengeLevel) {
+      if (
+        this.seasonWriteAvailability.isFrozen ||
+        !this.isSeasonRegistering ||
+        this.isChallengeLevelLocking ||
+        appState.selectedChallengeLevel
+      ) {
         return
       }
 

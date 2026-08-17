@@ -1,8 +1,8 @@
-# Rank 页面
+# 排行榜页面
 
 ## 当前状态
 
-`RankPage` 已接入 real data。
+`RankPage` 已接入真实数据。
 
 已接入：
 
@@ -16,8 +16,8 @@
 - 排行榜请求加载态最短保留 1 秒，避免接口过快返回时 UI 闪变
 - 加载完成后排名概览和排行列表渐入展示
 
+---
+
 ## 相关文档
 
-```text
-description/rank/leaderboard.md
-```
+接口契约和页面规则参阅 [排行榜](leaderboard.md)。

@@ -1,5 +1,7 @@
 # 积分流水
 
+本文说明积分流水接口、字段映射、排序规则和商城可用积分的计算口径。
+
 ## 相关文件
 
 ```text
@@ -8,15 +10,23 @@ src/components/ShopPage.vue
 src/api/shop.js
 ```
 
-## 接口
+---
+
+## `GET /shop/point_flow` 获取积分流水
+
+### 接口定义
 
 ```http
 GET /shop/point_flow
 ```
 
-请求参数：无。
+### 请求参数
 
-推荐响应：
+无。
+
+### 成功响应
+
+推荐响应如下：
 
 ```json
 [
@@ -39,16 +49,22 @@ GET /shop/point_flow
 ]
 ```
 
-## 字段映射
+### 字段映射
 
-| 后端字段 | 前端字段 | 说明 |
-| -------- | -------- | ---- |
-| product_name | productName | 商品名称，商品兑换时使用 |
-| change_type | changeType | 流水类型 |
-| change_points | amount | 本次积分变动值 |
-| points_after | balanceAfter | 本次变动后的积分余额 |
-| description | description | 流水描述 |
-| created_at | occurredAt | 变动时间 |
+| 后端字段        | 前端字段       | 说明                     |
+| --------------- | -------------- | ------------------------ |
+| `product_name`  | `productName`  | 商品名称，商品兑换时使用 |
+| `change_type`   | `changeType`   | 流水类型                 |
+| `change_points` | `amount`       | 本次积分变动值           |
+| `points_after`  | `balanceAfter` | 本次变动后的积分余额     |
+| `description`   | `description`  | 流水描述                 |
+| `created_at`    | `occurredAt`   | 变动时间                 |
+
+### 异常处理
+
+请求失败时页面保留错误恢复入口，不使用模拟流水；空数组表示用户尚无积分记录，不属于异常。
+
+---
 
 ## 页面展示
 

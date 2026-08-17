@@ -4,6 +4,8 @@ Flame Sport Pheno 是一个面向企业健康挑战场景的移动端 Web 应用
 
 项目主要运行于钉钉 H5 环境，同时保留普通浏览器下的本地开发登录方式。当前核心业务流程已接入真实接口；没有激活赛季时，应用仍可浏览项目规则、过往审核、商品与积分流水，并以“敬请期待”阻断赛季相关操作。
 
+赛季正式开始倒计时期间，应用会展示“将在 N 小时后正式开始”，并暂时关闭报名、上传和兑换入口；项目与规则等内容仍可提前浏览，健康资料和意见提交不受影响。
+
 ## 核心功能
 
 - **赛季与项目挑战**：获取当前赛季及可选运动项目，按赛季要求锁定项目并统一选择青铜、白银或黄金挑战等级；可随时查看活动规则长图。
@@ -15,22 +17,29 @@ Flame Sport Pheno 是一个面向企业健康挑战场景的移动端 Web 应用
 
 应用启动时还会完成钉钉免登、会话失效自动重登，以及必要的健康基础信息采集。
 
+---
+
 ## 页面预览
 
-<table>
-  <tr>
-    <th>项目</th>
-    <th>排行</th>
-    <th>历史</th>
-    <th>商城</th>
-  </tr>
-  <tr>
-    <td><img src="./description/preview-image/项目页面.jpg" alt="项目页面" width="220"></td>
-    <td><img src="./description/preview-image/排行页面.jpg" alt="排行页面" width="220"></td>
-    <td><img src="./description/preview-image/历史页面.jpg" alt="历史页面" width="220"></td>
-    <td><img src="./description/preview-image/商城页面.jpg" alt="商城页面" width="220"></td>
-  </tr>
-</table>
+以下图片展示当前四个主要页面的移动端界面。
+
+### 项目页面
+
+![项目页面](./description/preview-image/项目页面.jpg)
+
+### 排行页面
+
+![排行页面](./description/preview-image/排行页面.jpg)
+
+### 历史页面
+
+![历史页面](./description/preview-image/历史页面.jpg)
+
+### 商城页面
+
+![商城页面](./description/preview-image/商城页面.jpg)
+
+---
 
 ## 技术栈
 
@@ -41,6 +50,8 @@ Flame Sport Pheno 是一个面向企业健康挑战场景的移动端 Web 应用
 - Scoped CSS、CSS 动画与响应式布局
 
 项目未引入额外 UI 组件库。路由页面负责业务数据编排，组件负责页面呈现与交互，接口响应在 `src/api/` 中统一转换为前端数据模型，跨页面状态由 `src/state/` 中的轻量响应式状态维护。
+
+---
 
 ## 目录结构
 
@@ -57,7 +68,9 @@ description/    # 接口、页面流程和数据库设计文档
   preview-image/ # README 页面预览图
 ```
 
-详细的项目逻辑、接口接入范围、Agent 阅读路径和维护约定请参阅 [description/project.md](./description/project.md)。
+详细的项目逻辑、接口接入范围和维护约定请参阅 [项目概况](./description/project.md)；Agent 阅读路径及完整文档入口请参阅 [文档地图](./description/README.md)。
+
+---
 
 ## 本地开发
 
@@ -75,7 +88,7 @@ npm run build
 npm run lint
 ```
 
-开发环境通过 `.env` 配置带 `/flame/api` 前缀的普通后端基础地址、登录模式及钉钉 H5 参数。`VUE_APP_MODE=development` 时，请求层会自动在标准 `/flame/api` 路径前插入 `/dev`。云服务器上的 Vue CLI 开发服务固定监听 `127.0.0.1:8080`，由宿主机 Nginx 通过 `https://www.phenosolar.cloud/dev/flame/` 对外提供访问；开发 API 经 `/dev/flame/api` 转发到 `http://127.0.0.1:8000/flame/api`，因此浏览器不会产生跨域请求。
+开发环境通过 `.env` 配置带 `/flame/api` 前缀的普通后端基础地址、登录模式及钉钉 H5 参数。`VUE_APP_MODE=development` 时，请求层会自动在标准 `/flame/api` 路径前插入 `/dev`。云服务器上的 Vue CLI 开发服务固定监听 `127.0.0.1:8080`，由宿主机 Nginx 通过 `https://pheno.szkl.com/dev/flame/` 对外提供访问；开发 API 经 `/dev/flame/api` 转发到 `http://127.0.0.1:8000/flame/api`，因此浏览器不会产生跨域请求。Vue Dev Server 仅允许已配置的开发代理域名，新增域名时需要同步更新 `vue.config.js` 的 `devServer.allowedHosts`。
 
 应用静态位图统一使用 WebP。启动时会展示约 80 KB 的 `src/assets/cover.webp` 全屏封面，图片完整显示后至少停留 1 秒再淡出；登录和首屏业务请求在封面显示期间照常执行。上传凭证优先使用浏览器原生 Canvas WebP 编码；钉钉 WebView 不具备该编码能力时，会按需加载基于 libwebp 的 WebAssembly 编码器，最终接口格式保持不变。生产环境会对带内容哈希的图片、脚本、样式和 WASM 设置一年不可变缓存，资源更新后通过新哈希 URL 自动失效。
 
@@ -85,9 +98,12 @@ npm run lint
 VUE_APP_MODE=development
 VUE_APP_API_BASE_URL=https://www.phenosolar.cloud/flame/api
 VUE_APP_AUTH_CODE=<后端提供的开发 auth_code>
+VUE_APP_ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS=480
 ```
 
-生产构建部署在 `/flame/` 子路径；`npm run serve` 的开发资源独立使用 `/dev/flame/` 前缀。`VUE_APP_API_BASE_URL` 始终填写普通 `/flame/api` 地址；开发模式自动转换为 `/dev/flame/api`，生产模式保持原值。未配置时默认值同样为 `/flame/api`。生产入口为 `https://<host>/flame/`，云服务器开发入口为 `https://www.phenosolar.cloud/dev/flame/`。
+`VUE_APP_ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS` 用于在前端计算赛季开始后的配置保护期，开发联调时应与客户后端 `.env` 中的 `ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS` 保持一致。修改后需要重启前端开发服务。
+
+生产构建部署在 `/flame/` 子路径；`npm run serve` 的开发资源独立使用 `/dev/flame/` 前缀。`VUE_APP_API_BASE_URL` 始终填写普通 `/flame/api` 地址；开发模式自动转换为 `/dev/flame/api`，生产模式保持原值。未配置时默认值同样为 `/flame/api`。生产入口为 `https://<host>/flame/`，云服务器开发入口为 `https://pheno.szkl.com/dev/flame/`。
 
 商城默认仅在赛季开始日起的前 7 个自然日开放兑换。可通过 `.env` 或生产构建环境变量调整，修改后需要重新启动开发服务或重新构建：
 
@@ -101,6 +117,8 @@ VUE_APP_SHOP_REDEEM_WINDOW_DAYS=7
 VUE_APP_PAGE_TITLE=燃动现象
 ```
 
+---
+
 ## Docker 部署
 
 项目提供前端专用的两阶段 `Dockerfile`：Node 负责构建，Nginx 只负责提供静态资源。镜像默认将接口基地址编译为同域的 `/flame/api`。Vue CLI 在构建期读取 `VUE_APP_*`，因此需要在构建镜像时传入钉钉 Corp ID 与 Client ID。
@@ -108,6 +126,7 @@ VUE_APP_PAGE_TITLE=燃动现象
 ```bash
 docker build \
   --build-arg VUE_APP_SHOP_REDEEM_WINDOW_DAYS=7 \
+  --build-arg VUE_APP_ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS=24 \
   --build-arg VUE_APP_PAGE_TITLE=燃动现象 \
   --build-arg VUE_APP_DINGTALK_CORP_ID=<钉钉企业 CorpId> \
   --build-arg VUE_APP_DINGTALK_CLIENT_ID=<钉钉 H5 应用 ClientId> \
@@ -121,6 +140,7 @@ docker run --rm --name flame-sport-pheno-fe -p 8080:80 flame-sport-pheno-fe
 docker build \
   --build-arg VUE_APP_API_BASE_URL=https://api.example.com/flame/api \
   --build-arg VUE_APP_SHOP_REDEEM_WINDOW_DAYS=7 \
+  --build-arg VUE_APP_ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS=24 \
   --build-arg VUE_APP_PAGE_TITLE=燃动现象 \
   --build-arg VUE_APP_DINGTALK_CORP_ID=<钉钉企业 CorpId> \
   --build-arg VUE_APP_DINGTALK_CLIENT_ID=<钉钉 H5 应用 ClientId> \
@@ -130,6 +150,8 @@ docker build \
 钉钉 JSAPI 地址使用代码内置的官方默认值，不需要传入构建参数；如需升级版本或切换 CDN，再额外配置 `VUE_APP_DINGTALK_JSAPI_URL`。
 
 该容器处理 `/flame/` 的前端静态资源，并将 `/flame/api/` 代理到 Docker Compose 中的 `backend:8000`。完整的前后端与 MySQL 统一部署方式见上级目录的 `docker-compose.yml`。单独部署前端镜像时，需为 Nginx 提供名为 `backend` 的可解析上游服务。
+
+---
 
 ## 浏览器支持
 
