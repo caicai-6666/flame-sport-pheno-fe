@@ -210,7 +210,7 @@
     <SuggestionPanel v-if="isSuggestionPanelOpen" @close="closeSuggestionPanel" />
 
     <Teleport to="body">
-      <Transition name="activity-detail-panel">
+      <Transition name="activity-detail-panel" @after-leave="clearActivityRuleImageUrl">
         <div
           v-if="isActivityDetailOpen"
           class="activity-detail-overlay"
@@ -237,12 +237,12 @@
                 <p>正在加载活动规则…</p>
               </div>
               <div v-else-if="isActivityRuleImageError" class="activity-rule-error">
-                <strong>活动规则加载失败</strong>
+                <strong>{{ activityRuleImageErrorMessage }}</strong>
                 <button type="button" @click="reloadActivityRuleImage">重新加载</button>
               </div>
               <img
-                :key="activityRuleImageKey"
-                :src="activityRuleImage"
+                v-if="activityRuleImageUrl"
+                :src="activityRuleImageUrl"
                 alt="燃动现象运动季活动规则"
                 decoding="async"
                 :class="{ 'is-visible': isActivityRuleImageLoaded }"
@@ -260,7 +260,7 @@
 <script>
 import LiquidCardBackdrop from './LiquidCardBackdrop.vue'
 import UploadProofPanel from './UploadProofPanel.vue'
-import activityRuleImage from '../assets/活动规则.webp'
+import { getActivityPosterImage } from '../api/poster'
 import feedbackIcon from '../assets/xinxiang.webp'
 import SuggestionPanel from './SuggestionPanel.vue'
 
@@ -295,9 +295,10 @@ export default {
       isActivityDetailOpen: false,
       isActivityRuleImageLoaded: false,
       isActivityRuleImageError: false,
-      activityRuleImageKey: 0,
+      activityRuleImageErrorMessage: '',
+      activityRuleImageUrl: '',
+      activityRuleRequestToken: 0,
       activityDetailPreviousBodyOverflow: '',
-      activityRuleImage,
       feedbackIcon
     }
   },
@@ -825,11 +826,12 @@ export default {
 
       this.isActivityRuleImageLoaded = false
       this.isActivityRuleImageError = false
-      this.activityRuleImageKey += 1
+      this.activityRuleImageErrorMessage = ''
       this.isActivityDetailOpen = true
       this.activityDetailPreviousBodyOverflow = document.body.style.overflow
       document.body.style.overflow = 'hidden'
       window.addEventListener('keydown', this.handleActivityDetailKeydown)
+      this.loadActivityRuleImage()
     },
     closeActivityDetail() {
       if (!this.isActivityDetailOpen) {
@@ -837,6 +839,7 @@ export default {
       }
 
       this.isActivityDetailOpen = false
+      this.activityRuleRequestToken += 1
       document.body.style.overflow = this.activityDetailPreviousBodyOverflow
       window.removeEventListener('keydown', this.handleActivityDetailKeydown)
     },
@@ -852,11 +855,42 @@ export default {
     handleActivityRuleImageError() {
       this.isActivityRuleImageLoaded = false
       this.isActivityRuleImageError = true
+      this.activityRuleImageErrorMessage = '活动规则图片无法显示'
+      this.clearActivityRuleImageUrl()
     },
     reloadActivityRuleImage() {
+      this.loadActivityRuleImage()
+    },
+    async loadActivityRuleImage() {
+      const requestToken = this.activityRuleRequestToken + 1
+      this.activityRuleRequestToken = requestToken
       this.isActivityRuleImageLoaded = false
       this.isActivityRuleImageError = false
-      this.activityRuleImageKey += 1
+      this.activityRuleImageErrorMessage = ''
+      this.clearActivityRuleImageUrl()
+
+      try {
+        const posterBlob = await getActivityPosterImage()
+
+        if (requestToken !== this.activityRuleRequestToken || !this.isActivityDetailOpen) {
+          return
+        }
+
+        this.activityRuleImageUrl = URL.createObjectURL(posterBlob)
+      } catch (error) {
+        if (requestToken !== this.activityRuleRequestToken || !this.isActivityDetailOpen) {
+          return
+        }
+
+        this.isActivityRuleImageError = true
+        this.activityRuleImageErrorMessage = error?.message || '活动规则加载失败'
+      }
+    },
+    clearActivityRuleImageUrl() {
+      if (this.activityRuleImageUrl) {
+        URL.revokeObjectURL(this.activityRuleImageUrl)
+        this.activityRuleImageUrl = ''
+      }
     },
     playLevelCompletionAnimation() {
       this.isLevelLockingHolding = false
@@ -950,9 +984,13 @@ export default {
   deactivated() {
     // 首页被 KeepAlive 暂存时关闭 Teleport 弹层，避免切换底部导航后仍遮挡其他页面。
     this.closeActivityDetail()
+    this.clearActivityRuleImageUrl()
     this.closeSuggestionPanel()
   },
   beforeUnmount() {
+    this.activityRuleRequestToken += 1
+    this.clearActivityRuleImageUrl()
+
     if (this.isActivityDetailOpen) {
       document.body.style.overflow = this.activityDetailPreviousBodyOverflow
     }

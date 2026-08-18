@@ -8,6 +8,7 @@
 src/views/ProjectHomeView.vue
 src/components/ProjectHome.vue
 src/components/SuggestionPanel.vue
+src/api/poster.js
 src/api/projects.js
 src/api/suggestion.js
 src/api/season.js
@@ -20,6 +21,7 @@ src/state/appState.js
 
 ProjectHome 当前已接入真实接口：
 
+- `GET /image/poster`
 - `GET /season/current`
 - `GET /season/participate_check`
 - `GET /project/list`
@@ -253,9 +255,37 @@ Content-Type: application/json
 
 ## 活动详情
 
-ProjectHome hero 卡片右上角固定展示“活动详情”按钮，不依赖赛季状态、报名进度或目标等级，页面首次渲染后即可点击。点击后打开全屏弹层，用户可纵向滚动查看完整的 `src/assets/活动规则.webp` 长图；图片按原始宽高比展示，不裁剪、不放大插值，关闭按钮、点击遮罩和 `Escape` 均可退出弹层。
+ProjectHome hero 卡片右上角固定展示“活动详情”按钮，不依赖赛季状态、报名进度或目标等级，页面首次渲染后即可点击。点击后打开全屏弹层，并通过鉴权接口读取活动规则长图；图片按原始宽高比展示，不裁剪、不放大插值，关闭按钮、点击遮罩和 `Escape` 均可退出弹层。
 
-活动规则图片通过 `import` 进入 Vue 构建流程，生产构建会输出带内容哈希的 WebP 文件。容器 Nginx 对该文件返回 `Cache-Control: public, max-age=31536000, immutable`，钉钉 WebView 首次获取后可长期复用；图片更新时文件哈希及 URL 自动变化。弹层提供图片加载状态和失败后重新加载入口，打开期间锁定页面背景滚动。
+### `GET /image/poster` 获取活动海报
+
+接口定义：
+
+```http
+GET /image/poster
+Authorization: <auth_code>
+```
+
+接口不接收 Query 参数、文件名或本地路径，后端固定读取 `assets/images/poster/活动规则.webp`，避免借助图片接口访问其他资源。
+
+成功响应为 WebP 二进制内容：
+
+```http
+Content-Type: image/webp
+Cache-Control: private, no-cache
+```
+
+页面每次打开活动详情弹层都会重新发起请求，浏览器依据 `private, no-cache` 向服务端确认资源是否更新，不在前端长期复用旧 Blob。响应通过 `URL.createObjectURL()` 转换为图片地址，关闭弹层、重新加载或组件销毁时释放；并发请求使用递增令牌隔离，关闭或重开后返回的旧响应不能覆盖当前海报。
+
+错误处理如下：
+
+| 状态码 | 场景             | 页面处理                                         |
+| -----: | ---------------- | ------------------------------------------------ |
+|  `401` | 登录失效         | 公共请求层自动重新登录并重试一次，仍失败则提示重登 |
+|  `404` | 固定海报不存在   | 展示“活动海报文件不存在”并保留重新加载入口       |
+|  其他  | 网络或图片解码失败 | 展示具体错误或通用加载失败提示，并允许重新加载   |
+
+弹层打开期间锁定页面背景滚动。加载中展示进度反馈，Blob 请求成功后仍等待图片解码完成再淡入，避免未完成图片突然出现。
 
 ---
 
