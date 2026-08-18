@@ -2,6 +2,9 @@
   <HistoryPage
     :records="records"
     :past-season-review-records="pastSeasonReviewRecords"
+    :supplement-records="supplementRecords"
+    :is-supplement-records-loading="isSupplementRecordsLoading"
+    :supplement-records-error="supplementRecordsError"
     :project-progress-records="projectProgressRecords"
     :project-tasks="projectTasks"
     :is-project-progress-loading="isProjectProgressLoading"
@@ -9,15 +12,18 @@
     :selected-challenge-level="selectedChallengeLevel"
     :season-participation-status="seasonParticipationStatus"
     :is-no-active-season="isNoActiveSeason"
+    :is-season-write-frozen="seasonWriteAvailability.isFrozen"
+    @supplement-submitted="handleSupplementSubmitted"
   />
 </template>
 
 <script>
-import { getCurrentSeasonUploadRecords, getPastSeasonProofHistory } from '../api/history'
+import { getCurrentSeasonUploadRecords, getPastSeasonProofHistory, getSupplementRecords } from '../api/history'
 import { getProjectProgress, getProjects } from '../api/projects'
 import { getCurrentSeason, getSeasonParticipationStatus, isNoActiveSeasonError } from '../api/season'
 import HistoryPage from '../components/HistoryPage.vue'
 import { appState, setCurrentSeason, setPastSeasonReviewRecords, setProjectTasks, setSeasonAvailability, setSeasonParticipationStatus, setUploadRecords } from '../state/appState'
+import { getSeasonWriteAvailability, getSeasonWriteUpdateDelay } from '../utils/seasonWriteAvailability'
 
 export default {
   name: 'HistoryView',
@@ -28,11 +34,25 @@ export default {
     return {
       projectProgressRecords: [],
       isProjectProgressLoading: false,
-      projectProgressError: ''
+      projectProgressError: '',
+      supplementRecords: [],
+      isSupplementRecordsLoading: false,
+      supplementRecordsError: '',
+      seasonWriteAvailability: getSeasonWriteAvailability(null),
+      seasonWriteTimer: null
     }
   },
   created() {
     this.loadHistoryData()
+  },
+  activated() {
+    this.updateSeasonWriteAvailability()
+  },
+  deactivated() {
+    this.clearSeasonWriteTimer()
+  },
+  beforeUnmount() {
+    this.clearSeasonWriteTimer()
   },
   computed: {
     records() {
@@ -57,6 +77,7 @@ export default {
   methods: {
     async ensureCurrentSeason() {
       if (appState.currentSeason?.seasonId) {
+        this.updateSeasonWriteAvailability()
         return appState.currentSeason
       }
 
@@ -66,11 +87,13 @@ export default {
         const season = await getCurrentSeason()
         setCurrentSeason(season)
         setSeasonAvailability('active')
+        this.updateSeasonWriteAvailability()
 
         return season
       } catch (error) {
         setCurrentSeason(null)
         setSeasonAvailability(isNoActiveSeasonError(error) ? 'unavailable' : 'error')
+        this.updateSeasonWriteAvailability()
         throw error
       }
     },
@@ -121,7 +144,12 @@ export default {
     },
     async loadHistoryData() {
       try {
-        await this.loadPastSeasonProofHistory()
+        await Promise.all([
+          this.loadPastSeasonProofHistory(),
+          this.loadSupplementRecords(),
+          // 未参与当前赛季时也能进入补传流程，因此项目 ID 映射必须提前准备。
+          this.ensureProjectTasks().catch(() => [])
+        ])
         const season = await this.ensureCurrentSeason()
         const participationStatus = await this.ensureSeasonParticipationStatus(season.seasonId)
 
@@ -148,6 +176,46 @@ export default {
       } catch {
         setPastSeasonReviewRecords([])
       }
+    },
+    async loadSupplementRecords() {
+      this.isSupplementRecordsLoading = true
+      this.supplementRecordsError = ''
+
+      try {
+        this.supplementRecords = await getSupplementRecords()
+      } catch {
+        this.supplementRecords = []
+        this.supplementRecordsError = '可补传记录加载失败'
+      } finally {
+        this.isSupplementRecordsLoading = false
+      }
+    },
+    updateSeasonWriteAvailability() {
+      this.seasonWriteAvailability = getSeasonWriteAvailability(appState.currentSeason)
+      this.clearSeasonWriteTimer()
+
+      if (!this.seasonWriteAvailability.nextChangeAt) {
+        return
+      }
+
+      const delay = getSeasonWriteUpdateDelay(this.seasonWriteAvailability.nextChangeAt)
+      this.seasonWriteTimer = window.setTimeout(() => {
+        this.seasonWriteTimer = null
+        this.updateSeasonWriteAvailability()
+      }, delay)
+    },
+    clearSeasonWriteTimer() {
+      if (this.seasonWriteTimer) {
+        window.clearTimeout(this.seasonWriteTimer)
+        this.seasonWriteTimer = null
+      }
+    },
+    async handleSupplementSubmitted() {
+      // 补传会原位更新凭证并消费资格，两份列表必须一起刷新以免留下重复卡片。
+      await Promise.all([
+        this.loadPastSeasonProofHistory(),
+        this.loadSupplementRecords()
+      ])
     }
   }
 }

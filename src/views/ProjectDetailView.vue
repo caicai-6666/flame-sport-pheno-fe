@@ -1,30 +1,32 @@
 <template>
-  <ProjectDetail
-    v-if="task"
-    :task="task"
-    :is-locked="isLocked"
-    :remaining-lock-slots="remainingLockSlots"
-    :selected-challenge-level="selectedChallengeLevel"
-    :challenges="challenges"
-    :is-challenge-loading="isChallengeLoading"
-    :is-locking="isLocking"
-    :lock-error="lockError"
-    :is-registration-closed="isSeasonRegistrationClosed"
-    :is-no-active-season="isNoActiveSeason"
-    :is-season-context-loading="isSeasonContextLoading"
-    :is-season-write-frozen="seasonWriteAvailability.isFrozen"
-    :season-write-message="seasonWriteAvailability.message"
-    @lock-task="lockTask"
-  />
+  <div class="project-detail-view">
+    <ProjectDetail
+      v-if="task"
+      :task="task"
+      :is-locked="isLocked"
+      :remaining-lock-slots="remainingLockSlots"
+      :selected-challenge-level="selectedChallengeLevel"
+      :challenges="challenges"
+      :is-challenge-loading="isChallengeLoading"
+      :is-locking="isLocking"
+      :lock-error="lockError"
+      :is-registration-closed="isSeasonRegistrationClosed"
+      :is-no-active-season="isNoActiveSeason"
+      :is-season-context-loading="isSeasonContextLoading"
+      :is-season-write-frozen="seasonWriteAvailability.isFrozen"
+      :season-write-message="seasonWriteAvailability.message"
+      @lock-task="lockTask"
+    />
 
-  <section v-else class="module-page">
-    <span class="module-eyebrow">UNKNOWN CHALLENGE</span>
-    <h1>未找到运动项目</h1>
-    <p>当前链接对应的运动项目不存在，请返回项目列表重新选择。</p>
-    <button class="module-action" type="button" @click="$router.push({ name: 'projects' })">
-      返回项目列表
-    </button>
-  </section>
+    <section v-else class="module-page">
+      <span class="module-eyebrow">UNKNOWN CHALLENGE</span>
+      <h1>未找到运动项目</h1>
+      <p>当前链接对应的运动项目不存在，请返回项目列表重新选择。</p>
+      <button class="module-action" type="button" @click="$router.push({ name: 'projects' })">
+        返回项目列表
+      </button>
+    </section>
+  </div>
 </template>
 
 <script>

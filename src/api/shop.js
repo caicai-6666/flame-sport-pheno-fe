@@ -15,6 +15,7 @@ const PRODUCT_ACCENTS = [
 
 const PRODUCT_IMAGE_MAX_ATTEMPTS = 3
 const PRODUCT_IMAGE_RETRY_DELAYS = [600, 1400]
+const PRODUCT_IMAGE_REQUEST_PAUSED_CODE = 'PRODUCT_IMAGE_REQUEST_PAUSED'
 
 function waitForProductImageRetry(delay) {
   return new Promise(resolve => window.setTimeout(resolve, delay))
@@ -25,6 +26,16 @@ function isRetriableProductImageError(error) {
 
   // 无 HTTP 状态通常表示超时、断网或连接中断；明确的客户端错误不应重复占用网络。
   return !status || status === 408 || status === 429 || status >= 500
+}
+
+function createProductImageRequestPausedError() {
+  const error = new Error('奖品图片请求已暂停')
+  error.code = PRODUCT_IMAGE_REQUEST_PAUSED_CODE
+  return error
+}
+
+export function isProductImageRequestPausedError(error) {
+  return error?.code === PRODUCT_IMAGE_REQUEST_PAUSED_CODE
 }
 
 function toProductList(response) {
@@ -164,7 +175,7 @@ function getPointFlowDescription(record) {
   return record.description || '积分流水'
 }
 
-export async function getShopProductImageSrc(filename) {
+export async function getShopProductImageSrc(filename, { shouldStartRequest = () => true } = {}) {
   if (!filename) {
     return ''
   }
@@ -172,6 +183,10 @@ export async function getShopProductImageSrc(filename) {
   let lastError
 
   for (let attempt = 0; attempt < PRODUCT_IMAGE_MAX_ATTEMPTS; attempt += 1) {
+    if (!shouldStartRequest()) {
+      throw createProductImageRequestPausedError()
+    }
+
     try {
       const imageBlob = await request.get('/image/product', {
         params: {

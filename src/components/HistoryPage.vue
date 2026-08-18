@@ -2,43 +2,85 @@
   <PastSeasonReviewPage
     v-if="shouldShowPastSeasonOnly"
     :records="pastSeasonReviewRecords"
+    :supplement-records="supplementRecords"
+    :is-supplement-records-loading="isSupplementRecordsLoading"
+    :supplement-records-error="supplementRecordsError"
+    :project-tasks="projectTasks"
+    :is-season-write-frozen="isSeasonWriteFrozen"
     :hero-description="pastSeasonHeroDescription"
     :show-current-season-link="false"
+    @supplement-submitted="$emit('supplement-submitted', $event)"
   />
 
   <section v-else class="history-page" aria-label="当前赛季上传记录">
     <div class="history-hero">
-      <span class="history-eyebrow">{{ heroEyebrow }}</span>
-      <h1>{{ heroTitle }}</h1>
+      <LiquidCardBackdrop variant="history" />
+      <div
+        class="history-hero-copy-frame"
+        :class="{ 'is-showing-past': isShowingPastRecords }"
+        aria-live="polite"
+      >
+        <Transition name="history-hero-copy">
+          <div :key="isShowingPastRecords ? 'past' : 'current'" class="history-hero-content">
+            <span class="history-eyebrow">{{ heroEyebrow }}</span>
+            <h1>{{ heroTitle }}</h1>
+          </div>
+        </Transition>
+      </div>
     </div>
 
-    <section class="goal-progress-panel" aria-label="赛季目标进度">
-      <div class="goal-progress-heading">
-        <div>
-          <span>赛季进度</span>
-          <strong>{{ displayChallengeLevel }}</strong>
-        </div>
-        <em>仅按初审通过记录计算</em>
-      </div>
-
-      <div v-if="progressRows.length" class="goal-progress-list">
-        <article
-          v-for="row in progressRows"
-          :key="row.projectId"
-          class="goal-progress-row"
-          :style="{ '--progress': `${row.percent}%`, '--accent': row.accent }"
+    <section
+      class="goal-progress-board"
+      :class="{ 'is-showing-past': isShowingPastRecords }"
+      aria-label="赛季进度与可补传记录"
+    >
+      <LiquidCardBackdrop variant="supplement" />
+      <div class="goal-progress-board-inner">
+        <section
+          class="goal-progress-panel goal-progress-face is-current"
+          aria-label="当前赛季目标进度"
+          :aria-hidden="isShowingPastRecords"
+          :inert="isShowingPastRecords"
         >
-          <div class="goal-progress-meta">
-            <strong>{{ row.taskName }}</strong>
-            <div class="goal-progress-track" aria-hidden="true">
-              <span></span>
+          <div class="goal-progress-heading">
+            <div>
+              <span>赛季进度</span>
+              <strong>{{ displayChallengeLevel }}</strong>
             </div>
-            <em>{{ row.percent }}%</em>
+            <em>仅按初审通过记录计算</em>
           </div>
-        </article>
-      </div>
 
-      <p v-else class="goal-progress-empty">{{ progressEmptyText }}</p>
+          <div v-if="progressRows.length" class="goal-progress-list">
+            <article
+              v-for="row in progressRows"
+              :key="row.projectId"
+              class="goal-progress-row"
+              :style="{ '--progress': `${row.percent}%`, '--accent': row.accent }"
+            >
+              <div class="goal-progress-meta">
+                <strong>{{ row.taskName }}</strong>
+                <div class="goal-progress-track" aria-hidden="true">
+                  <span></span>
+                </div>
+                <em>{{ row.percent }}%</em>
+              </div>
+            </article>
+          </div>
+
+          <p v-else class="goal-progress-empty">{{ progressEmptyText }}</p>
+        </section>
+
+        <section
+          class="goal-progress-panel goal-progress-face is-supplement"
+          :aria-hidden="!isShowingPastRecords"
+          :inert="!isShowingPastRecords"
+        >
+          <span class="supplement-summary-copy">
+            <span>可补传记录</span>
+            <strong>{{ supplementSummary }}</strong>
+          </span>
+        </section>
+      </div>
     </section>
 
     <section class="record-board" :class="{ 'is-showing-past': isShowingPastRecords }" aria-label="上传记录看板">
@@ -122,7 +164,7 @@
           <div class="record-section-heading">
             <div>
               <span>过往上传</span>
-              <strong>{{ sortedPastSeasonReviewRecords.length ? `${sortedPastSeasonReviewRecords.length} 条已归档` : '暂无归档记录' }}</strong>
+              <strong>{{ pastRecordSummary }}</strong>
             </div>
             <button class="season-review-link is-return" type="button" @click="showCurrentSeasonRecords">
               <span aria-hidden="true">←</span>
@@ -130,42 +172,55 @@
             </button>
           </div>
 
-          <div class="past-record-list" v-if="isShowingPastRecords && sortedPastSeasonReviewRecords.length">
+          <div class="past-record-list" v-if="isShowingPastRecords && displayedPastRecords.length">
             <div
-              v-for="record in sortedPastSeasonReviewRecords"
+              v-for="record in displayedPastRecords"
               :key="record.id"
               class="past-record-card-entry"
             >
+              <SupplementRecordCard
+                v-if="record.isSupplementEligible"
+                :record="record"
+                :project-tasks="projectTasks"
+                :is-write-frozen="isSeasonWriteFrozen"
+                @preview="openProofImage"
+                @submitted="$emit('supplement-submitted', $event)"
+              />
               <article
-              class="past-record-card"
-              :class="{ 'is-previewable': canPreviewProof(record) }"
-              :style="{ '--accent': record.accent || '#72d84f' }"
-              :role="canPreviewProof(record) ? 'button' : undefined"
-              :tabindex="canPreviewProof(record) ? 0 : undefined"
-              @click="openProofImage(record)"
-              @keydown.enter.prevent="openProofImage(record)"
-              @keydown.space.prevent="openProofImage(record)"
-            >
-              <div class="past-record-top">
-                <div>
-                  <span>{{ record.seasonName }}</span>
-                  <strong>{{ record.taskName }}</strong>
+                v-else
+                class="past-record-card"
+                :class="{ 'is-previewable': canPreviewProof(record) }"
+                :style="{ '--accent': record.accent || '#72d84f' }"
+                :role="canPreviewProof(record) ? 'button' : undefined"
+                :tabindex="canPreviewProof(record) ? 0 : undefined"
+                @click="openProofImage(record)"
+                @keydown.enter.prevent="openProofImage(record)"
+                @keydown.space.prevent="openProofImage(record)"
+              >
+                <div class="past-record-top">
+                  <div>
+                    <span>{{ record.seasonName }}</span>
+                    <strong>{{ record.taskName }}</strong>
+                  </div>
+                  <em :class="`is-${record.result}`">{{ resultText(record.result) }}</em>
                 </div>
-                <em :class="`is-${record.result}`">{{ resultText(record.result) }}</em>
-              </div>
 
-              <p v-if="record.note">{{ record.note }}</p>
+                <p v-if="record.note">{{ record.note }}</p>
+                <p v-if="record.reviewComment" class="past-review-comment">
+                  <span>审核意见</span>
+                  {{ record.reviewComment }}
+                </p>
 
-              <dl class="past-record-meta">
-                <div>
-                  <dt>上传文件</dt>
-                  <dd>{{ record.fileName }}<em v-if="canPreviewProof(record)"> · 点击查看原图</em></dd>
-                </div>
-                <div>
-                  <dt>上传时间</dt>
-                  <dd>{{ formatDateTime(record.uploadedAt) }}</dd>
-                </div>
-              </dl>
+                <dl class="past-record-meta">
+                  <div>
+                    <dt>上传文件</dt>
+                    <dd>{{ record.fileName }}<em v-if="canPreviewProof(record)"> · 点击查看原图</em></dd>
+                  </div>
+                  <div>
+                    <dt>上传时间</dt>
+                    <dd>{{ formatDateTime(record.uploadedAt) }}</dd>
+                  </div>
+                </dl>
               </article>
             </div>
           </div>
@@ -189,15 +244,21 @@
 </template>
 
 <script>
+import LiquidCardBackdrop from './LiquidCardBackdrop.vue'
 import PastSeasonReviewPage from './PastSeasonReviewPage.vue'
 import ProofImageViewer from './ProofImageViewer.vue'
+import SupplementRecordCard from './SupplementRecordCard.vue'
+import { prioritizeSupplementRecords } from '../utils/historyRecords'
 import { getReviewStatusText } from '../utils/proofReview'
 
 export default {
   name: 'HistoryPage',
+  emits: ['supplement-submitted'],
   components: {
+    LiquidCardBackdrop,
     PastSeasonReviewPage,
-    ProofImageViewer
+    ProofImageViewer,
+    SupplementRecordCard
   },
   data() {
     return {
@@ -216,6 +277,18 @@ export default {
     pastSeasonReviewRecords: {
       type: Array,
       default: () => []
+    },
+    supplementRecords: {
+      type: Array,
+      default: () => []
+    },
+    isSupplementRecordsLoading: {
+      type: Boolean,
+      default: false
+    },
+    supplementRecordsError: {
+      type: String,
+      default: ''
     },
     projectProgressRecords: {
       type: Array,
@@ -244,6 +317,10 @@ export default {
     isNoActiveSeason: {
       type: Boolean,
       default: false
+    },
+    isSeasonWriteFrozen: {
+      type: Boolean,
+      default: false
     }
   },
   watch: {
@@ -265,6 +342,37 @@ export default {
     },
     sortedPastSeasonReviewRecords() {
       return [...this.pastSeasonReviewRecords].sort((a, b) => new Date(b.proofDate || b.uploadedAt) - new Date(a.proofDate || a.uploadedAt))
+    },
+    sortedSupplementRecords() {
+      // 后端已按赛季、运动日期、上传时间和凭证 ID 排序，前端保持其资格优先级。
+      return this.supplementRecords.map(record => ({
+        ...record,
+        isSupplementEligible: true
+      }))
+    },
+    prioritizedPastRecords() {
+      return prioritizeSupplementRecords(this.sortedPastSeasonReviewRecords, this.sortedSupplementRecords)
+    },
+    displayedPastRecords() {
+      return this.prioritizedPastRecords
+    },
+    supplementSummary() {
+      if (this.isSupplementRecordsLoading) {
+        return '正在查询…'
+      }
+
+      if (this.supplementRecordsError) {
+        return '暂时无法获取'
+      }
+
+      return this.sortedSupplementRecords.length
+        ? `${this.sortedSupplementRecords.length} 条可补传`
+        : '当前无可补传记录'
+    },
+    pastRecordSummary() {
+      return this.displayedPastRecords.length
+        ? `${this.displayedPastRecords.length} 条已归档`
+        : '暂无归档记录'
     },
     heroEyebrow() {
       return this.isShowingPastRecords ? 'PAST SEASONS' : 'CURRENT SEASON'
@@ -420,6 +528,8 @@ export default {
 <style scoped>
 .history-page {
   height: calc(100vh - 188px);
+  height: calc(100vh - 172px - env(safe-area-inset-top) - max(8px, env(safe-area-inset-bottom)));
+  height: calc(100dvh - 172px - env(safe-area-inset-top) - max(8px, env(safe-area-inset-bottom)));
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -431,50 +541,134 @@ export default {
   overflow: hidden;
   flex-shrink: 0;
   padding: 24px;
-  border: 1px solid rgba(23, 33, 27, 0.08);
+  border: 0;
   border-radius: 32px;
-  background:
-    radial-gradient(circle at 84% 18%, rgba(255, 159, 69, 0.32), transparent 27%),
-    linear-gradient(140deg, rgba(255, 255, 255, 0.95), rgba(250, 244, 234, 0.88));
-  box-shadow: 0 18px 44px rgba(89, 67, 47, 0.1);
+  background: linear-gradient(140deg, #211006, #713415);
+  box-shadow:
+    0 2px 5px rgba(55, 24, 7, 0.1),
+    0 10px 24px rgba(55, 24, 7, 0.21);
 }
 
-.history-hero::after {
-  position: absolute;
-  right: -34px;
-  bottom: -48px;
-  width: 148px;
-  height: 148px;
-  border: 1px solid rgba(255, 159, 69, 0.22);
-  border-radius: 50%;
-  content: '';
+.history-hero-copy-frame {
+  position: relative;
+  z-index: 2;
+  display: grid;
+}
+
+.history-hero-content {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.history-hero-copy-enter-active,
+.history-hero-copy-leave-active {
+  transition:
+    opacity 0.38s ease,
+    transform 0.46s cubic-bezier(0.2, 0.82, 0.2, 1);
+}
+
+.history-hero-copy-frame.is-showing-past .history-hero-copy-enter-from,
+.history-hero-copy-frame:not(.is-showing-past) .history-hero-copy-leave-to {
+  opacity: 0;
+  transform: translateX(112%);
+}
+
+.history-hero-copy-frame.is-showing-past .history-hero-copy-leave-to,
+.history-hero-copy-frame:not(.is-showing-past) .history-hero-copy-enter-from {
+  opacity: 0;
+  transform: translateX(-112%);
 }
 
 .history-eyebrow {
-  color: #d67624;
+  color: #ffd28a;
   font-size: 11px;
   font-weight: 950;
   letter-spacing: 0.16em;
+  text-shadow: 0 0 18px rgba(255, 160, 68, 0.5);
 }
 
 .history-hero h1 {
   position: relative;
   z-index: 1;
   margin: 10px 0 8px;
+  color: #fff;
   font-size: clamp(28px, 7.4vw, 34px);
   line-height: 1.08;
   letter-spacing: -0.04em;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .history-hero-copy-enter-active,
+  .history-hero-copy-leave-active {
+    transition: none;
+  }
+}
+
 .goal-progress-panel {
   flex-shrink: 0;
   padding: 16px 16px 15px;
-  border: 1px solid rgba(23, 33, 27, 0.08);
+  border: 0;
+  border-radius: 28px;
+  background: transparent;
+}
+
+.goal-progress-board {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
   border-radius: 28px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 252, 247, 0.78)),
-    rgba(255, 255, 255, 0.76);
-  box-shadow: 0 14px 30px rgba(38, 64, 45, 0.06);
+    radial-gradient(circle at 82% 18%, rgba(255, 112, 67, 0.46), transparent 34%),
+    linear-gradient(138deg, #160d2e, #54216f 58%, #28103d);
+  box-shadow:
+    0 2px 5px rgba(49, 18, 76, 0.07),
+    0 9px 22px rgba(49, 18, 76, 0.16);
+}
+
+.goal-progress-board-inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+}
+
+.goal-progress-face {
+  grid-area: 1 / 1;
+  min-width: 0;
+  width: 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.38s ease,
+    transform 0.46s cubic-bezier(0.2, 0.82, 0.2, 1);
+}
+
+.goal-progress-face.is-current {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.goal-progress-face.is-supplement {
+  box-sizing: border-box;
+  transform: translateX(112%);
+}
+
+/* 卡片与液体背景保持原位，只让内容按当前、过往页面的方向滑动。 */
+.goal-progress-board.is-showing-past .goal-progress-face.is-current {
+  opacity: 0;
+  transform: translateX(-112%);
+}
+
+.goal-progress-board.is-showing-past .goal-progress-face.is-supplement {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.goal-progress-board:not(.is-showing-past) .goal-progress-face.is-current {
+  pointer-events: auto;
+}
+
+.goal-progress-board.is-showing-past .goal-progress-face.is-supplement {
+  pointer-events: auto;
 }
 
 .goal-progress-heading,
@@ -483,6 +677,13 @@ export default {
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
+}
+
+.goal-progress-heading,
+.goal-progress-list,
+.goal-progress-empty {
+  position: relative;
+  z-index: 2;
 }
 
 .goal-progress-heading span,
@@ -509,6 +710,49 @@ export default {
   font-weight: 850;
   line-height: 1.35;
   text-align: right;
+}
+
+.goal-progress-face.is-current .goal-progress-heading span {
+  color: rgba(255, 239, 194, 0.76);
+}
+
+.goal-progress-face.is-current .goal-progress-heading strong {
+  color: #fff;
+}
+
+.goal-progress-face.is-current .goal-progress-heading em {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.goal-progress-face.is-supplement {
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.supplement-summary-copy > span {
+  position: relative;
+  z-index: 2;
+  color: rgba(255, 239, 194, 0.76);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.supplement-summary-copy > strong {
+  position: relative;
+  z-index: 2;
+  display: block;
+  margin-top: 6px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 950;
+  line-height: 1.1;
 }
 
 .goal-progress-list {
@@ -539,6 +783,11 @@ export default {
   white-space: nowrap;
 }
 
+.goal-progress-face.is-current .goal-progress-meta strong {
+  color: #fff;
+  text-shadow: 0 1px 10px rgba(22, 13, 46, 0.42);
+}
+
 .goal-progress-meta em {
   color: #607068;
   font-size: 11px;
@@ -548,6 +797,11 @@ export default {
   text-align: right;
 }
 
+.goal-progress-face.is-current .goal-progress-meta em {
+  color: #ffdf9c;
+  text-shadow: 0 1px 10px rgba(22, 13, 46, 0.42);
+}
+
 .goal-progress-track {
   height: 7px;
   overflow: hidden;
@@ -555,12 +809,19 @@ export default {
   background: rgba(23, 33, 27, 0.07);
 }
 
+.goal-progress-face.is-current .goal-progress-track {
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 3px rgba(22, 13, 46, 0.28);
+}
+
 .goal-progress-track span {
   display: block;
   width: var(--progress);
   height: 100%;
   border-radius: inherit;
+  background: var(--accent);
   background: linear-gradient(90deg, color-mix(in srgb, var(--accent), #fff 30%), color-mix(in srgb, var(--accent), #20c7b5 18%));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent), transparent 42%);
 }
 
 .goal-progress-empty {
@@ -569,6 +830,10 @@ export default {
   font-size: 12px;
   font-weight: 750;
   line-height: 1.6;
+}
+
+.goal-progress-face.is-current .goal-progress-empty {
+  color: rgba(255, 255, 255, 0.74);
 }
 
 .record-board {
@@ -612,7 +877,9 @@ export default {
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 30px;
   background: rgba(255, 255, 255, 0.58);
-  box-shadow: 0 16px 34px rgba(38, 64, 45, 0.06);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.04),
+    0 9px 22px rgba(38, 64, 45, 0.1);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -702,7 +969,9 @@ export default {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.72)),
     #fff;
-  box-shadow: 0 16px 38px rgba(38, 64, 45, 0.08);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.05),
+    0 10px 24px rgba(38, 64, 45, 0.12);
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr);
   gap: 12px;
@@ -908,7 +1177,9 @@ export default {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.72)),
     #fff;
-  box-shadow: 0 16px 38px rgba(38, 64, 45, 0.08);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.05),
+    0 10px 24px rgba(38, 64, 45, 0.12);
 }
 
 .past-record-top {
@@ -986,6 +1257,20 @@ export default {
   line-height: 1.55;
 }
 
+.past-record-card .past-review-comment {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 159, 69, 0.09);
+  color: #70513b;
+}
+
+.past-review-comment span {
+  margin-right: 6px;
+  color: #c65f1b;
+  font-size: 11px;
+  font-weight: 950;
+}
+
 .past-record-meta {
   margin: 14px 0 0;
   display: grid;
@@ -1045,6 +1330,10 @@ export default {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .goal-progress-face {
+    transition: none;
+  }
+
   .goal-progress-track span {
     transition: none;
   }

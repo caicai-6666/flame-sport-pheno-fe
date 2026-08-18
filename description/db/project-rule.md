@@ -1,7 +1,10 @@
-# 项目规则表：`project_rule`
 
-## 表介绍
 
+
+
+# 项目规则表：project_rule
+
+## 表作用
 `project_rule` 表用于存储不同项目在不同挑战等级下的完成规则。
 当前平台中，用户在一个赛季中选择 3 个运动项目，并选择一个统一的项目等级。  
 系统根据用户选择的项目和等级，找到对应的项目规则，用于前端展示和月末审核判断。
@@ -21,27 +24,31 @@ rule_note    = 规则备注
 
 ---
 
-## 字段介绍
+## 字段说明
 
-| 字段名         | 类型               | 是否必填 | 默认值 | 说明                                 |
-| -------------- | ------------------ | -------: | -----: | ------------------------------------ |
-| `id`           | `BIGINT UNSIGNED`  |       是 |   自增 | 项目规则主键 ID                      |
-| `project_id`   | `BIGINT UNSIGNED`  |       是 |     无 | 项目 ID，关联 `project.id`           |
-| `level_id`     | `BIGINT UNSIGNED`  |       是 |     无 | 项目等级 ID，关联 `project_level.id` |
-| `sub_desc`     | `VARCHAR(128)`     |       否 |   NULL | 挑战副描述                           |
-| `rule_content` | `JSON`             |       是 |     无 | 规则指标内容，JSON 数组              |
-| `rule_note`    | `VARCHAR(255)`     |       否 |   NULL | 规则备注说明                         |
-| `status`       | `TINYINT UNSIGNED` |       是 |      1 | 规则状态：`1` 启用，`0` 停用         |
+| 字段名       | 类型             | 是否必填 | 默认值 | 说明                                 |
+| ------------ | ---------------- | -------: | -----: | ------------------------------------ |
+| id           | BIGINT UNSIGNED  |       是 |   自增 | 项目规则主键 ID                      |
+| project_id   | BIGINT UNSIGNED  |       是 |     无 | 项目 ID，关联 `project.id`           |
+| level_id     | BIGINT UNSIGNED  |       是 |     无 | 项目等级 ID，关联 `project_level.id` |
+| sub_desc     | VARCHAR(128)     |       否 |   NULL | 挑战副描述                           |
+| rule_content | JSON             |       是 |     无 | 规则指标内容，JSON 数组              |
+| rule_note    | VARCHAR(255)     |       否 |   NULL | 规则备注说明                         |
+| status       | TINYINT UNSIGNED |       是 |      1 | 规则状态：`1` 启用，`0` 停用         |
 
-### 字段设计说明
+---
 
-#### `id`
+## 字段设计说明
+
+### id
 
 项目规则的唯一标识。
 
 使用 `BIGINT UNSIGNED AUTO_INCREMENT` 作为主键。
 
-#### `project_id`
+---
+
+### project_id
 
 项目 ID。
 
@@ -56,7 +63,9 @@ rule_note    = 规则备注
 减重挑战
 ```
 
-#### `level_id`
+---
+
+### level_id
 
 项目等级 ID。
 
@@ -70,7 +79,9 @@ rule_note    = 规则备注
 黄金
 ```
 
-#### `sub_desc`
+---
+
+### sub_desc
 
 挑战副描述。
 
@@ -88,7 +99,9 @@ rule_note    = 规则备注
 该字段允许为空。  
 如果为空，前端可以不展示副描述。
 
-#### `rule_content`
+---
+
+### rule_content
 
 规则指标内容。
 
@@ -152,7 +165,9 @@ rule_note    = 规则备注
 
 MySQL `JSON` 类型会校验字段内容必须是合法 JSON，能减少后台配置时写入非法结构的风险。
 
-#### `rule_note`
+---
+
+### rule_note
 
 规则备注说明。
 
@@ -170,7 +185,9 @@ MySQL `JSON` 类型会校验字段内容必须是合法 JSON，能减少后台�
 该字段允许为空。  
 如果为空，前端可以不展示备注。
 
-#### `status`
+---
+
+### status
 
 项目规则状态。
 
@@ -186,7 +203,7 @@ MySQL `JSON` 类型会校验字段内容必须是合法 JSON，能减少后台�
 
 ---
 
-## 建表语句
+## MySQL 建表语句
 
 ```sql
 CREATE TABLE project_rule (

@@ -28,6 +28,8 @@ ProjectHome 当前已接入真实接口：
 - `POST /project/lock_level`
 - `POST /suggestion/remark`
 
+顶部卡片的文字、活动详情入口和报名引导继续使用 DOM，背景由按需加载的共享 PixiJS 组件绘制。项目页使用偏青柠绿的高速横向流体变体，与排行榜的深森林绿保持同一视觉体系但具有更明确的推进感；WebGL 不可用或系统开启“减少动态效果”时使用深绿色 CSS 静态渐变。
+
 上传记录弹窗由 [运动凭证上传](upload-proof.md) 单独描述。
 
 ---

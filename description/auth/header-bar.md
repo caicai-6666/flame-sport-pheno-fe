@@ -13,6 +13,8 @@ src/api/avatar.js
 
 品牌 Logo 使用带 Alpha 通道的无损 `src/assets/logo.webp`，组件不为图片绘制额外实色背景，透明区域直接显示 Header 背景。生产构建会生成带内容哈希的 WebP 文件，并由容器 Nginx 设置一年不可变缓存；Logo 更新后文件哈希变化，浏览器会自动获取新版本。
 
+全屏模式通过 `viewport-fit=cover` 将页面扩展至设备安全区。Header 从屏幕顶部开始绘制背景，并把 `safe-area-inset-top` 计入高度和上内边距，避免内容滚动时从状态栏或刘海区域透出。根页面不参与业务内容滚动，滚动仅发生在 Header 与底部导航之间的内容容器，因此旧版 WebView 的根页面回弹不会带动固定导航。
+
 ---
 
 ## `GET /image/avatar` 获取用户头像

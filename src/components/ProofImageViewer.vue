@@ -3,7 +3,7 @@
     <transition name="proof-image-viewer" appear @after-leave="finishClose">
       <div v-if="isVisible" class="proof-image-viewer" @click.self="closeViewer">
         <section class="proof-image-dialog" role="dialog" aria-modal="true" aria-label="凭证原图">
-          <header class="proof-image-header">
+          <header ref="imageHeader" class="proof-image-header">
             <div>
               <span>运动凭证</span>
               <strong>{{ fileName || '凭证原图' }}</strong>
@@ -21,8 +21,19 @@
             <button type="button" @click="loadImage">重新加载</button>
           </div>
 
-          <div v-else-if="imageSrc" class="proof-image-content">
-            <img :src="imageSrc" :alt="`${fileName || '运动'}凭证原图`" @error="handleImageRenderError">
+          <div
+            v-else-if="imageSrc"
+            ref="imageContent"
+            class="proof-image-content"
+            :class="{ 'is-ready': isImageReady }"
+            :style="{ height: `${imageContentHeight}px` }"
+          >
+            <img
+              :src="imageSrc"
+              :alt="`${fileName || '运动'}凭证原图`"
+              @load="handleImageLoad"
+              @error="handleImageRenderError"
+            >
           </div>
         </section>
       </div>
@@ -58,7 +69,9 @@ export default {
       requestVersion: 0,
       originalBodyOverflow: '',
       isVisible: true,
-      isClosing: false
+      isClosing: false,
+      isImageReady: false,
+      imageContentHeight: 220
     }
   },
   methods: {
@@ -67,6 +80,8 @@ export default {
       this.requestVersion = requestVersion
       this.isLoading = true
       this.errorMessage = ''
+      this.isImageReady = false
+      this.imageContentHeight = 220
 
       this.revokeImageUrl()
 
@@ -117,6 +132,39 @@ export default {
       this.revokeImageUrl()
       this.errorMessage = '图片无法解析，请重新加载'
     },
+    handleImageLoad(event) {
+      const image = event.currentTarget
+
+      if (!image?.naturalWidth || !image?.naturalHeight) {
+        return
+      }
+
+      // 原图解码完成后再按固有比例计算可视高度，避免 img 从零高度瞬间撑开弹窗。
+      this.updateImageContentHeight(image)
+      this.isImageReady = true
+    },
+    updateImageContentHeight(image = this.$refs.imageContent?.querySelector('img')) {
+      const content = this.$refs.imageContent
+
+      if (!content || !image?.naturalWidth || !image?.naturalHeight) {
+        return
+      }
+
+      const contentPadding = 20
+      const imageWidth = Math.max(content.clientWidth - contentPadding, 1)
+      const naturalHeight = imageWidth * (image.naturalHeight / image.naturalWidth)
+      const dialogMaxHeight = Math.min(window.innerHeight * 0.82, 760)
+      const headerHeight = this.$refs.imageHeader?.offsetHeight || 0
+      const availableHeight = Math.max(dialogMaxHeight - headerHeight, 96)
+
+      // 长图只扩展到弹窗上限，剩余内容继续沿用区域内滚动查看。
+      this.imageContentHeight = Math.round(Math.min(naturalHeight + contentPadding, availableHeight))
+    },
+    handleViewportResize() {
+      if (this.isImageReady) {
+        this.updateImageContentHeight()
+      }
+    },
     revokeImageUrl() {
       if (this.imageSrc.startsWith('blob:')) {
         URL.revokeObjectURL(this.imageSrc)
@@ -152,6 +200,7 @@ export default {
   mounted() {
     this.lockPageScroll()
     window.addEventListener('keydown', this.handleKeydown)
+    window.addEventListener('resize', this.handleViewportResize)
     this.loadImage()
   },
   beforeUnmount() {
@@ -160,6 +209,7 @@ export default {
     this.revokeImageUrl()
     this.unlockPageScroll()
     window.removeEventListener('keydown', this.handleKeydown)
+    window.removeEventListener('resize', this.handleViewportResize)
   },
   emits: ['close']
 }
@@ -264,11 +314,14 @@ export default {
 }
 
 .proof-image-content {
+  box-sizing: border-box;
+  flex: 0 1 auto;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
   padding: 10px;
   background: rgba(225, 234, 225, 0.72);
+  transition: height 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .proof-image-content img {
@@ -277,9 +330,17 @@ export default {
   height: auto;
   border-radius: 18px;
   background: #fff;
+  opacity: 0;
+  transition: opacity 0.22s ease 0.06s;
+}
+
+.proof-image-content.is-ready img {
+  opacity: 1;
 }
 
 .proof-image-state {
+  box-sizing: border-box;
+  height: 220px;
   min-height: 220px;
   padding: 24px;
   color: #68766d;
@@ -333,6 +394,11 @@ export default {
   .proof-image-viewer-leave-active,
   .proof-image-viewer-enter-active .proof-image-dialog,
   .proof-image-viewer-leave-active .proof-image-dialog {
+    transition: none;
+  }
+
+  .proof-image-content,
+  .proof-image-content img {
     transition: none;
   }
 

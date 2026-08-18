@@ -7,6 +7,8 @@
 ```text
 src/views/RankView.vue
 src/components/RankPage.vue
+src/components/LiquidCardBackdrop.vue
+src/utils/liquidCardPixi.js
 src/api/rank.js
 src/state/appState.js
 ```
@@ -80,7 +82,8 @@ GET /leaderboard/info
 - `/rank` 路由开启 `KeepAlive`，底部导航切出再返回时不会重新创建页面组件。
 - 请求加载中展示旋转加载动画和 shimmer 骨架条。
 - 加载态最短保留 1 秒，避免接口过快返回时出现跳变。
-- 请求完成后，“我的排名”卡片和排行列表使用渐入上浮过渡展示。
+- 请求完成后，“我的排名”卡片使用渐入上浮过渡，排行列表按排名顺序逐条插入并淡入上浮，避免完整列表在同一帧突变出现。系统开启“减少动态效果”时直接展示完整列表。
+- 顶部卡片的 DOM 层仅保留文字排版，背景进入页面后由按需加载的 PixiJS 接管，以双层 `DisplacementFilter` 驱动绿色流体主体与高光，并叠加辉光和微粒层。渲染器固定优先使用兼容性更好的 WebGL 1，并限制像素密度；页面进入后台时暂停动画，WebGL 不可用、上下文丢失、初始化失败或开启“减少动态效果”时使用深绿色 CSS 静态渐变。
 
 ---
 

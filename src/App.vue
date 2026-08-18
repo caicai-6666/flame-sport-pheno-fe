@@ -10,17 +10,24 @@
 
       <main class="page-content">
         <router-view v-slot="{ Component, route }">
-          <KeepAlive>
+          <Transition :name="pageTransitionName">
+            <KeepAlive>
+              <component
+                :is="Component"
+                v-if="route.meta.keepAlive"
+                :key="route.fullPath"
+                class="route-page-frame"
+              />
+            </KeepAlive>
+          </Transition>
+          <Transition :name="pageTransitionName">
             <component
               :is="Component"
-              v-if="route.meta.keepAlive"
+              v-if="!route.meta.keepAlive"
               :key="route.fullPath"
+              class="route-page-frame"
             />
-          </KeepAlive>
-          <component
-            :is="Component"
-            v-if="!route.meta.keepAlive"
-          />
+          </Transition>
         </router-view>
       </main>
 
@@ -137,7 +144,8 @@ export default {
       isHealthProfileSaving: false,
       healthProfileSaveError: null,
       healthProfileConfettiBursts: [],
-      healthProfileConfettiTimers: []
+      healthProfileConfettiTimers: [],
+      pageTransitionName: 'route-crossfade'
     }
   },
   computed: {
@@ -208,6 +216,20 @@ export default {
     }
   },
   watch: {
+    $route(to, from) {
+      const toOrder = Number(to.meta.pageOrder)
+      const fromOrder = Number(from.meta.pageOrder)
+
+      if (!Number.isFinite(toOrder) || !Number.isFinite(fromOrder) || toOrder === fromOrder) {
+        this.pageTransitionName = 'route-crossfade'
+        return
+      }
+
+      // 页面顺序与底部导航保持一致；进入右侧页面时内容整体左移，反向导航则整体右移。
+      this.pageTransitionName = toOrder > fromOrder
+        ? 'route-slide-left'
+        : 'route-slide-right'
+    },
     shouldCollectHealthProfile: {
       immediate: true,
       handler(shouldLock) {
@@ -347,6 +369,20 @@ export default {
   box-sizing: border-box;
 }
 
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html {
+  background: #f8fbf5;
+}
+
 body {
   min-width: 320px;
   margin: 0;
@@ -371,14 +407,15 @@ button {
 }
 
 #app {
-  min-height: 100vh;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
 .app-shell {
   position: relative;
   width: min(100vw, 430px);
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   margin: 0 auto;
   overflow: hidden;
   background:
@@ -402,9 +439,88 @@ button {
 .page-content {
   position: relative;
   z-index: 1;
+  overflow: hidden;
   flex: 1;
   min-height: 0;
-  padding: 92px 18px 96px;
+  padding: 92px 0 96px;
+  padding:
+    calc(92px + env(safe-area-inset-top))
+    0
+    calc(80px + max(8px, env(safe-area-inset-bottom)));
+  overscroll-behavior: none;
+  display: grid;
+  align-items: start;
+}
+
+.route-page-frame {
+  grid-area: 1 / 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0 18px;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.route-slide-left-enter-active,
+.route-slide-left-leave-active,
+.route-slide-right-enter-active,
+.route-slide-right-leave-active {
+  transition:
+    opacity 0.38s ease,
+    transform 0.44s cubic-bezier(0.2, 0.82, 0.2, 1);
+  will-change: opacity, transform;
+}
+
+.route-slide-left-enter-active,
+.route-slide-right-enter-active {
+  position: relative;
+  z-index: 2;
+}
+
+.route-slide-left-leave-active,
+.route-slide-right-leave-active {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.route-slide-left-enter-from {
+  opacity: 0.36;
+  transform: translate3d(104%, 0, 0);
+}
+
+.route-slide-left-leave-to {
+  opacity: 0.18;
+  transform: translate3d(-104%, 0, 0);
+}
+
+.route-slide-right-enter-from {
+  opacity: 0.36;
+  transform: translate3d(-104%, 0, 0);
+}
+
+.route-slide-right-leave-to {
+  opacity: 0.18;
+  transform: translate3d(104%, 0, 0);
+}
+
+.route-crossfade-enter-active,
+.route-crossfade-leave-active {
+  transition: opacity 0.22s ease;
+}
+
+.route-crossfade-leave-active {
+  pointer-events: none;
+}
+
+.route-crossfade-enter-from,
+.route-crossfade-leave-to {
+  opacity: 0;
 }
 
 .auth-status-panel {
@@ -609,6 +725,22 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .route-slide-left-enter-active,
+  .route-slide-left-leave-active,
+  .route-slide-right-enter-active,
+  .route-slide-right-leave-active,
+  .route-crossfade-enter-active,
+  .route-crossfade-leave-active {
+    transition-duration: 1ms;
+  }
+
+  .route-slide-left-enter-from,
+  .route-slide-left-leave-to,
+  .route-slide-right-enter-from,
+  .route-slide-right-leave-to {
+    transform: none;
+  }
+
   .launch-cover-leave-active {
     transition-duration: 1ms;
   }

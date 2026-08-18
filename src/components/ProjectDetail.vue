@@ -414,7 +414,9 @@ export default {
     radial-gradient(circle at 82% 28%, color-mix(in srgb, var(--accent), transparent 54%), transparent 28%),
     linear-gradient(135deg, #17211b, #263d2a);
   color: #fff;
-  box-shadow: 0 22px 48px rgba(24, 38, 28, 0.2);
+  box-shadow:
+    0 2px 5px rgba(24, 38, 28, 0.08),
+    0 10px 24px rgba(24, 38, 28, 0.19);
 }
 
 .detail-hero::after {
@@ -731,7 +733,9 @@ export default {
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 26px;
   background: rgba(255, 255, 255, 0.76);
-  box-shadow: 0 14px 34px rgba(38, 64, 45, 0.08);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.05),
+    0 10px 24px rgba(38, 64, 45, 0.12);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -772,7 +776,9 @@ export default {
   background:
     linear-gradient(110deg, rgba(255, 255, 255, 0.78), rgba(242, 248, 238, 0.94), rgba(255, 255, 255, 0.78));
   background-size: 220% 100%;
-  box-shadow: 0 16px 38px rgba(38, 64, 45, 0.06);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.04),
+    0 9px 22px rgba(38, 64, 45, 0.1);
   color: #68766d;
   display: flex;
   align-items: center;
@@ -802,7 +808,9 @@ export default {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.72)),
     #fff;
-  box-shadow: 0 16px 38px rgba(38, 64, 45, 0.09);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.05),
+    0 10px 24px rgba(38, 64, 45, 0.14);
   display: flex;
   flex-direction: column;
   justify-content: space-between;

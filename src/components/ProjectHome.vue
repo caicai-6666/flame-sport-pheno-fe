@@ -1,6 +1,7 @@
 <template>
   <section class="project-home" aria-label="项目任务">
     <div class="hero-card">
+      <LiquidCardBackdrop variant="project" />
       <button
         type="button"
         class="activity-detail-trigger"
@@ -10,9 +11,11 @@
         <span class="activity-detail-trigger-arrow" aria-hidden="true">↗</span>
       </button>
 
-      <span class="eyebrow">{{ seasonLabel }}</span>
-      <h1>{{ heroTitle }}</h1>
-      <p>{{ heroDescription }}</p>
+      <div class="hero-card-copy">
+        <span class="eyebrow">{{ seasonLabel }}</span>
+        <h1>{{ heroTitle }}</h1>
+        <p>{{ heroDescription }}</p>
+      </div>
 
       <div
         ref="heroGuidanceFrame"
@@ -252,6 +255,7 @@
 </template>
 
 <script>
+import LiquidCardBackdrop from './LiquidCardBackdrop.vue'
 import UploadProofPanel from './UploadProofPanel.vue'
 import activityRuleImage from '../assets/活动规则.webp'
 import feedbackIcon from '../assets/xinxiang.webp'
@@ -260,6 +264,7 @@ import SuggestionPanel from './SuggestionPanel.vue'
 export default {
   name: 'ProjectHome',
   components: {
+    LiquidCardBackdrop,
     UploadProofPanel,
     SuggestionPanel
   },
@@ -921,42 +926,43 @@ export default {
   gap: 18px;
 }
 
+.project-home > * {
+  /* 路由根节点负责滚动，首页区块必须保持内容高度，不能被一屏高度反向压缩。 */
+  flex-shrink: 0;
+}
+
 .hero-card {
   position: relative;
   overflow: hidden;
   padding: 24px;
-  border: 1px solid rgba(23, 33, 27, 0.08);
+  border: 0;
   border-radius: 32px;
-  background:
-    radial-gradient(circle at 82% 18%, rgba(114, 216, 79, 0.5), transparent 26%),
-    linear-gradient(140deg, rgba(255, 255, 255, 0.94), rgba(241, 249, 237, 0.86));
-  box-shadow: 0 18px 44px rgba(47, 89, 55, 0.12);
+  background: linear-gradient(140deg, #07190d, #245a20);
+  box-shadow:
+    0 2px 5px rgba(6, 31, 18, 0.1),
+    0 10px 24px rgba(6, 31, 18, 0.21);
 }
 
-.hero-card::after {
-  position: absolute;
-  right: -34px;
-  bottom: -46px;
-  width: 150px;
-  height: 150px;
-  border: 1px solid rgba(47, 143, 50, 0.18);
-  border-radius: 50%;
-  content: '';
+.hero-card-copy {
+  position: relative;
+  z-index: 2;
 }
 
 .eyebrow {
   max-width: calc(100% - 96px);
-  color: #2f8f32;
+  color: #d8ffad;
   display: block;
   font-size: 11px;
   font-weight: 900;
   line-height: 1.35;
   letter-spacing: 0.16em;
+  text-shadow: 0 0 18px rgba(157, 241, 93, 0.48);
 }
 
 .hero-card h1 {
   max-width: 100%;
   margin: 20px 0 8px;
+  color: #fff;
   font-size: clamp(26px, 7.2vw, 30px);
   line-height: 1.14;
   letter-spacing: -0.03em;
@@ -966,7 +972,7 @@ export default {
 .hero-card p {
   max-width: 290px;
   margin: 0;
-  color: #68766d;
+  color: rgba(235, 255, 239, 0.72);
   font-size: 14px;
   line-height: 1.7;
 }
@@ -1535,7 +1541,9 @@ export default {
     linear-gradient(135deg, rgba(23, 33, 27, 0.94), rgba(47, 83, 53, 0.9)),
     #17211b;
   color: #fff;
-  box-shadow: 0 14px 30px rgba(23, 33, 27, 0.16);
+  box-shadow:
+    0 2px 5px rgba(23, 33, 27, 0.08),
+    0 10px 24px rgba(23, 33, 27, 0.17);
 }
 
 .season-target-card.is-checking {
@@ -1774,7 +1782,9 @@ export default {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.74)),
     #fff;
-  box-shadow: 0 14px 34px rgba(38, 64, 45, 0.08);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.05),
+    0 10px 24px rgba(38, 64, 45, 0.12);
   color: #17211b;
   cursor: pointer;
   display: flex;
@@ -1832,7 +1842,9 @@ export default {
 
 .task-card:hover:not(.is-pressed):not(.is-recovering) {
   border-color: color-mix(in srgb, var(--accent), #fff 24%);
-  box-shadow: 0 18px 40px rgba(38, 64, 45, 0.13);
+  box-shadow:
+    0 3px 7px rgba(38, 64, 45, 0.07),
+    0 13px 28px rgba(38, 64, 45, 0.16);
   transform: translateY(-2px);
 }
 
@@ -1942,7 +1954,9 @@ export default {
 
 .feedback-card:hover {
   border-color: color-mix(in srgb, var(--accent), #fff 60%);
-  box-shadow: 0 18px 40px rgba(238, 85, 184, 0.14);
+  box-shadow:
+    0 3px 7px rgba(238, 85, 184, 0.08),
+    0 13px 28px rgba(238, 85, 184, 0.17);
   transform: translateY(-2px);
 }
 

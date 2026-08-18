@@ -1,6 +1,6 @@
-# 项目上传配置表：`project_upload_config`
+# 项目上传配置表：project_upload_config
 
-## 表介绍
+## 表作用
 
 `project_upload_config` 表用于存储不同项目在上传凭证时展示给用户的配置。
 
@@ -23,27 +23,31 @@
 
 ---
 
-## 字段介绍
+## 字段说明
 
-| 字段名         | 类型               | 是否必填 | 默认值 | 说明                                           |
-| -------------- | ------------------ | -------: | -----: | ---------------------------------------------- |
-| `id`           | `BIGINT UNSIGNED`  |       是 |   自增 | 项目上传配置主键 ID                            |
-| `project_id`   | `BIGINT UNSIGNED`  |       是 |     无 | 项目 ID，关联 `project.id`                     |
-| `record_type`  | `VARCHAR(64)`      |       是 |     无 | 凭证类型展示名称，供前端展示和历史记录展示使用 |
-| `upload_hint`  | `VARCHAR(255)`     |       是 |     无 | 上传图片下方的凭证类型提示                     |
-| `note_example` | `VARCHAR(255)`     |       否 |   NULL | 备注输入框中的填写示例                         |
-| `sort_order`   | `INT UNSIGNED`     |       是 |      0 | 展示排序，数值越小越靠前                       |
-| `status`       | `TINYINT UNSIGNED` |       是 |      1 | 状态：`1` 启用，`0` 停用                       |
+| 字段名           | 类型             | 是否必填 | 默认值 | 说明                              |
+| ---------------- | ---------------- | -------: | -----: | --------------------------------- |
+| id               | BIGINT UNSIGNED  |       是 |   自增 | 项目上传配置主键 ID               |
+| project_id       | BIGINT UNSIGNED  |       是 |     无 | 项目 ID，关联 `project.id`        |
+| record_type      | VARCHAR(64)      |       是 |     无 | 凭证类型展示名称，供前端展示和历史记录展示使用 |
+| upload_hint      | VARCHAR(255)     |       是 |     无 | 上传图片下方的凭证类型提示        |
+| note_example     | VARCHAR(255)     |       否 |   NULL | 备注输入框中的填写示例            |
+| sort_order       | INT UNSIGNED     |       是 |      0 | 展示排序，数值越小越靠前          |
+| status           | TINYINT UNSIGNED |       是 |      1 | 状态：`1` 启用，`0` 停用          |
 
-### 字段设计说明
+---
 
-#### `id`
+## 字段设计说明
+
+### id
 
 项目上传配置的唯一标识。
 
 使用 `BIGINT UNSIGNED AUTO_INCREMENT` 作为主键。
 
-#### `project_id`
+---
+
+### project_id
 
 项目 ID。
 
@@ -60,7 +64,9 @@
 减重挑战
 ```
 
-#### `record_type`
+---
+
+### record_type
 
 凭证类型展示名称。
 
@@ -88,7 +94,7 @@
 后端创建 `proof_record` 时，应将用户提交的 `project_upload_config_id` 写入 `proof_record.project_upload_config_id`。  
 `record_type` 只作为展示文案使用。
 
-#### `upload_hint`
+### upload_hint
 
 上传图片下方的凭证类型提示。
 
@@ -105,7 +111,9 @@
 
 该字段对应前端上传弹窗中“点击上传图片”下方的小字提示。
 
-#### `note_example`
+---
+
+### note_example
 
 备注输入框中的填写示例。
 
@@ -123,7 +131,9 @@
 该字段允许为空。  
 如果为空，前端可以展示默认备注提示。
 
-#### `sort_order`
+---
+
+### sort_order
 
 展示排序。
 
@@ -140,7 +150,9 @@
 
 前端展示凭证类型选项时，应按该字段升序排列。
 
-#### `status`
+---
+
+### status
 
 项目上传配置状态。
 
@@ -155,7 +167,7 @@
 
 ---
 
-## 建表语句
+## MySQL 建表语句
 
 ```sql
 CREATE TABLE project_upload_config (

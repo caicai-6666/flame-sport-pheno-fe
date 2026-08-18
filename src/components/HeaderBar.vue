@@ -107,7 +107,9 @@ export default {
   left: 50%;
   width: min(100vw, 430px);
   min-height: 76px;
+  min-height: calc(76px + env(safe-area-inset-top));
   padding: 16px 18px 16px;
+  padding: calc(16px + env(safe-area-inset-top)) 18px 16px;
   background:
     linear-gradient(
       180deg,
@@ -117,6 +119,7 @@ export default {
     ),
     rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;

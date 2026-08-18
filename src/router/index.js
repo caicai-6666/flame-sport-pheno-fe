@@ -6,6 +6,8 @@ import HistoryView from '../views/HistoryView.vue'
 import PastSeasonReviewView from '../views/PastSeasonReviewView.vue'
 import ShopView from '../views/ShopView.vue'
 
+// pageOrder 按底部导航从左到右排列，详情页放在所属主页面与下一主页面之间。
+// App.vue 只比较该值决定滑动方向，不把浏览器前进/后退误当成固定方向。
 const routes = [
   {
     path: '/',
@@ -18,6 +20,7 @@ const routes = [
     meta: {
       navKey: 'project',
       title: '项目',
+      pageOrder: 0,
       keepAlive: true
     }
   },
@@ -28,6 +31,7 @@ const routes = [
     meta: {
       navKey: 'project',
       title: '项目详情',
+      pageOrder: 0.5,
       keepAlive: true
     }
   },
@@ -38,6 +42,7 @@ const routes = [
     meta: {
       navKey: 'rank',
       title: '排行',
+      pageOrder: 1,
       keepAlive: true
     }
   },
@@ -48,6 +53,7 @@ const routes = [
     meta: {
       navKey: 'history',
       title: '历史',
+      pageOrder: 2,
       keepAlive: true
     }
   },
@@ -58,6 +64,7 @@ const routes = [
     meta: {
       navKey: 'history',
       title: '过往审核',
+      pageOrder: 2.5,
       keepAlive: true
     }
   },
@@ -68,6 +75,7 @@ const routes = [
     meta: {
       navKey: 'shop',
       title: '商城',
+      pageOrder: 3,
       keepAlive: true
     }
   },

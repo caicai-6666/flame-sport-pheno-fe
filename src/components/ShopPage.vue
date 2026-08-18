@@ -1,28 +1,31 @@
 <template>
   <section class="shop-page" aria-label="积分商城">
     <div class="shop-hero">
-      <span class="shop-eyebrow">POINTS STORE</span>
-      <h1>积分商城</h1>
-      <p>使用赛季积分兑换运动周边和健康补给，为目标助力！</p>
-      <p class="redeem-window-hint" :class="{ 'is-unavailable': !isRedeemAvailable }">
-        {{ redeemWindowMessage }}
-      </p>
+      <LiquidCardBackdrop variant="shop" />
+      <div class="shop-hero-content">
+        <span class="shop-eyebrow">POINTS STORE</span>
+        <h1>积分商城</h1>
+        <p>使用赛季积分兑换运动周边和健康补给，为目标助力！</p>
+        <p class="redeem-window-hint" :class="{ 'is-unavailable': !isRedeemAvailable }">
+          {{ redeemWindowMessage }}
+        </p>
 
-      <div class="shop-wallet">
-        <div>
-          <span>可用积分</span>
-          <strong>{{ displayPoints }}</strong>
-          <em
-            v-for="delta in pointDeltas"
-            :key="delta.id"
-            class="point-delta"
-          >
-            -{{ delta.points }}
-          </em>
+        <div class="shop-wallet">
+          <div>
+            <span>可用积分</span>
+            <strong>{{ displayPoints }}</strong>
+            <em
+              v-for="delta in pointDeltas"
+              :key="delta.id"
+              class="point-delta"
+            >
+              -{{ delta.points }}
+            </em>
+          </div>
+          <button class="exchange-history" type="button" @click="toggleRecordView">
+            {{ isRecordView ? '返回商城' : '积分流水' }}
+          </button>
         </div>
-        <button class="exchange-history" type="button" @click="isRecordView = !isRecordView">
-          {{ isRecordView ? '返回商城' : '积分流水' }}
-        </button>
       </div>
     </div>
 
@@ -205,6 +208,7 @@
 </template>
 
 <script>
+import LiquidCardBackdrop from './LiquidCardBackdrop.vue'
 import { groupProductsByTier } from '../utils/shopProductTiers'
 
 const REDEEM_REQUEST_DELAY = 1000
@@ -225,7 +229,17 @@ async function waitForMinRedeemingDuration(startedAt) {
 
 export default {
   name: 'ShopPage',
-  emits: ['retry-products', 'retry-point-flow', 'consume-success', 'product-image-loaded', 'product-image-failed'],
+  components: {
+    LiquidCardBackdrop
+  },
+  emits: [
+    'retry-products',
+    'retry-point-flow',
+    'consume-success',
+    'product-image-loaded',
+    'product-image-failed',
+    'product-panel-visibility-change'
+  ],
   props: {
     products: {
       type: Array,
@@ -316,6 +330,10 @@ export default {
     }
   },
   methods: {
+    toggleRecordView() {
+      this.isRecordView = !this.isRecordView
+      this.$emit('product-panel-visibility-change', !this.isRecordView)
+    },
     rewardKey(item, points) {
       return `${points}-${item.id}`
     },
@@ -542,40 +560,41 @@ export default {
   gap: 16px;
 }
 
+.shop-page > * {
+  /* 与首页一致，长列表应滚动而不是压缩顶部卡片和商品区块。 */
+  flex-shrink: 0;
+}
+
 .shop-hero {
   position: relative;
   overflow: hidden;
   padding: 24px;
-  border: 1px solid rgba(23, 33, 27, 0.08);
+  border: 0;
   border-radius: 32px;
-  background:
-    radial-gradient(circle at 84% 16%, rgba(32, 199, 181, 0.32), transparent 27%),
-    linear-gradient(140deg, rgba(255, 255, 255, 0.95), rgba(237, 250, 247, 0.88));
-  box-shadow: 0 18px 44px rgba(47, 89, 55, 0.1);
+  background: linear-gradient(140deg, #041b19, #0b5a51);
+  box-shadow:
+    0 2px 5px rgba(4, 42, 38, 0.1),
+    0 10px 24px rgba(4, 42, 38, 0.21);
 }
 
-.shop-hero::after {
-  position: absolute;
-  right: -36px;
-  bottom: -50px;
-  width: 152px;
-  height: 152px;
-  border: 1px solid rgba(32, 199, 181, 0.22);
-  border-radius: 50%;
-  content: '';
+.shop-hero-content {
+  position: relative;
+  z-index: 2;
 }
 
 .shop-eyebrow {
-  color: #159b8d;
+  color: #9bfff0;
   font-size: 11px;
   font-weight: 950;
   letter-spacing: 0.16em;
+  text-shadow: 0 0 18px rgba(32, 199, 181, 0.52);
 }
 
 .shop-hero h1 {
   position: relative;
   z-index: 1;
   margin: 10px 0 8px;
+  color: #fff;
   font-size: clamp(28px, 7.4vw, 34px);
   line-height: 1.08;
   letter-spacing: -0.04em;
@@ -586,7 +605,7 @@ export default {
   z-index: 1;
   max-width: none;
   margin: 0;
-  color: #68766d;
+  color: rgba(226, 255, 250, 0.74);
   font-size: 12px;
   line-height: 1.55;
   white-space: nowrap;
@@ -597,8 +616,8 @@ export default {
   margin-top: 10px;
   padding: 5px 9px;
   border-radius: 999px;
-  background: rgba(47, 143, 50, 0.1);
-  color: #2f8f32;
+  background: rgba(155, 255, 240, 0.14);
+  color: #bafff5;
   font-size: 11px;
   font-weight: 850;
   line-height: 1.35;
@@ -606,8 +625,8 @@ export default {
 }
 
 .shop-hero .redeem-window-hint.is-unavailable {
-  background: rgba(224, 90, 56, 0.1);
-  color: #b04a3f;
+  background: rgba(255, 155, 122, 0.16);
+  color: #ffd1bf;
 }
 
 .shop-wallet {
@@ -727,7 +746,9 @@ export default {
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 30px;
   background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 16px 38px rgba(38, 64, 45, 0.08);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.05),
+    0 10px 24px rgba(38, 64, 45, 0.12);
 }
 
 .records-heading {
@@ -970,7 +991,9 @@ export default {
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 30px;
   background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 16px 38px rgba(38, 64, 45, 0.08);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.05),
+    0 10px 24px rgba(38, 64, 45, 0.12);
 }
 
 .tier-heading {

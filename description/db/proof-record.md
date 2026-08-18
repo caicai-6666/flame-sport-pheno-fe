@@ -1,6 +1,6 @@
-# 凭证记录表：`proof_record`
+# 凭证记录表：proof_record
 
-## 表介绍
+## 表作用
 
 `proof_record` 表用于记录用户在赛季期间上传的运动凭证。
 
@@ -14,40 +14,43 @@
 
 ---
 
-## 字段介绍
+## 字段说明
 
-| 字段名                     | 类型               | 是否必填 |            默认值 | 说明                                             |
-| -------------------------- | ------------------ | -------: | ----------------: | ------------------------------------------------ |
-| `id`                       | `BIGINT UNSIGNED`  |       是 |              自增 | 凭证记录主键 ID                                  |
-| `season_user_id`           | `BIGINT UNSIGNED`  |       是 |                无 | 赛季用户记录 ID，关联 `season_user.id`           |
-| `project_id`               | `BIGINT UNSIGNED`  |       是 |                无 | 项目 ID，关联 `project.id`                       |
-| `project_upload_config_id` | `BIGINT UNSIGNED`  |       是 |                无 | 项目上传配置 ID，关联 `project_upload_config.id` |
-| `image_url`                | `VARCHAR(500)`     |       是 |                无 | 上传图片路径                                     |
-| `note`                     | `VARCHAR(255)`     |       否 |              NULL | 用户备注                                         |
-| `proof_date`               | `DATE`             |       是 |                无 | 凭证对应的实际运动日期                           |
-| `review_status`            | `VARCHAR(32)`      |       是 |           pending | 初审与终审状态                                   |
-| `review_comment`           | `VARCHAR(500)`     |       否 |              NULL | 审核评论，用于后台人员填写审核说明               |
-| `progress_delta`           | `DECIMAL(5,4)`     |       是 |            0.0000 | 大模型初审给出的原始项目进度增量                 |
-| `increase`                 | `DECIMAL(5,4)`     |       是 |            0.0000 | 当前凭证实际分配到项目进度条的贡献               |
-| `status`                   | `TINYINT UNSIGNED` |       是 |                 1 | 记录状态：`1` 正常，`0` 无效/删除                |
-| `created_at`               | `DATETIME`         |       是 | CURRENT_TIMESTAMP | 上传时间                                         |
+| 字段名         | 类型             | 是否必填 |      默认值 | 说明                                   |
+| -------------- | ---------------- | -------: | ----------: | -------------------------------------- |
+| id             | BIGINT UNSIGNED  |       是 |        自增 | 凭证记录主键 ID                        |
+| season_user_id | BIGINT UNSIGNED  |       是 |          无 | 赛季用户记录 ID，关联 `season_user.id` |
+| project_id     | BIGINT UNSIGNED  |       是 |          无 | 项目 ID，关联 `project.id`             |
+| project_upload_config_id | BIGINT UNSIGNED | 是 | 无 | 项目上传配置 ID，关联 `project_upload_config.id` |
+| image_url      | VARCHAR(500)     |       是 |          无 | 上传图片路径                           |
+| note           | VARCHAR(255)     |       否 |        NULL | 用户备注                               |
+| proof_date     | DATE             |       是 |          无 | 凭证对应的实际运动日期                 |
+| review_status  | VARCHAR(32)      |       是 |     pending | 初审与终审状态                         |
+| review_comment | VARCHAR(500)     |       否 |        NULL | 初审或终审的审核说明，终审时可覆盖初审意见 |
+| progress_delta | DECIMAL(5,4) | 是 | 0.0000 | 大模型初审给出的原始项目进度增量 |
+| increase       | DECIMAL(5,4) | 是 | 0.0000 | 当前凭证实际分配到项目进度条的贡献 |
+| status         | TINYINT UNSIGNED |       是 |           1 | 记录状态：`1` 正常，`0` 无效/删除      |
+| created_at     | DATETIME         |       是 | CURRENT_TIMESTAMP | 上传时间                         |
 
-### 字段设计说明
+---
 
-#### `id`
+## 字段设计说明
+
+### id
 
 凭证记录的唯一标识。
 
 使用 `BIGINT UNSIGNED AUTO_INCREMENT` 作为主键。
 
-#### `season_user_id`
+---
+
+### season_user_id
 
 赛季用户记录 ID。
 
 该字段关联 `season_user.id`。
 
 通过 `season_user_id` 可以确定：
-
 ```text
 用户是谁
 属于哪个赛季
@@ -56,32 +59,32 @@
 
 因此本表不再重复存储 `season_id` 和 `user_id`，避免数据冗余。
 
-#### `project_id`
+---
+
+### project_id
 
 项目 ID。
 
 该字段关联 `project.id`，表示这条凭证属于哪个运动项目。
 
 示例：
-
 ```text
 日常步数
 跑步/快走
 健身打卡
 减重挑战
 ```
-
 上传凭证时，后端应校验该项目是否属于用户当前赛季已锁定的项目。
 
 即需要存在有效记录：
-
 ```text
 season_user_project.season_user_id = 当前 season_user_id
 season_user_project.project_id = 当前 project_id
 season_user_project.status = 1
 ```
+---
 
-#### `project_upload_config_id`
+### project_upload_config_id
 
 项目上传配置 ID。
 
@@ -117,23 +120,21 @@ project_upload_config.status = 1
 
 校验通过后，才能写入 `proof_record.project_upload_config_id`。
 
-#### `image_url`
+---
+
+### image_url
 
 上传图片路径。
 
 当前平台采用 MySQL + 文件夹存储图片的方式：
-
 ```text
 MySQL 存储图片路径
 服务器文件夹存储图片文件
 ```
-
 示例路径：
-
 ```text
 /uploads/proofs/2026/07/user_10001/proof_xxxxx.jpg
 ```
-
 需要注意：
 
 - 图片文件名应由服务端生成
@@ -141,22 +142,24 @@ MySQL 存储图片路径
 - 文件路径写入数据库前，应确保图片已成功保存
 - 如果数据库写入失败，应清理已上传的孤儿文件
 
-#### `note`
+---
+
+### note
 
 用户备注。
 
 用于用户补充说明该凭证对应的运动情况。
 
 示例：
-
 ```text
 晚间快走 4km，用时 38 分钟，配速稳定。
 今日累计 8612 步，通勤和饭后散步完成。
 ```
-
 该字段允许为空。
 
-#### `proof_date`
+---
+
+### proof_date
 
 凭证对应的实际运动日期，格式为 `YYYY-MM-DD`。
 
@@ -170,12 +173,13 @@ season.start_date <= proof_date <= min(season.end_date, 今天)
 
 同一 `season_user_id + project_id + proof_date` 最多保留一条 `status = 1` 的记录。用户再次提交该日期时，系统按重传处理，更新原记录并重新初审。
 
-#### `review_status`
+---
+
+### review_status
 
 审核状态。该字段使用一个 `VARCHAR(32)` 字段记录模型初审和管理员终审结果。
 
 取值：
-
 ```text
 pending
 preliminary_approved
@@ -183,9 +187,7 @@ preliminary_rejected
 approved
 rejected
 ```
-
 含义如下：
-
 ```text
 pending              = 待初审
 preliminary_approved = 初审通过
@@ -195,21 +197,19 @@ rejected             = 终审失败
 ```
 
 用户上传凭证或同运动日期重复上传后，默认状态为：
-
 ```text
 pending
 ```
 
 定时初审任务根据图片、`note` 和项目等级规则更新为：
-
 ```text
 preliminary_approved
 preliminary_rejected
 ```
-
 初审通过的凭证计入排行榜；初审失败的凭证不计入，用户可重传后重新初审。管理员在赛季期间持续将初审通过记录更新为 `approved` 或 `rejected`。终审失败的凭证不再贡献项目进度，也不再计入后续排行榜快照。
+---
 
-#### `progress_delta`
+### progress_delta
 
 大模型初审给出的原始项目进度增量，取值范围为 `0.0000`～`1.0000`。
 
@@ -217,7 +217,9 @@ preliminary_rejected
 
 该字段为终审失败后的进度回补保留原始依据，不会因为进度条封顶而截断。对于迁移前已经存在的历史记录，旧系统没有保存被封顶前的原始值，迁移时保守使用原实际贡献进行回填。
 
-#### `increase`
+---
+
+### increase
 
 当前凭证实际分配到 `season_user_project.completion_progress` 的进度贡献，取值范围为 `0.0000`～`1.0000`，并始终满足：
 
@@ -241,14 +243,15 @@ completion_progress = SUM(当前有效通过凭证的 increase)
 completion_progress <= 1.0000
 ```
 
-#### `review_comment`
+---
+
+### review_comment
 
 审核评论。
 
-该字段用于后台审核人员填写审核说明、补充判断依据或拒绝原因。
+该字段用于保存模型初审或管理员终审的审核说明、判断依据或拒绝原因。管理员终审时可以覆盖初审意见。
 
 示例：
-
 ```text
 截图清晰，运动时间和距离符合本月挑战要求。
 凭证缺少日期信息，无法确认是否属于当前赛季。
@@ -259,23 +262,25 @@ completion_progress <= 1.0000
 
 原因是待初审记录通常还没有审核评论；初审或终审通过时也可能不需要额外说明。
 
-#### `status`
+---
+
+### status
 
 记录状态。
 
 取值说明：
-
 ```text
 1 = 正常
 0 = 无效/删除
 ```
-
 该字段用于软删除或后台作废凭证记录。
 
 保留该字段的原因是：凭证一旦上传，通常不建议直接物理删除。  
 如果凭证上传错误、用户撤回或后台判定无效，可以将状态改为 `0`。
 
-#### `created_at`
+---
+
+### created_at
 
 上传时间。
 
@@ -292,8 +297,7 @@ completion_progress <= 1.0000
 
 ---
 
-## 建表语句
-
+## MySQL 建表语句
 ```sql
 CREATE TABLE proof_record (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '凭证记录ID',
@@ -304,7 +308,7 @@ CREATE TABLE proof_record (
   note VARCHAR(255) DEFAULT NULL COMMENT '用户备注',
   proof_date DATE NOT NULL COMMENT '凭证对应的实际运动日期',
   review_status VARCHAR(32) NOT NULL DEFAULT 'pending' COMMENT '审核状态：pending待初审，preliminary_approved初审通过，preliminary_rejected初审失败，approved终审通过，rejected终审失败',
-  review_comment VARCHAR(500) DEFAULT NULL COMMENT '审核评论，用于后台人员填写审核说明',
+  review_comment VARCHAR(500) DEFAULT NULL COMMENT '初审或终审的审核说明，终审时可覆盖初审意见',
   progress_delta DECIMAL(5,4) NOT NULL DEFAULT 0.0000 COMMENT '大模型初审给出的原始项目进度增量',
   `increase` DECIMAL(5,4) NOT NULL DEFAULT 0.0000 COMMENT '当前凭证实际分配到项目进度条的贡献',
   status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '状态：1正常，0无效/删除',

@@ -1,9 +1,12 @@
 <template>
   <section class="rank-page" aria-label="打卡上传排行榜">
     <div class="rank-hero">
-      <span class="rank-eyebrow">SEASON CHECK-IN</span>
-      <h1>打卡排行榜</h1>
-      <p>仅统计本赛季通过初审的打卡记录（定时更新）</p>
+      <LiquidCardBackdrop variant="rank" />
+      <div class="rank-hero-content">
+        <span class="rank-eyebrow">SEASON CHECK-IN</span>
+        <h1>打卡排行榜</h1>
+        <p>仅统计本赛季通过初审的打卡记录（定时更新）</p>
+      </div>
     </div>
 
     <div v-if="isNoActiveSeason" class="rank-status">
@@ -62,7 +65,7 @@
 
         <TransitionGroup v-else name="rank-row-reveal" tag="div" class="rank-reveal-list">
           <article
-            v-for="(employee, index) in rankedEmployees"
+            v-for="(employee, index) in visibleRankedEmployees"
             :key="employee.id"
             class="rank-row"
             :class="{
@@ -70,8 +73,7 @@
               'is-top-three': index < 3
             }"
             :style="{
-              '--bar-width': `${rankPercent(employee)}%`,
-              '--row-index': Math.min(index, 14)
+              '--bar-width': `${rankPercent(employee)}%`
             }"
           >
             <span
@@ -104,6 +106,8 @@
 </template>
 
 <script>
+import LiquidCardBackdrop from './LiquidCardBackdrop.vue'
+
 const CHALLENGE_LEVEL_META = {
   1: {
     label: '青铜',
@@ -125,8 +129,13 @@ const RANK_MEDAL_TONES = {
   3: 'bronze'
 }
 
+const ROW_REVEAL_INTERVAL = 70
+
 export default {
   name: 'RankPage',
+  components: {
+    LiquidCardBackdrop
+  },
   emits: ['retry'],
   props: {
     leaderboardRecords: {
@@ -146,9 +155,18 @@ export default {
       default: false
     }
   },
+  data() {
+    return {
+      visibleRankCount: 0,
+      rowRevealTimer: null
+    }
+  },
   computed: {
     rankedEmployees() {
       return [...this.leaderboardRecords].sort((a, b) => b.checkinCount - a.checkinCount)
+    },
+    visibleRankedEmployees() {
+      return this.rankedEmployees.slice(0, this.visibleRankCount)
     },
     maxScore() {
       return this.rankedEmployees[0]?.checkinCount || 1
@@ -174,7 +192,63 @@ export default {
       return !this.isLoading && !this.errorMessage
     }
   },
+  watch: {
+    isLoading(isLoading) {
+      if (isLoading) {
+        this.stopRowReveal()
+        this.visibleRankCount = 0
+        return
+      }
+
+      this.startRowReveal()
+    },
+    leaderboardRecords() {
+      if (!this.isLoading) {
+        this.startRowReveal()
+      }
+    }
+  },
+  mounted() {
+    if (!this.isLoading) {
+      this.startRowReveal()
+    }
+  },
+  beforeUnmount() {
+    this.stopRowReveal()
+  },
   methods: {
+    startRowReveal() {
+      this.stopRowReveal()
+      this.visibleRankCount = 0
+
+      if (this.errorMessage || !this.rankedEmployees.length) {
+        return
+      }
+
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        this.visibleRankCount = this.rankedEmployees.length
+        return
+      }
+
+      // 先挂载空的过渡列表，再依排名逐条插入，避免首屏数据在同一帧整体出现。
+      this.$nextTick(() => {
+        this.revealNextRow()
+      })
+    },
+    revealNextRow() {
+      if (this.visibleRankCount >= this.rankedEmployees.length) {
+        return
+      }
+
+      this.visibleRankCount += 1
+      this.rowRevealTimer = window.setTimeout(this.revealNextRow, ROW_REVEAL_INTERVAL)
+    },
+    stopRowReveal() {
+      if (this.rowRevealTimer !== null) {
+        window.clearTimeout(this.rowRevealTimer)
+        this.rowRevealTimer = null
+      }
+    },
     rankPercent(employee) {
       return employee.checkinCount > 0
         ? Math.max((employee.checkinCount / this.maxScore) * 100, 8).toFixed(2)
@@ -196,6 +270,8 @@ export default {
 <style scoped>
 .rank-page {
   height: calc(100vh - 188px);
+  height: calc(100vh - 172px - env(safe-area-inset-top) - max(8px, env(safe-area-inset-bottom)));
+  height: calc(100dvh - 172px - env(safe-area-inset-top) - max(8px, env(safe-area-inset-bottom)));
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -207,36 +283,32 @@ export default {
   overflow: hidden;
   flex-shrink: 0;
   padding: 24px;
-  border: 1px solid rgba(23, 33, 27, 0.08);
+  border: 0;
   border-radius: 32px;
-  background:
-    radial-gradient(circle at 84% 18%, rgba(114, 216, 79, 0.44), transparent 27%),
-    linear-gradient(140deg, rgba(255, 255, 255, 0.95), rgba(239, 248, 235, 0.86));
-  box-shadow: 0 18px 44px rgba(47, 89, 55, 0.12);
+  background: linear-gradient(140deg, #091a11, #154728);
+  box-shadow:
+    0 2px 5px rgba(6, 31, 18, 0.1),
+    0 10px 24px rgba(6, 31, 18, 0.21);
 }
 
-.rank-hero::after {
-  position: absolute;
-  right: -38px;
-  bottom: -52px;
-  width: 150px;
-  height: 150px;
-  border: 1px solid rgba(47, 143, 50, 0.18);
-  border-radius: 50%;
-  content: '';
+.rank-hero-content {
+  position: relative;
+  z-index: 2;
 }
 
 .rank-eyebrow {
-  color: #2f8f32;
+  color: #baff9e;
   font-size: 11px;
   font-weight: 950;
   letter-spacing: 0.16em;
+  text-shadow: 0 0 18px rgba(114, 216, 79, 0.52);
 }
 
 .rank-hero h1 {
   position: relative;
   z-index: 1;
   margin: 10px 0 8px;
+  color: #fff;
   font-size: clamp(28px, 7.4vw, 34px);
   line-height: 1.08;
   letter-spacing: -0.04em;
@@ -247,7 +319,7 @@ export default {
   z-index: 1;
   max-width: 300px;
   margin: 0;
-  color: #68766d;
+  color: rgba(235, 255, 239, 0.7);
   font-size: 13px;
   line-height: 1.65;
 }
@@ -260,7 +332,9 @@ export default {
   background:
     linear-gradient(135deg, rgba(23, 33, 27, 0.94), rgba(37, 60, 42, 0.92)),
     #17211b;
-  box-shadow: 0 18px 36px rgba(23, 33, 27, 0.14);
+  box-shadow:
+    0 2px 5px rgba(23, 33, 27, 0.1),
+    0 10px 24px rgba(23, 33, 27, 0.19);
   color: #fff;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -304,7 +378,9 @@ export default {
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 30px;
   background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 16px 38px rgba(38, 64, 45, 0.09);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.05),
+    0 10px 24px rgba(38, 64, 45, 0.12);
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -358,10 +434,9 @@ export default {
 
 .rank-row-reveal-enter-active {
   transition:
-    opacity 0.56s ease,
-    transform 0.56s cubic-bezier(0.16, 0.9, 0.28, 1),
-    filter 0.56s ease;
-  transition-delay: calc(var(--row-index, 0) * 34ms);
+    opacity 0.48s ease,
+    transform 0.48s cubic-bezier(0.16, 0.9, 0.28, 1),
+    filter 0.48s ease;
 }
 
 .rank-row-reveal-enter-from {
@@ -619,6 +694,12 @@ export default {
 @keyframes rank-loading-shimmer {
   100% {
     transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rank-row-reveal-enter-active {
+    transition: none;
   }
 }
 

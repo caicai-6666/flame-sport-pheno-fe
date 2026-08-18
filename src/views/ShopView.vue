@@ -16,6 +16,7 @@
     @consume-success="handleConsumeSuccess"
     @product-image-loaded="markProductImageLoaded"
     @product-image-failed="markProductImageFailed"
+    @product-panel-visibility-change="handleProductPanelVisibilityChange"
   />
 </template>
 
@@ -26,7 +27,8 @@ import {
   getLatestPointBalance,
   getShopPointFlow,
   getShopProducts,
-  getShopProductImageSrc
+  getShopProductImageSrc,
+  isProductImageRequestPausedError
 } from '../api/shop'
 import { getCurrentSeason, isNoActiveSeasonError } from '../api/season'
 import { appState, setCurrentSeason, setSeasonAvailability } from '../state/appState'
@@ -49,6 +51,9 @@ export default {
       isPointFlowLoading: false,
       pointFlowErrorMessage: '',
       productImageLoadVersion: 0,
+      isProductImageQueueRunning: false,
+      isShopRouteActive: false,
+      isProductPanelVisible: true,
       currentSeason: null,
       redeemAvailability: {
         isAvailable: false,
@@ -63,6 +68,13 @@ export default {
     this.loadPointFlow()
     this.loadRedeemWindow()
   },
+  activated() {
+    this.isShopRouteActive = this.$route.name === 'shop'
+    this.startProductImageQueue()
+  },
+  deactivated() {
+    this.isShopRouteActive = false
+  },
   beforeUnmount() {
     this.productImageLoadVersion += 1
     this.revokeProductImageUrls()
@@ -71,6 +83,22 @@ export default {
   computed: {
     isNoActiveSeason() {
       return appState.seasonAvailability === 'unavailable'
+    },
+    canScheduleProductImages() {
+      return this.isShopRouteActive && this.isProductPanelVisible
+    }
+  },
+  watch: {
+    '$route.name': {
+      immediate: true,
+      handler(routeName) {
+        // 路由切换开始时立即暂停，不能等页面离场动画结束后才触发 deactivated。
+        this.isShopRouteActive = routeName === 'shop'
+
+        if (this.isShopRouteActive) {
+          this.startProductImageQueue()
+        }
+      }
     }
   },
   methods: {
@@ -89,7 +117,7 @@ export default {
 
         this.revokeProductImageUrls()
         this.products = products
-        this.loadProductImagesByTier(imageLoadVersion)
+        this.startProductImageQueue()
       } catch (error) {
         if (imageLoadVersion === this.productImageLoadVersion) {
           this.productErrorMessage = error.message || '奖品列表加载失败'
@@ -209,12 +237,44 @@ export default {
       this.pointRecords = [exchangeRecord, ...this.pointRecords]
         .sort((current, next) => new Date(next.occurredAt) - new Date(current.occurredAt))
     },
+    handleProductPanelVisibilityChange(isVisible) {
+      this.isProductPanelVisible = isVisible
+
+      if (isVisible) {
+        this.startProductImageQueue()
+      }
+    },
+    hasPendingProductImages() {
+      return this.products.some(product => (
+        product.imageFilename &&
+        !product.imageSrc &&
+        !product.isImageFailed
+      ))
+    },
+    startProductImageQueue() {
+      if (!this.canScheduleProductImages || this.isProductImageQueueRunning || !this.hasPendingProductImages()) {
+        return
+      }
+
+      const imageLoadVersion = this.productImageLoadVersion
+      this.isProductImageQueueRunning = true
+
+      this.loadProductImagesByTier(imageLoadVersion)
+        .finally(() => {
+          this.isProductImageQueueRunning = false
+
+          // 列表刷新或短暂暂停后，从尚未缓存的第一张图片继续调度。
+          if (this.canScheduleProductImages) {
+            this.startProductImageQueue()
+          }
+        })
+    },
     async loadProductImagesByTier(imageLoadVersion) {
       const tierGroups = groupProductsByTier(this.products)
 
       for (const tier of tierGroups) {
         for (const product of tier.items) {
-          if (imageLoadVersion !== this.productImageLoadVersion) {
+          if (imageLoadVersion !== this.productImageLoadVersion || !this.canScheduleProductImages) {
             return
           }
 
@@ -223,7 +283,9 @@ export default {
       }
     },
     async loadProductImage(product, imageLoadVersion) {
-      if (!product.imageFilename || product.imageSrc) {
+      const currentProduct = this.products.find(item => item.id === product.id)
+
+      if (!currentProduct?.imageFilename || currentProduct.imageSrc || currentProduct.isImageFailed) {
         return
       }
 
@@ -237,7 +299,13 @@ export default {
             }
           : item)
 
-        const imageSrc = await getShopProductImageSrc(product.imageFilename)
+        const imageSrc = await getShopProductImageSrc(currentProduct.imageFilename, {
+          // 每次首次请求及退避重试前检查，隐藏页面期间不再产生新的图片请求。
+          shouldStartRequest: () => (
+            imageLoadVersion === this.productImageLoadVersion &&
+            this.canScheduleProductImages
+          )
+        })
 
         if (imageLoadVersion !== this.productImageLoadVersion) {
           if (imageSrc.startsWith('blob:')) {
@@ -255,11 +323,16 @@ export default {
               isImageFailed: false
             }
           : item)
-      } catch {
+      } catch (error) {
         if (imageLoadVersion !== this.productImageLoadVersion) {
           return
         }
 
+        if (isProductImageRequestPausedError(error)) {
+          return
+        }
+
+        // 已发出的请求即使在离场后失败，也缓存最终失败态，避免返回商城时重复请求明确无效的图片。
         this.products = this.products.map(item => item.id === product.id
           ? {
               ...item,

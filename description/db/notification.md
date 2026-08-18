@@ -1,6 +1,6 @@
-# 用户通知表：`notification`
+# 用户通知表：notification
 
-## 表介绍
+## 表作用
 
 `notification` 表用于记录需要发送给用户的 Markdown 工作通知及其钉钉投递状态。
 
@@ -8,34 +8,36 @@
 
 ---
 
-## 字段介绍
+## 字段说明
 
-| 字段名                    | 类型              | 是否必填 |                 默认值 | 说明                         |
-| ------------------------- | ----------------- | -------: | ---------------------: | ---------------------------- |
-| `id`                      | `BIGINT UNSIGNED` |       是 |                   自增 | 通知记录主键 ID              |
-| `task_id`                 | `BIGINT UNSIGNED` |       否 |                 `NULL` | 钉钉异步工作通知任务 ID      |
-| `user_id`                 | `VARCHAR(64)`     |       是 |                     无 | 接收用户 ID，关联 `user.id`  |
-| `message_title`           | `VARCHAR(100)`    |       是 |                     无 | Markdown 工作通知标题        |
-| `message_fields`          | `JSON`            |       是 |                     无 | 按展示顺序保存的消息键值列表 |
-| `notification_status`     | `VARCHAR(32)`     |       是 |              `pending` | 通知投递状态                 |
-| `notification_updated_at` | `DATETIME(6)`     |       是 | `CURRENT_TIMESTAMP(6)` | 通知状态最后更新时间         |
-| `created_at`              | `DATETIME(6)`     |       是 | `CURRENT_TIMESTAMP(6)` | 通知创建时间                 |
+| 字段名 | 类型 | 是否必填 | 默认值 | 说明 |
+| --- | --- | ---: | ---: | --- |
+| `id` | `BIGINT UNSIGNED` | 是 | 自增 | 通知记录主键 ID |
+| `task_id` | `BIGINT UNSIGNED` | 否 | `NULL` | 钉钉异步工作通知任务 ID |
+| `user_id` | `VARCHAR(64)` | 是 | 无 | 接收用户 ID，关联 `user.id` |
+| `message_title` | `VARCHAR(100)` | 是 | 无 | Markdown 工作通知标题 |
+| `message_fields` | `JSON` | 是 | 无 | 按展示顺序保存的消息键值列表 |
+| `notification_status` | `VARCHAR(32)` | 是 | `pending` | 通知状态，覆盖待发送至失败的完整投递阶段 |
+| `notification_updated_at` | `DATETIME(6)` | 是 | `CURRENT_TIMESTAMP(6)` | 通知状态最后更新时间 |
+| `created_at` | `DATETIME(6)` | 是 | `CURRENT_TIMESTAMP(6)` | 通知创建时间 |
 
-### 字段设计说明
+---
 
-#### `task_id`
+## 字段设计说明
+
+### task_id
 
 客户端后端成功提交钉钉工作通知后写入的任务 ID，通知尚未提交时为空。
 
-#### `user_id`
+### user_id
 
 接收通知的用户 ID，关联 `user.id`。该值用于指定钉钉工作通知的接收人。
 
-#### `message_title`
+### message_title
 
 Markdown 工作通知的标题，对应钉钉消息中的 `markdown.title`。
 
-#### `message_fields`
+### message_fields
 
 消息正文的有序键值列表，客户端后端将其转换为 `markdown.text`。格式如下：
 
@@ -52,26 +54,26 @@ Markdown 工作通知的标题，对应钉钉消息中的 `markdown.title`。
 ]
 ```
 
-#### `notification_status`
+### notification_status
 
 通知投递状态允许以下取值：
 
-| 字段值       | 说明                                                     |
-| ------------ | -------------------------------------------------------- |
-| `pending`    | 待发送                                                   |
-| `processing` | 发送中                                                   |
-| `accepted`   | 钉钉已受理                                               |
-| `delivered`  | 已送达，包含钉钉返回的已读和未读结果；当前投递任务的终态 |
-| `read`       | 历史兼容的已读终态；当前投递任务不再写入                 |
-| `failed`     | 发送失败                                                 |
+| 字段值 | 说明 |
+| --- | --- |
+| `pending` | 待发送 |
+| `processing` | 发送中 |
+| `accepted` | 钉钉已受理 |
+| `delivered` | 已送达但未读 |
+| `read` | 已读 |
+| `failed` | 发送失败 |
 
-#### `notification_updated_at`
+### notification_updated_at
 
 每次修改 `notification_status` 时同步更新该字段。
 
 ---
 
-## 建表语句
+## MySQL 建表语句
 
 保留以下索引：
 
@@ -87,7 +89,7 @@ CREATE TABLE notification (
     COMMENT '接收通知的用户ID',
   message_title VARCHAR(100) NOT NULL COMMENT 'Markdown工作通知标题',
   message_fields JSON NOT NULL COMMENT '按展示顺序保存的消息键值列表',
-  notification_status VARCHAR(32) NOT NULL DEFAULT 'pending' COMMENT '通知投递状态',
+  notification_status VARCHAR(32) NOT NULL DEFAULT 'pending' COMMENT '通知状态：pending待发送，processing发送中，accepted已受理，delivered已送达，read已读，failed失败',
   notification_updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '通知状态最后更新时间',
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '通知创建时间',
   PRIMARY KEY (id),

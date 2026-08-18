@@ -9,6 +9,7 @@ src/components/UploadProofPanel.vue
 src/components/ProjectHome.vue
 src/views/ProjectHomeView.vue
 src/api/projects.js
+src/utils/proofImageProcessing.js
 ```
 
 ---
@@ -26,6 +27,8 @@ src/api/projects.js
 进入 `HistoryPage` 时，前端会重新查询当前赛季上传历史；即时追加只用于上传成功后的当前会话反馈。
 
 用户完成图片处理后，可点击上传摘要中的“查看处理后的图片”翻转上传面板至背面，在独立的可滚动区域查看完整 WebP 长图；点击“返回编辑”翻回表单，上传字段和已选图片保持不变。
+
+图片压缩、WebP 兼容编码和多图纵向拼接已经集中在 `src/utils/proofImageProcessing.js`。普通上传面板与历史页补传卡共同调用该模块，确保图片数量、清晰度、文件大小和钉钉兼容策略一致。
 
 ---
 
@@ -149,6 +152,7 @@ image=steps-20260719.webp
 ## 移动端弹窗布局与兼容
 
 - 上传表单的图片、配置和备注区域可在弹窗内部滚动；提交按钮固定在弹窗底部、横向填满操作区并保留圆角内边距，避免小屏幕或钉钉内置浏览器可视高度变化时被内容挤出。
+- 备注输入框使用至少 `16px` 的字号，避免 iOS Safari 和部分移动 WebView 在输入框聚焦时自动放大页面；不通过禁止页面缩放的 viewport 配置规避该行为。
 - 上传图片框线和主要颜色先使用基础 CSS 颜色作为回退，再叠加 `color-mix()` 的增强效果；不支持该函数的旧版 Android WebView 仍会显示绿色虚线边框和可辨识的上传区域。
 
 ---

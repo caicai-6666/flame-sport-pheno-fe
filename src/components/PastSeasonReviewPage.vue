@@ -1,16 +1,30 @@
 <template>
   <section class="past-season-page" aria-label="过往赛季上传记录">
     <div class="past-season-hero">
-      <span class="past-season-eyebrow">PAST SEASONS</span>
-      <h1>过往赛季上传记录</h1>
-      <p>{{ heroDescription }}</p>
+      <LiquidCardBackdrop variant="history" />
+      <div class="past-season-hero-content">
+        <span class="past-season-eyebrow">PAST SEASONS</span>
+        <h1>过往赛季上传记录</h1>
+        <p>{{ heroDescription }}</p>
+      </div>
     </div>
+
+    <section
+      class="supplement-records-card"
+      aria-label="可补传记录概况"
+    >
+      <LiquidCardBackdrop variant="supplement" />
+      <span class="supplement-records-copy">
+        <span>可补传记录</span>
+        <strong>{{ supplementSummary }}</strong>
+      </span>
+    </section>
 
     <section class="review-section" aria-label="上传记录列表">
       <div class="review-section-heading">
         <div>
           <span>上传记录</span>
-          <strong>{{ sortedRecords.length ? `${sortedRecords.length} 条已归档` : '暂无归档记录' }}</strong>
+          <strong>{{ recordSummary }}</strong>
         </div>
         <button
           v-if="showCurrentSeasonLink"
@@ -22,42 +36,55 @@
         </button>
       </div>
 
-      <div v-if="sortedRecords.length" class="review-list">
+      <div v-if="displayedRecords.length" class="review-list">
         <div
-          v-for="record in sortedRecords"
+          v-for="record in displayedRecords"
           :key="record.id"
           class="review-card-entry"
         >
+          <SupplementRecordCard
+            v-if="record.isSupplementEligible"
+            :record="record"
+            :project-tasks="projectTasks"
+            :is-write-frozen="isSeasonWriteFrozen"
+            @preview="openProofImage"
+            @submitted="$emit('supplement-submitted', $event)"
+          />
           <article
-          class="review-card"
-          :class="{ 'is-previewable': canPreviewProof(record) }"
-          :style="{ '--accent': record.accent || '#72d84f' }"
-          :role="canPreviewProof(record) ? 'button' : undefined"
-          :tabindex="canPreviewProof(record) ? 0 : undefined"
-          @click="openProofImage(record)"
-          @keydown.enter.prevent="openProofImage(record)"
-          @keydown.space.prevent="openProofImage(record)"
-        >
-          <div class="review-card-top">
-            <div>
-              <span>{{ record.seasonName }}</span>
-              <strong>{{ record.taskName }}</strong>
+            v-else
+            class="review-card"
+            :class="{ 'is-previewable': canPreviewProof(record) }"
+            :style="{ '--accent': record.accent || '#72d84f' }"
+            :role="canPreviewProof(record) ? 'button' : undefined"
+            :tabindex="canPreviewProof(record) ? 0 : undefined"
+            @click="openProofImage(record)"
+            @keydown.enter.prevent="openProofImage(record)"
+            @keydown.space.prevent="openProofImage(record)"
+          >
+            <div class="review-card-top">
+              <div>
+                <span>{{ record.seasonName }}</span>
+                <strong>{{ record.taskName }}</strong>
+              </div>
+              <em :class="`is-${record.result}`">{{ resultText(record.result) }}</em>
             </div>
-            <em :class="`is-${record.result}`">{{ resultText(record.result) }}</em>
-          </div>
 
-          <p v-if="record.note">{{ record.note }}</p>
+            <p v-if="record.note">{{ record.note }}</p>
+            <p v-if="record.reviewComment" class="review-comment">
+              <span>审核意见</span>
+              {{ record.reviewComment }}
+            </p>
 
-          <dl class="review-meta">
-            <div>
-              <dt>上传文件</dt>
-              <dd>{{ record.fileName }}<em v-if="canPreviewProof(record)"> · 点击查看原图</em></dd>
-            </div>
-            <div>
-              <dt>上传时间</dt>
-              <dd>{{ formatDateTime(record.uploadedAt) }}</dd>
-            </div>
-          </dl>
+            <dl class="review-meta">
+              <div>
+                <dt>上传文件</dt>
+                <dd>{{ record.fileName }}<em v-if="canPreviewProof(record)"> · 点击查看原图</em></dd>
+              </div>
+              <div>
+                <dt>上传时间</dt>
+                <dd>{{ formatDateTime(record.uploadedAt) }}</dd>
+              </div>
+            </dl>
           </article>
         </div>
       </div>
@@ -79,18 +106,36 @@
 </template>
 
 <script>
+import LiquidCardBackdrop from './LiquidCardBackdrop.vue'
 import ProofImageViewer from './ProofImageViewer.vue'
+import SupplementRecordCard from './SupplementRecordCard.vue'
+import { prioritizeSupplementRecords } from '../utils/historyRecords'
 import { getReviewStatusText } from '../utils/proofReview'
 
 export default {
   name: 'PastSeasonReviewPage',
+  emits: ['supplement-submitted'],
   components: {
-    ProofImageViewer
+    LiquidCardBackdrop,
+    ProofImageViewer,
+    SupplementRecordCard
   },
   props: {
     records: {
       type: Array,
       default: () => []
+    },
+    supplementRecords: {
+      type: Array,
+      default: () => []
+    },
+    isSupplementRecordsLoading: {
+      type: Boolean,
+      default: false
+    },
+    supplementRecordsError: {
+      type: String,
+      default: ''
     },
     heroDescription: {
       type: String,
@@ -99,11 +144,48 @@ export default {
     showCurrentSeasonLink: {
       type: Boolean,
       default: true
+    },
+    projectTasks: {
+      type: Array,
+      default: () => []
+    },
+    isSeasonWriteFrozen: {
+      type: Boolean,
+      default: false
     }
   },
   computed: {
     sortedRecords() {
       return [...this.records].sort((a, b) => new Date(b.proofDate || b.uploadedAt) - new Date(a.proofDate || a.uploadedAt))
+    },
+    sortedSupplementRecords() {
+      // 后端已经给出补传资格顺序，不能只按日期重排而打乱跨赛季优先级。
+      return this.supplementRecords.map(record => ({
+        ...record,
+        isSupplementEligible: true
+      }))
+    },
+    prioritizedRecords() {
+      return prioritizeSupplementRecords(this.sortedRecords, this.sortedSupplementRecords)
+    },
+    displayedRecords() {
+      return this.prioritizedRecords
+    },
+    supplementSummary() {
+      if (this.isSupplementRecordsLoading) {
+        return '正在查询…'
+      }
+
+      if (this.supplementRecordsError) {
+        return '暂时无法获取'
+      }
+
+      return this.sortedSupplementRecords.length
+        ? `${this.sortedSupplementRecords.length} 条可补传`
+        : '当前无可补传记录'
+    },
+    recordSummary() {
+      return this.displayedRecords.length ? `${this.displayedRecords.length} 条已归档` : '暂无归档记录'
     }
   },
   data() {
@@ -153,6 +235,8 @@ export default {
 <style scoped>
 .past-season-page {
   height: calc(100vh - 188px);
+  height: calc(100vh - 172px - env(safe-area-inset-top) - max(8px, env(safe-area-inset-bottom)));
+  height: calc(100dvh - 172px - env(safe-area-inset-top) - max(8px, env(safe-area-inset-bottom)));
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -164,23 +248,30 @@ export default {
   overflow: hidden;
   flex-shrink: 0;
   padding: 24px;
-  border: 1px solid rgba(23, 33, 27, 0.08);
+  border: 0;
   border-radius: 32px;
-  background:
-    radial-gradient(circle at 84% 18%, rgba(114, 216, 79, 0.28), transparent 27%),
-    linear-gradient(140deg, rgba(255, 255, 255, 0.95), rgba(240, 249, 239, 0.88));
-  box-shadow: 0 18px 44px rgba(38, 64, 45, 0.1);
+  background: linear-gradient(140deg, #211006, #713415);
+  box-shadow:
+    0 2px 5px rgba(55, 24, 7, 0.1),
+    0 10px 24px rgba(55, 24, 7, 0.21);
+}
+
+.past-season-hero-content {
+  position: relative;
+  z-index: 2;
 }
 
 .past-season-eyebrow {
-  color: #2f8f32;
+  color: #ffd28a;
   font-size: 11px;
   font-weight: 950;
   letter-spacing: 0.16em;
+  text-shadow: 0 0 18px rgba(255, 160, 68, 0.5);
 }
 
 .past-season-hero h1 {
   margin: 10px 0 8px;
+  color: #fff;
   font-size: clamp(28px, 7.4vw, 34px);
   line-height: 1.08;
   letter-spacing: -0.04em;
@@ -189,10 +280,56 @@ export default {
 .past-season-hero p {
   max-width: 300px;
   margin: 0;
-  color: #68766d;
+  color: rgba(255, 241, 221, 0.74);
   font-size: 13px;
   font-weight: 750;
   line-height: 1.6;
+}
+
+.supplement-records-card {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 16px;
+  border: 0;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(255, 112, 67, 0.46), transparent 34%),
+    linear-gradient(138deg, #160d2e, #54216f 58%, #28103d);
+  box-shadow:
+    0 2px 5px rgba(49, 18, 76, 0.07),
+    0 9px 22px rgba(49, 18, 76, 0.16);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.supplement-records-copy > span {
+  position: relative;
+  z-index: 2;
+  color: rgba(255, 239, 194, 0.76);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.supplement-records-copy > strong {
+  position: relative;
+  z-index: 2;
+  display: block;
+  margin-top: 6px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 950;
+  line-height: 1.1;
 }
 
 .review-section {
@@ -201,7 +338,9 @@ export default {
   border: 1px solid rgba(23, 33, 27, 0.08);
   border-radius: 30px;
   background: rgba(255, 255, 255, 0.58);
-  box-shadow: 0 16px 34px rgba(38, 64, 45, 0.06);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.04),
+    0 9px 22px rgba(38, 64, 45, 0.1);
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -283,7 +422,9 @@ export default {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.72)),
     #fff;
-  box-shadow: 0 16px 38px rgba(38, 64, 45, 0.08);
+  box-shadow:
+    0 2px 5px rgba(38, 64, 45, 0.05),
+    0 10px 24px rgba(38, 64, 45, 0.12);
 }
 
 .review-card-entry {
@@ -394,6 +535,20 @@ export default {
   line-height: 1.55;
 }
 
+.review-card .review-comment {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 159, 69, 0.09);
+  color: #70513b;
+}
+
+.review-comment span {
+  margin-right: 6px;
+  color: #c65f1b;
+  font-size: 11px;
+  font-weight: 950;
+}
+
 .review-meta {
   margin: 14px 0 0;
   display: grid;
@@ -456,6 +611,12 @@ export default {
   margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.65;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .supplement-records-card {
+    transition: none;
+  }
 }
 
 </style>

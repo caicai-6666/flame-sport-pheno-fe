@@ -39,6 +39,19 @@ function getProofFileName(record) {
   return segments[segments.length - 1] || 'proof.webp'
 }
 
+function getProofRecordId(record) {
+  const directId = record.proofRecordId || record.proof_record_id || record.id
+
+  if (directId) {
+    return String(directId)
+  }
+
+  const imageUrl = String(record.imageUrl || record.image_url || '')
+  const pathMatch = imageUrl.match(/\/proof_record\/([^/?#]+)/)
+
+  return pathMatch?.[1] || ''
+}
+
 function normalizeCurrentSeasonRecord(record, index) {
   const project = record.project || {}
   const uploadConfig = record.upload_config || record.project_upload_config || {}
@@ -90,9 +103,11 @@ function normalizePastSeasonRecord(record, index) {
   const projectName = record.projectName || record.project_name || record.taskName || ''
   const reviewComment = String(record.reviewComment || record.review_comment || '').trim()
   const uploadedAt = record.createdAt || record.created_at || record.uploadedAt || record.uploaded_at || ''
+  const proofRecordId = getProofRecordId(record)
 
   return {
-    id: String(record.id || record.proof_record_id || `${seasonName || index}-${projectName || index}-${uploadedAt || index}`),
+    id: proofRecordId || `${seasonName || index}-${projectName || index}-${uploadedAt || index}`,
+    proofRecordId,
     seasonName,
     taskName: projectName,
     fileName: record.imageName || record.image_name || getProofFileName(record),
@@ -102,6 +117,23 @@ function normalizePastSeasonRecord(record, index) {
     accent: record.accent || HISTORY_ACCENTS[index % HISTORY_ACCENTS.length],
     proofDate: record.proofDate || record.proof_date || '',
     uploadedAt
+  }
+}
+
+function normalizeSupplementRecord(record, index) {
+  const normalizedRecord = normalizePastSeasonRecord(record, index)
+  const proofRecordId = getProofRecordId(record)
+  const reviewComment = String(record.reviewComment || record.review_comment || '').trim()
+
+  return {
+    ...normalizedRecord,
+    id: String(proofRecordId || normalizedRecord.id),
+    proofRecordId: String(proofRecordId || ''),
+    seasonId: String(record.seasonId || record.season_id || ''),
+    seasonUserId: String(record.seasonUserId || record.season_user_id || ''),
+    projectId: String(record.projectId || record.project_id || ''),
+    note: String(record.note || '').trim(),
+    reviewComment
   }
 }
 
@@ -127,6 +159,54 @@ export async function getPastSeasonProofHistory() {
   const records = Array.isArray(response) ? response : response.records
 
   return (records || []).map(normalizePastSeasonRecord)
+}
+
+/**
+ * 获取结算中赛季仍向当前用户开放的补传记录。
+ *
+ * 查询本身不修改资格；真正补交由 /supplement/upload 完成。
+ */
+export async function getSupplementRecords() {
+  const response = await request.get('/supplement/records')
+  const records = Array.isArray(response) ? response : response.records
+
+  return (records || []).map(normalizeSupplementRecord)
+}
+
+/**
+ * 原位补交一条仍具备资格的结算赛季凭证。
+ *
+ * 赛季、项目和运动日期必须与资格绑定的原凭证一致；接口成功后资格会被消费。
+ */
+export async function uploadSupplementProof({
+  proofRecordId,
+  seasonId,
+  projectId,
+  projectUploadConfigId,
+  recordType,
+  proofDate,
+  note,
+  imageFile
+}) {
+  const formData = new FormData()
+
+  formData.append('proof_record_id', proofRecordId)
+  formData.append('season_id', seasonId)
+  formData.append('project_id', projectId)
+  formData.append('project_upload_config_id', projectUploadConfigId)
+  if (recordType) {
+    formData.append('record_type', recordType)
+  }
+  formData.append('proof_date', proofDate)
+  formData.append('note', note || '')
+  formData.append('image', imageFile, imageFile.name)
+
+  const response = await request.post('/supplement/upload', formData)
+
+  return {
+    createdAt: response?.created_at || response?.createdAt || '',
+    proofDate: response?.proof_date || response?.proofDate || ''
+  }
 }
 
 /**
