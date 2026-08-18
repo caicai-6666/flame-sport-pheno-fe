@@ -528,8 +528,8 @@ export default {
     radial-gradient(circle at 92% 8%, rgba(255, 112, 67, 0.17), transparent 38%),
     linear-gradient(145deg, rgba(248, 244, 255, 0.99), rgba(241, 232, 255, 0.94) 58%, rgba(255, 244, 231, 0.96));
   box-shadow:
-    0 2px 5px rgba(63, 31, 95, 0.07),
-    0 10px 24px rgba(63, 31, 95, 0.16);
+    0 2px 4px rgba(63, 31, 95, 0.07),
+    0 8px 18px rgba(63, 31, 95, 0.14);
 }
 
 .supplement-record-face.is-front::before {
@@ -548,7 +548,18 @@ export default {
   background:
     radial-gradient(circle at 96% 2%, rgba(255, 112, 67, 0.13), transparent 32%),
     linear-gradient(155deg, #fbf9ff, #f4edff 54%, #fff8ef);
-  box-shadow: 0 24px 54px rgba(63, 31, 95, 0.2);
+  box-shadow: none;
+}
+
+/* 隐藏面不参与阴影合成，避免部分 WebView 在 3D 翻面层上绘制拉长的重影。 */
+.supplement-record-shell.is-editing .supplement-record-face.is-front {
+  box-shadow: none;
+}
+
+.supplement-record-shell.is-editing .supplement-record-face.is-back {
+  box-shadow:
+    0 3px 6px rgba(63, 31, 95, 0.08),
+    0 12px 26px rgba(63, 31, 95, 0.16);
 }
 
 .supplement-record-top,

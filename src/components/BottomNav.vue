@@ -53,8 +53,8 @@ export default {
   position: fixed;
   z-index: 4;
   right: 50%;
-  bottom: 8px;
-  bottom: max(8px, env(safe-area-inset-bottom));
+  bottom: 4px;
+  bottom: max(4px, env(safe-area-inset-bottom));
   overflow: hidden;
   width: min(calc(100vw - 28px), 398px);
   min-height: 72px;

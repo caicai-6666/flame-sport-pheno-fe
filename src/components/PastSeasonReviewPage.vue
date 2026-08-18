@@ -212,7 +212,7 @@ export default {
       return `${date.getFullYear()}.${month}.${day} ${hour}:${minute}`
     },
     openCurrentSeasonHistory() {
-      this.$router.push({ name: 'history' })
+      this.$router.replace({ name: 'history' })
     },
     openProofImage(record) {
       if (this.canPreviewProof(record)) {
@@ -234,9 +234,7 @@ export default {
 
 <style scoped>
 .past-season-page {
-  height: calc(100vh - 188px);
-  height: calc(100vh - 172px - env(safe-area-inset-top) - max(8px, env(safe-area-inset-bottom)));
-  height: calc(100dvh - 172px - env(safe-area-inset-top) - max(8px, env(safe-area-inset-bottom)));
+  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -397,7 +395,8 @@ export default {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-right: 4px;
+  /* 独立过往记录页与历史看板使用同一阴影安全区，避免底部暗带式鬼影。 */
+  padding: 4px 8px calc(84px + max(4px, env(safe-area-inset-bottom))) 4px;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -423,8 +422,8 @@ export default {
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.72)),
     #fff;
   box-shadow:
-    0 2px 5px rgba(38, 64, 45, 0.05),
-    0 10px 24px rgba(38, 64, 45, 0.12);
+    0 2px 4px rgba(38, 64, 45, 0.06),
+    0 8px 18px rgba(38, 64, 45, 0.11);
 }
 
 .review-card-entry {
@@ -435,23 +434,25 @@ export default {
   cursor: pointer;
   border-color: color-mix(in srgb, var(--accent), #fff 72%);
   box-shadow:
-    0 3px 0 color-mix(in srgb, var(--accent), #fff 80%),
-    0 16px 38px rgba(38, 64, 45, 0.08);
+    0 2px 4px rgba(38, 64, 45, 0.06),
+    0 8px 18px rgba(38, 64, 45, 0.11);
   transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 160ms ease, border-color 160ms ease;
 }
 
-.review-card.is-previewable:hover {
-  border-color: color-mix(in srgb, var(--accent), #fff 48%);
-  box-shadow:
-    0 5px 0 color-mix(in srgb, var(--accent), #fff 80%),
-    0 22px 42px rgba(38, 64, 45, 0.14);
-  transform: translateY(-3px);
+@media (hover: hover) and (pointer: fine) {
+  .review-card.is-previewable:hover {
+    border-color: color-mix(in srgb, var(--accent), #fff 48%);
+    box-shadow:
+      0 3px 6px rgba(38, 64, 45, 0.07),
+      0 10px 22px rgba(38, 64, 45, 0.13);
+    transform: translateY(-2px);
+  }
 }
 
 .review-card.is-previewable:active {
   box-shadow:
-    0 1px 0 color-mix(in srgb, var(--accent), #fff 82%),
-    0 8px 18px rgba(38, 64, 45, 0.1);
+    0 1px 3px rgba(38, 64, 45, 0.06),
+    0 5px 12px rgba(38, 64, 45, 0.09);
   transform: translateY(2px) scale(0.988);
 }
 

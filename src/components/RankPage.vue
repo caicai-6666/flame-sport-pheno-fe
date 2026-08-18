@@ -269,9 +269,7 @@ export default {
 
 <style scoped>
 .rank-page {
-  height: calc(100vh - 188px);
-  height: calc(100vh - 172px - env(safe-area-inset-top) - max(8px, env(safe-area-inset-bottom)));
-  height: calc(100dvh - 172px - env(safe-area-inset-top) - max(8px, env(safe-area-inset-bottom)));
+  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -411,6 +409,7 @@ export default {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 4px;
+  padding-bottom: calc(84px + max(4px, env(safe-area-inset-bottom)));
   display: flex;
   flex: 1;
   flex-direction: column;

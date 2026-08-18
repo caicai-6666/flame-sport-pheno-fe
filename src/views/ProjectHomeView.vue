@@ -318,7 +318,7 @@ export default {
         query.seasonId = this.currentSeason.seasonId
       }
 
-      this.$router.push({
+      this.$router.replace({
         name: 'project-detail',
         params: { taskName: task.name },
         query

@@ -22,7 +22,7 @@
       <span class="module-eyebrow">UNKNOWN CHALLENGE</span>
       <h1>未找到运动项目</h1>
       <p>当前链接对应的运动项目不存在，请返回项目列表重新选择。</p>
-      <button class="module-action" type="button" @click="$router.push({ name: 'projects' })">
+      <button class="module-action" type="button" @click="$router.replace({ name: 'projects' })">
         返回项目列表
       </button>
     </section>

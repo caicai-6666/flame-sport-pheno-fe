@@ -5,7 +5,9 @@
       <HeaderBar
         :active-title="activeTitle"
         :is-detail="isProjectDetail"
+        :is-exiting="isApplicationExiting"
         @back="goBack"
+        @exit="exitApplication"
       />
 
       <main class="page-content">
@@ -36,6 +38,12 @@
         :active-key="activeNav"
         @change="changeNav"
       />
+
+      <Transition name="exit-notice">
+        <p v-if="applicationExitError" class="application-exit-notice" role="alert">
+          {{ applicationExitError }}
+        </p>
+      </Transition>
 
       <UserHealthProfilePanel
         v-if="shouldCollectHealthProfile"
@@ -112,6 +120,7 @@ import launchCoverSource from './assets/cover.webp'
 import HeaderBar from './components/HeaderBar.vue'
 import BottomNav from './components/BottomNav.vue'
 import UserHealthProfilePanel from './components/UserHealthProfilePanel.vue'
+import { closeDingTalkApplication } from './api/dingtalkNavigation'
 import { updateUserProfile } from './api/userProfile'
 import { getLoginCredentialSource } from './api/loginCredential'
 import { findTaskByName } from './state/appState'
@@ -125,6 +134,9 @@ const navItems = [
   { key: 'shop', label: '商城', icon: '🛍', routeName: 'shop' }
 ]
 const LAUNCH_COVER_MIN_DURATION = 1000
+const EDGE_GESTURE_START_WIDTH = 24
+const EDGE_GESTURE_EXIT_DISTANCE = 72
+const EDGE_GESTURE_MAX_DURATION = 900
 
 export default {
   name: 'App',
@@ -145,7 +157,12 @@ export default {
       healthProfileSaveError: null,
       healthProfileConfettiBursts: [],
       healthProfileConfettiTimers: [],
-      pageTransitionName: 'route-crossfade'
+      pageTransitionName: 'route-crossfade',
+      isApplicationExiting: false,
+      applicationExitError: '',
+      applicationExitErrorTimer: null,
+      edgeExitGesture: null,
+      edgeGestureTarget: null
     }
   },
   computed: {
@@ -243,6 +260,13 @@ export default {
       }
     }
   },
+  mounted() {
+    this.edgeGestureTarget = this.$el
+    this.edgeGestureTarget.addEventListener('touchstart', this.handleEdgeTouchStart, { passive: true, capture: true })
+    this.edgeGestureTarget.addEventListener('touchmove', this.handleEdgeTouchMove, { passive: false, capture: true })
+    this.edgeGestureTarget.addEventListener('touchend', this.handleEdgeTouchEnd, { passive: true, capture: true })
+    this.edgeGestureTarget.addEventListener('touchcancel', this.resetEdgeExitGesture, { passive: true, capture: true })
+  },
   methods: {
     handleLaunchCoverLoaded() {
       this.isLaunchCoverImageLoaded = true
@@ -270,10 +294,104 @@ export default {
         return
       }
 
-      this.$router.push({ name: item.routeName })
+      this.$router.replace({ name: item.routeName })
     },
     goBack() {
-      this.$router.push({ name: 'projects' })
+      this.$router.replace({ name: 'projects' })
+    },
+    async exitApplication() {
+      if (this.isApplicationExiting) {
+        return
+      }
+
+      this.isApplicationExiting = true
+      this.applicationExitError = ''
+      window.clearTimeout(this.applicationExitErrorTimer)
+
+      try {
+        await closeDingTalkApplication()
+      } catch (error) {
+        this.applicationExitError = error?.message || '退出失败，请稍后重试'
+        this.applicationExitErrorTimer = window.setTimeout(() => {
+          this.applicationExitError = ''
+          this.applicationExitErrorTimer = null
+        }, 3200)
+      } finally {
+        this.isApplicationExiting = false
+      }
+    },
+    handleEdgeTouchStart(event) {
+      if (!this.canRenderApplication || event.touches.length !== 1) {
+        this.resetEdgeExitGesture()
+        return
+      }
+
+      const touch = event.touches[0]
+      const appBounds = this.$el.getBoundingClientRect()
+      const relativeX = touch.clientX - appBounds.left
+      const startsAtLeftEdge = relativeX >= 0 && relativeX <= EDGE_GESTURE_START_WIDTH
+      const startsAtRightEdge = relativeX <= appBounds.width && relativeX >= appBounds.width - EDGE_GESTURE_START_WIDTH
+
+      if (!startsAtLeftEdge && !startsAtRightEdge) {
+        this.resetEdgeExitGesture()
+        return
+      }
+
+      this.edgeExitGesture = {
+        side: startsAtLeftEdge ? 'left' : 'right',
+        startX: touch.clientX,
+        startY: touch.clientY,
+        startedAt: Date.now(),
+        isHorizontal: false
+      }
+    },
+    handleEdgeTouchMove(event) {
+      const gesture = this.edgeExitGesture
+
+      if (!gesture || event.touches.length !== 1) {
+        return
+      }
+
+      const touch = event.touches[0]
+      const deltaX = touch.clientX - gesture.startX
+      const deltaY = touch.clientY - gesture.startY
+      const inwardDistance = gesture.side === 'left' ? deltaX : -deltaX
+
+      if (Math.abs(deltaY) > 12 && Math.abs(deltaY) > Math.abs(deltaX)) {
+        this.resetEdgeExitGesture()
+        return
+      }
+
+      if (inwardDistance > 8 && inwardDistance > Math.abs(deltaY) * 1.2) {
+        // 边缘返回手势一旦被识别就阻止 WebView 接管，避免先退回上一条前端路由。
+        gesture.isHorizontal = true
+        event.preventDefault()
+      }
+    },
+    handleEdgeTouchEnd(event) {
+      const gesture = this.edgeExitGesture
+      const touch = event.changedTouches[0]
+      this.resetEdgeExitGesture()
+
+      if (!gesture?.isHorizontal || !touch) {
+        return
+      }
+
+      const deltaX = touch.clientX - gesture.startX
+      const deltaY = touch.clientY - gesture.startY
+      const inwardDistance = gesture.side === 'left' ? deltaX : -deltaX
+      const gestureDuration = Date.now() - gesture.startedAt
+
+      if (
+        inwardDistance >= EDGE_GESTURE_EXIT_DISTANCE &&
+        Math.abs(deltaY) <= inwardDistance * 0.72 &&
+        gestureDuration <= EDGE_GESTURE_MAX_DURATION
+      ) {
+        this.exitApplication()
+      }
+    },
+    resetEdgeExitGesture() {
+      this.edgeExitGesture = null
     },
     retryLogin() {
       initLogin()
@@ -349,7 +467,12 @@ export default {
   beforeUnmount() {
     document.body.classList.remove('is-profile-panel-open')
     document.body.classList.remove('is-auth-panel-open')
+    this.edgeGestureTarget?.removeEventListener('touchstart', this.handleEdgeTouchStart, true)
+    this.edgeGestureTarget?.removeEventListener('touchmove', this.handleEdgeTouchMove, true)
+    this.edgeGestureTarget?.removeEventListener('touchend', this.handleEdgeTouchEnd, true)
+    this.edgeGestureTarget?.removeEventListener('touchcancel', this.resetEdgeExitGesture, true)
     window.clearTimeout(this.launchCoverTimer)
+    window.clearTimeout(this.applicationExitErrorTimer)
     this.healthProfileConfettiTimers.forEach(timer => window.clearTimeout(timer))
   }
 }
@@ -357,6 +480,7 @@ export default {
 
 <style>
 :root {
+  --header-height: 64px;
   --ink: #17211b;
   --muted: #718078;
   --line: rgba(23, 33, 27, 0.1);
@@ -442,11 +566,11 @@ button {
   overflow: hidden;
   flex: 1;
   min-height: 0;
-  padding: 92px 0 96px;
+  padding: var(--header-height) 0 0;
   padding:
-    calc(92px + env(safe-area-inset-top))
+    calc(var(--header-height) + env(safe-area-inset-top))
     0
-    calc(80px + max(8px, env(safe-area-inset-bottom)));
+    0;
   overscroll-behavior: none;
   display: grid;
   align-items: start;
@@ -459,11 +583,51 @@ button {
   min-width: 0;
   width: 100%;
   height: 100%;
-  padding: 0 18px;
+  padding: 16px 18px calc(92px + max(4px, env(safe-area-inset-bottom)));
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+/* 固定高度页面把避让空间放进自己的滚动列表，底部玻璃栏才能真正悬浮在内容上方。 */
+.route-page-frame.rank-page,
+.route-page-frame.history-page,
+.route-page-frame.past-season-page {
+  padding-bottom: 0;
+}
+
+.application-exit-notice {
+  position: fixed;
+  z-index: 24;
+  top: calc(70px + env(safe-area-inset-top));
+  left: 50%;
+  max-width: min(calc(100vw - 44px), 360px);
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(123, 67, 42, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 248, 239, 0.94);
+  color: #78401f;
+  box-shadow: 0 10px 26px rgba(66, 36, 20, 0.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.exit-notice-enter-active,
+.exit-notice-leave-active {
+  transition: opacity 220ms ease, transform 260ms cubic-bezier(0.2, 0.82, 0.2, 1);
+}
+
+.exit-notice-enter-from,
+.exit-notice-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -10px) scale(0.96);
 }
 
 .route-slide-left-enter-active,
@@ -731,6 +895,11 @@ button {
   .route-slide-right-leave-active,
   .route-crossfade-enter-active,
   .route-crossfade-leave-active {
+    transition-duration: 1ms;
+  }
+
+  .exit-notice-enter-active,
+  .exit-notice-leave-active {
     transition-duration: 1ms;
   }
 

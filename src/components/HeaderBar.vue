@@ -2,6 +2,20 @@
   <header class="header-bar">
     <div class="brand-group">
       <button
+        class="exit-button"
+        :class="{ 'is-exiting': isExiting }"
+        type="button"
+        :disabled="isExiting"
+        :aria-label="isExiting ? '正在退出应用' : '退出应用'"
+        title="退出应用"
+        @click="$emit('exit')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2.75v8.5" />
+          <path d="M7.4 5.85a8 8 0 1 0 9.2 0" />
+        </svg>
+      </button>
+      <button
         v-if="isDetail"
         class="back-button"
         type="button"
@@ -40,6 +54,10 @@ export default {
       required: true
     },
     isDetail: {
+      type: Boolean,
+      default: false
+    },
+    isExiting: {
       type: Boolean,
       default: false
     }
@@ -95,7 +113,7 @@ export default {
       URL.revokeObjectURL(this.avatarObjectUrl)
     }
   },
-  emits: ['back']
+  emits: ['back', 'exit']
 }
 </script>
 
@@ -106,20 +124,20 @@ export default {
   top: 0;
   left: 50%;
   width: min(100vw, 430px);
-  min-height: 76px;
-  min-height: calc(76px + env(safe-area-inset-top));
-  padding: 16px 18px 16px;
-  padding: calc(16px + env(safe-area-inset-top)) 18px 16px;
+  min-height: var(--header-height);
+  min-height: calc(var(--header-height) + env(safe-area-inset-top));
+  padding: 8px 18px 12px;
+  padding: calc(8px + env(safe-area-inset-top)) 18px 12px;
   background:
     linear-gradient(
       180deg,
       rgba(248, 251, 245, 0.98) 0%,
-      rgba(248, 251, 245, 0.9) 62%,
-      rgba(248, 251, 245, 0) 100%
+      rgba(248, 251, 245, 0.96) 100%
     ),
-    rgba(255, 255, 255, 0.72);
+    #f8fbf5;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  pointer-events: none;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -134,6 +152,87 @@ export default {
   align-items: center;
   gap: 10px;
   min-width: 0;
+  pointer-events: auto;
+}
+
+.exit-button {
+  position: relative;
+  overflow: hidden;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border: 1px solid rgba(41, 94, 55, 0.14);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(205, 239, 209, 0.66)),
+    rgba(234, 246, 235, 0.88);
+  color: #236b38;
+  box-shadow:
+    0 8px 18px rgba(34, 85, 47, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition:
+    color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.exit-button::before {
+  position: absolute;
+  inset: -60% 36% -60% -48%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.74), transparent);
+  content: '';
+  transform: rotate(18deg);
+}
+
+.exit-button svg {
+  position: relative;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.1;
+}
+
+.exit-button:active {
+  transform: scale(0.94);
+}
+
+.exit-button:focus-visible {
+  outline: 3px solid rgba(114, 216, 79, 0.32);
+  outline-offset: 2px;
+}
+
+.exit-button.is-exiting {
+  color: #163d23;
+  cursor: wait;
+  box-shadow:
+    0 4px 12px rgba(34, 85, 47, 0.11),
+    inset 0 0 0 8px rgba(114, 216, 79, 0.1);
+}
+
+.exit-button.is-exiting svg {
+  animation: exit-button-pulse 720ms ease-in-out infinite alternate;
+}
+
+@keyframes exit-button-pulse {
+  to {
+    opacity: 0.52;
+    transform: scale(0.88);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exit-button,
+  .exit-button.is-exiting svg {
+    animation: none;
+    transition: none;
+  }
 }
 
 .back-button {
@@ -165,6 +264,7 @@ export default {
   justify-content: flex-end;
   gap: 10px;
   min-width: 0;
+  pointer-events: auto;
 }
 
 .current-title {
