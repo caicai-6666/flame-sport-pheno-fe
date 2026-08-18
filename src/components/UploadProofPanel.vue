@@ -912,11 +912,8 @@ export default {
 
 <style scoped>
 .upload-overlay {
-  --upload-safe-top: 92px;
-  --upload-header-height: 76px;
   --upload-panel-edge-gap: 16px;
-  --upload-bottom-nav-space: 88px;
-  --upload-panel-header-gap: calc(var(--upload-safe-top) - var(--upload-header-height) + var(--upload-panel-edge-gap));
+  --upload-bottom-nav-space: calc(72px + max(4px, env(safe-area-inset-bottom)));
 
   position: fixed;
   z-index: 20;
@@ -931,9 +928,9 @@ export default {
 
 .upload-panel {
   position: absolute;
-  top: calc(var(--upload-safe-top) + var(--upload-panel-edge-gap));
+  top: calc(var(--header-height) + env(safe-area-inset-top) + var(--upload-panel-edge-gap));
   right: 16px;
-  bottom: calc(var(--upload-bottom-nav-space) + var(--upload-panel-header-gap));
+  bottom: calc(var(--upload-bottom-nav-space) + var(--upload-panel-edge-gap));
   width: min(330px, calc(100% - 58px));
   perspective: 1200px;
 }
@@ -1735,7 +1732,6 @@ export default {
 
 @media (max-height: 640px) {
   .upload-overlay {
-    --upload-safe-top: 84px;
     --upload-panel-edge-gap: 10px;
   }
 

@@ -142,10 +142,11 @@
         :disabled="isTaskDisabled(task)"
         :aria-pressed="isTaskLocked(task)"
         :style="{ '--accent': task.accent }"
-        @pointerdown="pressTask(task)"
-        @pointerup="releaseTask(task)"
-        @pointerleave="cancelPress(task)"
-        @pointercancel="cancelPress(task)"
+        @pointerdown="pressTask(task, $event)"
+        @pointermove="trackTaskPress(task, $event)"
+        @pointerup="releaseTask(task, $event)"
+        @pointerleave="cancelPress(task, $event)"
+        @pointercancel="cancelPress(task, $event)"
         @keydown.enter.prevent="selectWithKeyboard(task)"
         @keydown.space.prevent="selectWithKeyboard(task)"
         @transitionend="finishRecovery(task, $event)"
@@ -192,17 +193,19 @@
       </button>
     </div>
 
-    <Transition name="upload-panel">
-      <UploadProofPanel
-        v-if="activeUploadTask"
-        :task="activeUploadTask"
-        :season="season"
-        :season-id="seasonId"
-        :is-write-frozen="isSeasonWriteFrozen"
-        @close="closeUploadPanel"
-        @submit-proof="$emit('submit-proof', $event)"
-      />
-    </Transition>
+    <Teleport to="body">
+      <Transition name="upload-panel">
+        <UploadProofPanel
+          v-if="activeUploadTask"
+          :task="activeUploadTask"
+          :season="season"
+          :season-id="seasonId"
+          :is-write-frozen="isSeasonWriteFrozen"
+          @close="closeUploadPanel"
+          @submit-proof="$emit('submit-proof', $event)"
+        />
+      </Transition>
+    </Teleport>
 
     <SuggestionPanel v-if="isSuggestionPanelOpen" @close="closeSuggestionPanel" />
 
@@ -261,6 +264,8 @@ import activityRuleImage from '../assets/活动规则.webp'
 import feedbackIcon from '../assets/xinxiang.webp'
 import SuggestionPanel from './SuggestionPanel.vue'
 
+const TASK_PRESS_SCROLL_THRESHOLD = 10
+
 export default {
   name: 'ProjectHome',
   components: {
@@ -273,6 +278,7 @@ export default {
       pressedTask: '',
       recoveringTask: '',
       pendingTask: null,
+      taskPressGesture: null,
       activeUploadTask: null,
       isSuggestionPanelOpen: false,
       confirmingChallengeLevel: '',
@@ -692,16 +698,63 @@ export default {
 
       return '查看挑战 →'
     },
-    pressTask(task) {
+    pressTask(task, event = null) {
       if (this.isTaskDisabled(task)) {
+        return
+      }
+
+      if (event && event.pointerType === 'mouse' && event.button !== 0) {
         return
       }
 
       this.recoveringTask = ''
       this.pendingTask = null
       this.pressedTask = task.name
+      this.taskPressGesture = event
+        ? {
+            taskName: task.name,
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            hasMoved: false
+          }
+        : null
     },
-    releaseTask(task) {
+    trackTaskPress(task, event) {
+      const gesture = this.taskPressGesture
+
+      if (!gesture || gesture.taskName !== task.name || gesture.pointerId !== event.pointerId) {
+        return
+      }
+
+      const movedDistance = Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY)
+
+      if (movedDistance < TASK_PRESS_SCROLL_THRESHOLD) {
+        return
+      }
+
+      // 钉钉 WebView 在滚动结束后仍可能派发 pointerup，越过阈值后必须永久取消本次卡片选择。
+      gesture.hasMoved = true
+      this.pressedTask = ''
+      this.recoveringTask = ''
+      this.pendingTask = null
+    },
+    releaseTask(task, event = null) {
+      const gesture = this.taskPressGesture
+      const isPointerGesture = Boolean(event)
+      const isMatchingPointer = !isPointerGesture || (
+        gesture?.taskName === task.name &&
+        gesture?.pointerId === event.pointerId
+      )
+      const shouldCancelSelection = isPointerGesture && (!isMatchingPointer || gesture?.hasMoved)
+
+      this.taskPressGesture = null
+
+      if (shouldCancelSelection) {
+        this.cancelPress(task)
+        return
+      }
+
       if (this.pressedTask !== task.name) {
         return
       }
@@ -710,9 +763,20 @@ export default {
       this.recoveringTask = task.name
       this.pendingTask = task
     },
-    cancelPress(task) {
+    cancelPress(task, event = null) {
+      if (event && this.taskPressGesture?.pointerId !== event.pointerId) {
+        return
+      }
+
+      this.taskPressGesture = null
+
       if (this.pressedTask === task.name) {
         this.pressedTask = ''
+      }
+
+      if (this.recoveringTask === task.name) {
+        this.recoveringTask = ''
+        this.pendingTask = null
       }
     },
     selectWithKeyboard(task) {
