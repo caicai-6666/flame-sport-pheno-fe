@@ -34,6 +34,7 @@
       </main>
 
       <BottomNav
+        ref="bottomNav"
         :items="navItems"
         :active-key="activeNav"
         @change="changeNav"
@@ -162,10 +163,16 @@ export default {
       applicationExitError: '',
       applicationExitErrorTimer: null,
       edgeExitGesture: null,
-      edgeGestureTarget: null
+      edgeGestureTarget: null,
+      viewportResizeObserver: null,
+      viewportResizeTimer: null
     }
   },
   computed: {
+    isAppleMobile() {
+      const ua = window.navigator?.userAgent || ''
+      return /iphone|ipad|ipod/i.test(ua)
+    },
     activeNav() {
       return this.$route.meta.navKey || 'project'
     },
@@ -266,8 +273,96 @@ export default {
     this.edgeGestureTarget.addEventListener('touchmove', this.handleEdgeTouchMove, { passive: false, capture: true })
     this.edgeGestureTarget.addEventListener('touchend', this.handleEdgeTouchEnd, { passive: true, capture: true })
     this.edgeGestureTarget.addEventListener('touchcancel', this.resetEdgeExitGesture, { passive: true, capture: true })
+
+    this.syncViewportMetrics()
+    this.syncBottomNavSpacing()
+    window.addEventListener('resize', this.handleViewportResize, { passive: true })
+
+    if (window.visualViewport) {
+      const visualViewport = window.visualViewport
+      this.viewportResizeObserver = visualViewport
+      visualViewport.addEventListener('resize', this.handleViewportResize, { passive: true })
+    }
   },
   methods: {
+    resolveViewportSize(values, fallback) {
+      const normalized = values.filter(value => Number.isFinite(value))
+
+      if (!normalized.length) {
+        return fallback
+      }
+
+      // iOS 旧 WebView 可能把 visualViewport 缩成安全区内的子区域，回退时取布局候选中的最大值；
+      // 非 iOS 使用较保守的最小值，避免把工具栏或系统 UI 一起计入布局高度。
+      if (this.isAppleMobile) {
+        return Math.round(Math.max(...normalized.slice(0, 3)))
+      }
+
+      return Math.round(Math.min(...normalized))
+    },
+    syncViewportMetrics() {
+      document.documentElement.classList.toggle('is-apple-mobile', this.isAppleMobile)
+
+      const viewportHeightCandidates = [
+        window.visualViewport?.height,
+        window.innerHeight,
+        document.documentElement.clientHeight,
+        window.screen?.height
+      ]
+      const viewportWidthCandidates = [
+        window.visualViewport?.width,
+        window.innerWidth,
+        document.documentElement.clientWidth,
+        window.screen?.width
+      ]
+
+      const viewportHeight = Math.max(this.resolveViewportSize(viewportHeightCandidates, 1), 1)
+      const viewportWidth = Math.max(this.resolveViewportSize(viewportWidthCandidates, 1), 1)
+
+      // iOS 钉钉 WebView 的 visualViewport 可能只返回当前可视子区域，不能用它裁剪整页。
+      // 支持 large viewport 的设备使用 100lvh；旧 WebView 回退到布局视口高度。
+      const supportsLargeViewport = this.isAppleMobile
+        && typeof window.CSS?.supports === 'function'
+        && window.CSS.supports('height', '100lvh')
+      const viewportHeightValue = supportsLargeViewport ? '100lvh' : `${viewportHeight}px`
+
+      document.documentElement.style.setProperty('--app-viewport-height', viewportHeightValue)
+      document.documentElement.style.setProperty('--app-viewport-width', `${viewportWidth}px`)
+    },
+    syncBottomNavSpacing() {
+      this.$nextTick(() => {
+        const navElement = this.$refs.bottomNav?.$el
+        const navRect = navElement?.getBoundingClientRect?.()
+        const measuredHeight = Math.max(Math.round(navRect?.height || 0), 0)
+        const measuredViewportHeight = Math.max(
+          this.resolveViewportSize(
+            [window.visualViewport?.height, window.innerHeight, document.documentElement.clientHeight, window.screen?.height],
+            1
+          ),
+          1
+        )
+        const measuredBottomOffset = Math.max(Math.round(measuredViewportHeight - Math.round(navRect?.bottom || measuredViewportHeight)), 0)
+
+        // 12px 是悬浮视觉间距；上限仍低于 iPhone 安全区常见的 34px，避免底栏显得下坠。
+        const bottomOffsetMin = 12
+        const bottomOffsetMax = this.isAppleMobile ? 20 : 16
+        const navSpaceMin = this.isAppleMobile ? 84 : 80
+        const navSpaceMax = this.isAppleMobile ? 96 : 90
+        const clampedBottomOffset = Math.max(bottomOffsetMin, Math.min(measuredBottomOffset, bottomOffsetMax))
+        const computedNavHeight = measuredHeight > 0 ? measuredHeight : 72
+        const computedSpacing = Math.max(navSpaceMin, Math.min(navSpaceMax, computedNavHeight + clampedBottomOffset + 4))
+
+        document.documentElement.style.setProperty('--bottom-nav-space', `${computedSpacing}px`)
+        document.documentElement.style.setProperty('--bottom-nav-offset', `${clampedBottomOffset}px`)
+      })
+    },
+    handleViewportResize() {
+      window.clearTimeout(this.viewportResizeTimer)
+      this.viewportResizeTimer = window.setTimeout(() => {
+        this.syncViewportMetrics()
+        this.syncBottomNavSpacing()
+      }, 80)
+    },
     handleLaunchCoverLoaded() {
       this.isLaunchCoverImageLoaded = true
       this.startLaunchCoverTimer()
@@ -465,12 +560,16 @@ export default {
     }
   },
   beforeUnmount() {
+    this.viewportResizeObserver?.removeEventListener('resize', this.handleViewportResize)
+    document.documentElement.classList.remove('is-apple-mobile')
     document.body.classList.remove('is-profile-panel-open')
     document.body.classList.remove('is-auth-panel-open')
     this.edgeGestureTarget?.removeEventListener('touchstart', this.handleEdgeTouchStart, true)
     this.edgeGestureTarget?.removeEventListener('touchmove', this.handleEdgeTouchMove, true)
     this.edgeGestureTarget?.removeEventListener('touchend', this.handleEdgeTouchEnd, true)
     this.edgeGestureTarget?.removeEventListener('touchcancel', this.resetEdgeExitGesture, true)
+    window.removeEventListener('resize', this.handleViewportResize)
+    window.clearTimeout(this.viewportResizeTimer)
     window.clearTimeout(this.launchCoverTimer)
     window.clearTimeout(this.applicationExitErrorTimer)
     this.healthProfileConfettiTimers.forEach(timer => window.clearTimeout(timer))
@@ -480,6 +579,10 @@ export default {
 
 <style>
 :root {
+  --app-viewport-height: 100vh;
+  --app-viewport-width: 100vw;
+  --bottom-nav-space: 88px;
+  --bottom-nav-offset: 12px;
   --header-height: 64px;
   --ink: #17211b;
   --muted: #718078;
@@ -498,9 +601,19 @@ body,
 #app {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   min-height: 0;
   overflow: hidden;
   overscroll-behavior: none;
+}
+
+/* large viewport 能覆盖部分 iOS WebView 错误缩短的可视区，保证根容器延伸到屏幕底部。 */
+@supports (height: 100lvh) {
+  html.is-apple-mobile,
+  html.is-apple-mobile body,
+  html.is-apple-mobile #app {
+    min-height: 100lvh;
+  }
 }
 
 html {
@@ -536,9 +649,8 @@ button {
 
 .app-shell {
   position: relative;
-  width: min(100vw, 430px);
-  height: 100vh;
-  height: 100dvh;
+  height: var(--app-viewport-height);
+  width: min(var(--app-viewport-width), 430px);
   min-height: 0;
   margin: 0 auto;
   overflow: hidden;
@@ -583,7 +695,7 @@ button {
   min-width: 0;
   width: 100%;
   height: 100%;
-  padding: 16px 18px calc(92px + max(4px, env(safe-area-inset-bottom)));
+  padding: 16px 18px var(--bottom-nav-space);
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
   backface-visibility: hidden;
@@ -747,9 +859,8 @@ button {
   position: fixed;
   z-index: 100;
   inset: 0;
-  width: min(100vw, 430px);
-  height: 100vh;
-  height: 100dvh;
+  width: min(var(--app-viewport-width), 430px);
+  height: var(--app-viewport-height);
   margin: auto;
   overflow: hidden;
   background:

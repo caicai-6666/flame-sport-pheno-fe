@@ -396,7 +396,7 @@ export default {
   overflow-y: auto;
   overscroll-behavior: contain;
   /* 独立过往记录页与历史看板使用同一阴影安全区，避免底部暗带式鬼影。 */
-  padding: 4px 8px calc(84px + max(4px, env(safe-area-inset-bottom))) 4px;
+  padding: 4px 8px var(--bottom-nav-space) 4px;
   display: flex;
   flex: 1;
   flex-direction: column;

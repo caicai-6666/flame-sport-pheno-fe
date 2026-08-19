@@ -50,11 +50,12 @@ export default {
 
 <style scoped>
 .bottom-nav {
-  position: fixed;
+  /* 应用壳层本身不滚动，使用壳层定位可避开 iOS WebView 对 fixed visual viewport 的裁剪。 */
+  position: absolute;
   z-index: 4;
   right: 50%;
   bottom: 4px;
-  bottom: max(4px, env(safe-area-inset-bottom));
+  bottom: var(--bottom-nav-offset, 12px);
   overflow: hidden;
   width: min(calc(100vw - 28px), 398px);
   min-height: 72px;

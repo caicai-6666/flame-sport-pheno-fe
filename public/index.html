@@ -15,6 +15,102 @@
         window.dd.ready(function () {})
       }
     </script>
+    <script>
+      // 若钉钉保留了旧入口而容器已移除对应哈希脚本，主应用不会挂载且只能显示空白页。
+      // 此脚本必须早于构建产物注册，才能捕获主入口的加载失败。
+      (function () {
+        var retryKey = 'flame_sport_pheno_entry_retry_count'
+
+        function getAppRoot() {
+          return document.getElementById('app')
+        }
+
+        function hasMountedApplication() {
+          var appRoot = getAppRoot()
+          return appRoot && appRoot.childNodes.length > 0
+        }
+
+        function clearRetryMark() {
+          if (!hasMountedApplication()) {
+            return
+          }
+
+          try {
+            window.sessionStorage.removeItem(retryKey)
+          } catch (error) {}
+        }
+
+        function renderRecoveryNotice() {
+          var appRoot = getAppRoot()
+          if (!appRoot) {
+            return
+          }
+
+          appRoot.innerHTML = ''
+          var panel = document.createElement('section')
+          var title = document.createElement('strong')
+          var description = document.createElement('p')
+          var retryButton = document.createElement('button')
+
+          panel.style.cssText = 'min-height:100vh;padding:32px 24px;background:#f8fbf5;color:#17211b;display:grid;place-content:center;text-align:center;font-family:-apple-system,BlinkMacSystemFont,PingFang SC,Microsoft YaHei,sans-serif;gap:12px;'
+          title.textContent = '页面资源加载失败'
+          title.style.fontSize = '20px'
+          description.textContent = '请点击重新加载；若仍失败，请退出钉钉工作台后重新打开应用。'
+          description.style.cssText = 'max-width:300px;margin:0;color:#68766d;font-size:13px;line-height:1.65;'
+          retryButton.type = 'button'
+          retryButton.textContent = '重新加载'
+          retryButton.style.cssText = 'min-height:42px;margin:4px auto 0;padding:0 18px;border:0;border-radius:999px;background:#2f8f32;color:#fff;font:inherit;font-weight:700;'
+          retryButton.addEventListener('click', function () {
+            window.location.reload()
+          })
+
+          panel.appendChild(title)
+          panel.appendChild(description)
+          panel.appendChild(retryButton)
+          appRoot.appendChild(panel)
+        }
+
+        function retryWithFreshEntry() {
+          var retries = 0
+
+          try {
+            retries = Number(window.sessionStorage.getItem(retryKey) || 0)
+          } catch (error) {}
+
+          if (retries >= 1) {
+            window.setTimeout(renderRecoveryNotice, 0)
+            return
+          }
+
+          try {
+            window.sessionStorage.setItem(retryKey, String(retries + 1))
+          } catch (error) {}
+
+          var href = window.location.href
+          var hashIndex = href.indexOf('#')
+          var baseUrl = hashIndex >= 0 ? href.slice(0, hashIndex) : href
+          var hash = hashIndex >= 0 ? href.slice(hashIndex) : ''
+          var separator = baseUrl.indexOf('?') >= 0 ? '&' : '?'
+
+          window.location.replace(baseUrl + separator + 'entry_reload=' + Date.now() + hash)
+        }
+
+        window.addEventListener('error', function (event) {
+          if (hasMountedApplication()) {
+            return
+          }
+
+          var target = event.target
+          var isScriptLoadFailure = target && target.tagName === 'SCRIPT'
+
+          if (isScriptLoadFailure || event.error) {
+            retryWithFreshEntry()
+          }
+        }, true)
+
+        window.setTimeout(clearRetryMark, 5000)
+      })()
+    </script>
   </head>
   <body>
     <noscript>

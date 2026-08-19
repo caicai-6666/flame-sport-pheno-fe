@@ -150,7 +150,7 @@ docker run --rm --name flame-sport-pheno-fe -p 8080:80 flame-sport-pheno-fe
 
 容器入口为 `http://127.0.0.1:8080/flame/`。容器内 Nginx 只提供前端静态资源，生产网关必须将同域 `/flame/api/` 转发到客户端后端。
 
-完整部署仓库的 `docker-compose.yml` 会把共享的 `ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS` 同时注入客户端后端、管理端后端和前端构建，避免保护期口径不一致。带内容哈希的静态资源使用长期不可变缓存，入口文件和其他非哈希资源保持重新校验。
+完整部署仓库的 `docker-compose.yml` 会把共享的 `ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS` 同时注入客户端后端、管理端后端和前端构建，避免保护期口径不一致。带内容哈希的静态资源使用长期不可变缓存，入口 HTML 和其他非哈希资源使用 `no-store`；若钉钉 WebView 仍加载到过期入口而主脚本无法读取，页面会自动刷新一次并提供手动重试提示。
 
 ---
 

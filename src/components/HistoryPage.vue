@@ -940,7 +940,7 @@ export default {
   overflow-y: auto;
   overscroll-behavior: contain;
   /* 四周留出真实阴影的绘制空间，避免横向被滚动层裁切后只剩底部长条。 */
-  padding: 4px 8px calc(84px + max(4px, env(safe-area-inset-bottom))) 4px;
+  padding: 4px 8px var(--bottom-nav-space) 4px;
   display: flex;
   flex: 1;
   flex-direction: column;

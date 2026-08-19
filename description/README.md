@@ -21,6 +21,7 @@
 | [项目概况](project.md)                      | 业务闭环、实现状态、关键规则和前端编排       | 每个开发任务开始前           |
 | [项目文档撰写规范](document-style.md)       | Markdown 结构、格式、表达和维护规则          | 新增或修改文档前             |
 | [通用接口约定](conventions/api-response.md) | API 基础地址、鉴权、响应兼容、重试和错误结构 | 涉及接口调用或页面错误处理时 |
+| [iPhone 16 Pro 底部视口兼容性](compatibility/ios16-bottom-viewport.md) | 移动端底部空白问题、根因和视口修复方案 | 排查移动端布局或安全区问题时 |
 | [项目 README](../README.md)                 | 对外介绍、页面预览、技术栈和启动方式         | 了解运行方式或修改对外能力时 |
 
 ---

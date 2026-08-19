@@ -409,7 +409,7 @@ export default {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 4px;
-  padding-bottom: calc(84px + max(4px, env(safe-area-inset-bottom)));
+  padding-bottom: var(--bottom-nav-space);
   display: flex;
   flex: 1;
   flex-direction: column;
