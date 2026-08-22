@@ -38,7 +38,16 @@
             <strong>{{ seasonWriteMessage }}</strong>
           </div>
 
-          <div v-else-if="shouldShowSeasonResultCard" key="target" class="season-target-card">
+          <div
+            v-else-if="shouldShowSeasonResultCard"
+            key="target"
+            class="season-target-card"
+            :class="{
+              'is-golden': isGoldenChallengeLevel(selectedChallengeLevel),
+              'is-silver': isSilverChallengeLevel(selectedChallengeLevel),
+              'is-bronze': isBronzeChallengeLevel(selectedChallengeLevel)
+            }"
+          >
             <span>{{ seasonResultTitle }}</span>
             <strong v-if="seasonResultDescription">{{ seasonResultDescription }}</strong>
           </div>
@@ -94,6 +103,9 @@
                 :key="level.projectRuleLevelId || level.label"
                 type="button"
                 :class="{
+                  'is-golden': isGoldenChallengeLevel(level),
+                  'is-silver': isSilverChallengeLevel(level),
+                  'is-bronze': isBronzeChallengeLevel(level),
                   'is-selected': selectedChallengeLevel === level.label,
                   'is-confirming': confirmingChallengeLevel === level.label,
                   'is-locking': pendingChallengeLevel === level.label && isLevelLockingInProgress,
@@ -594,6 +606,24 @@ export default {
         !level ||
         (this.confirmingChallengeLevel && this.confirmingChallengeLevel !== level.label)
       )
+    },
+    isGoldenChallengeLevel(level) {
+      const levelText = typeof level === 'string'
+        ? level
+        : `${level?.label || ''}${level?.name || ''}`
+      return levelText.includes('黄金')
+    },
+    isSilverChallengeLevel(level) {
+      const levelText = typeof level === 'string'
+        ? level
+        : `${level?.label || ''}${level?.name || ''}`
+      return levelText.includes('白银') || levelText.includes('银牌')
+    },
+    isBronzeChallengeLevel(level) {
+      const levelText = typeof level === 'string'
+        ? level
+        : `${level?.label || ''}${level?.name || ''}`
+      return levelText.includes('青铜') || levelText.includes('铜牌')
     },
     levelButtonText(level) {
       if (this.pendingChallengeLevel === level.label && this.isLevelLockingInProgress) {
@@ -1538,6 +1568,139 @@ export default {
   animation: level-button-shine 780ms ease-out;
 }
 
+/* 黄金等级沿用金属按钮质感，同时保留确认、锁定和失败状态的反馈颜色。 */
+.level-picker button.is-golden:not(.is-selected):not(.is-confirming):not(.is-locking):not(.is-failed) {
+  touch-action: manipulation;
+  border: 1px solid #a55d07;
+  border-radius: 0.3em;
+  background-image: linear-gradient(160deg, #a54e07, #b47e11, #fef1a2, #bc881b, #a54e07);
+  background-position: center;
+  background-size: 100% 100%;
+  color: rgb(120, 50, 5);
+  text-shadow: 0 2px 2px rgba(250, 227, 133, 1);
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.16),
+    0 3px 6px rgba(110, 80, 20, 0.4),
+    inset 0 -2px 5px 1px rgba(139, 66, 8, 1),
+    inset 0 -1px 1px 3px rgba(250, 227, 133, 1);
+  animation: golden-button-appear 420ms cubic-bezier(0.16, 0.9, 0.28, 1) both;
+}
+
+.level-picker button.is-golden:hover:not(.is-selected):not(.is-confirming):not(.is-locking):not(.is-failed):not(:disabled),
+.level-picker button.is-golden:focus-visible:not(.is-selected):not(.is-confirming):not(.is-locking):not(.is-failed):not(:disabled) {
+  border-color: rgba(165, 93, 7, 0.6);
+  background-size: 150% 150%;
+  color: rgba(120, 50, 5, 0.8);
+  box-shadow:
+    0 10px 20px rgba(0, 0, 0, 0.19),
+    0 6px 6px rgba(0, 0, 0, 0.23),
+    inset 0 -2px 5px 1px #b17d10,
+    inset 0 -1px 1px 3px rgba(250, 227, 133, 1);
+  transform: translateY(-1px);
+}
+
+.level-picker button.is-silver:not(.is-selected):not(.is-confirming):not(.is-locking):not(.is-failed) {
+  touch-action: manipulation;
+  border: 1px solid #7d8994;
+  border-radius: 0.3em;
+  background-image: linear-gradient(160deg, #66717c, #aeb7c2, #f4f7fa, #9ba5af, #66717c);
+  background-position: center;
+  background-size: 100% 100%;
+  color: #3f4b56;
+  text-shadow: 0 2px 2px rgba(255, 255, 255, 0.86);
+  box-shadow:
+    0 3px 6px rgba(34, 43, 51, 0.18),
+    0 3px 6px rgba(82, 94, 106, 0.32),
+    inset 0 -2px 5px 1px rgba(82, 94, 106, 0.82),
+    inset 0 -1px 1px 3px rgba(244, 247, 250, 0.92);
+  animation: silver-button-appear 420ms cubic-bezier(0.16, 0.9, 0.28, 1) both;
+}
+
+.level-picker button.is-silver:hover:not(.is-selected):not(.is-confirming):not(.is-locking):not(.is-failed):not(:disabled),
+.level-picker button.is-silver:focus-visible:not(.is-selected):not(.is-confirming):not(.is-locking):not(.is-failed):not(:disabled) {
+  border-color: rgba(91, 104, 116, 0.7);
+  background-size: 150% 150%;
+  color: #35414c;
+  box-shadow:
+    0 10px 20px rgba(34, 43, 51, 0.2),
+    0 6px 6px rgba(34, 43, 51, 0.18),
+    inset 0 -2px 5px 1px #7d8994,
+    inset 0 -1px 1px 3px rgba(244, 247, 250, 0.96);
+  transform: translateY(-1px);
+}
+
+.level-picker button.is-golden.is-selected {
+  border: 1px solid #a55d07;
+  border-radius: 0.3em;
+  background-image: linear-gradient(160deg, #a54e07, #b47e11, #fef1a2, #bc881b, #a54e07);
+  background-size: 110% 110%;
+  color: rgb(120, 50, 5);
+  text-shadow: 0 2px 2px rgba(250, 227, 133, 1);
+  box-shadow:
+    0 8px 16px rgba(110, 80, 20, 0.36),
+    0 0 0 3px rgba(250, 227, 133, 0.22),
+    inset 0 -2px 5px 1px rgba(139, 66, 8, 1),
+    inset 0 -1px 1px 3px rgba(250, 227, 133, 1);
+}
+
+.level-picker button.is-silver.is-selected {
+  border: 1px solid #7d8994;
+  border-radius: 0.3em;
+  background-image: linear-gradient(160deg, #66717c, #aeb7c2, #f4f7fa, #9ba5af, #66717c);
+  background-size: 110% 110%;
+  color: #3f4b56;
+  text-shadow: 0 2px 2px rgba(255, 255, 255, 0.86);
+  box-shadow:
+    0 8px 16px rgba(82, 94, 106, 0.34),
+    0 0 0 3px rgba(214, 222, 230, 0.42),
+    inset 0 -2px 5px 1px rgba(82, 94, 106, 0.82),
+    inset 0 -1px 1px 3px rgba(244, 247, 250, 0.92);
+}
+
+.level-picker button.is-bronze:not(.is-selected):not(.is-confirming):not(.is-locking):not(.is-failed) {
+  touch-action: manipulation;
+  border: 1px solid #8b4a27;
+  border-radius: 0.3em;
+  background-image: linear-gradient(160deg, #6f351c, #a85a2a, #f3c28b, #b87333, #6f351c);
+  background-position: center;
+  background-size: 100% 100%;
+  color: #542b1c;
+  text-shadow: 0 2px 2px rgba(255, 218, 173, 0.9);
+  box-shadow:
+    0 3px 6px rgba(52, 27, 17, 0.2),
+    0 3px 6px rgba(124, 66, 34, 0.34),
+    inset 0 -2px 5px 1px rgba(111, 53, 28, 0.86),
+    inset 0 -1px 1px 3px rgba(243, 194, 139, 0.9);
+  animation: bronze-button-appear 420ms cubic-bezier(0.16, 0.9, 0.28, 1) both;
+}
+
+.level-picker button.is-bronze:hover:not(.is-selected):not(.is-confirming):not(.is-locking):not(.is-failed):not(:disabled),
+.level-picker button.is-bronze:focus-visible:not(.is-selected):not(.is-confirming):not(.is-locking):not(.is-failed):not(:disabled) {
+  border-color: rgba(139, 74, 39, 0.72);
+  background-size: 150% 150%;
+  color: #482418;
+  box-shadow:
+    0 10px 20px rgba(52, 27, 17, 0.22),
+    0 6px 6px rgba(52, 27, 17, 0.18),
+    inset 0 -2px 5px 1px #9b5229,
+    inset 0 -1px 1px 3px rgba(243, 194, 139, 0.96);
+  transform: translateY(-1px);
+}
+
+.level-picker button.is-bronze.is-selected {
+  border: 1px solid #8b4a27;
+  border-radius: 0.3em;
+  background-image: linear-gradient(160deg, #6f351c, #a85a2a, #f3c28b, #b87333, #6f351c);
+  background-size: 110% 110%;
+  color: #542b1c;
+  text-shadow: 0 2px 2px rgba(255, 218, 173, 0.9);
+  box-shadow:
+    0 8px 16px rgba(124, 66, 34, 0.36),
+    0 0 0 3px rgba(243, 194, 139, 0.28),
+    inset 0 -2px 5px 1px rgba(111, 53, 28, 0.86),
+    inset 0 -1px 1px 3px rgba(243, 194, 139, 0.9);
+}
+
 .level-picker button:disabled {
   cursor: not-allowed;
 }
@@ -1648,6 +1811,101 @@ export default {
     0 10px 24px rgba(23, 33, 27, 0.17);
 }
 
+.season-target-card.is-golden {
+  border-color: #a55d07;
+  border-radius: 0.3em;
+  background-image: linear-gradient(160deg, #a54e07, #b47e11, #fef1a2, #bc881b, #a54e07);
+  color: rgb(120, 50, 5);
+  text-shadow: 0 2px 2px rgba(250, 227, 133, 1);
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.16),
+    0 10px 20px rgba(110, 80, 20, 0.3),
+    inset 0 -2px 5px 1px rgba(139, 66, 8, 1),
+    inset 0 -1px 1px 3px rgba(250, 227, 133, 1);
+}
+
+.season-target-card.is-silver {
+  border-color: #7d8994;
+  border-radius: 0.3em;
+  background-image: linear-gradient(160deg, #66717c, #aeb7c2, #f4f7fa, #9ba5af, #66717c);
+  color: #3f4b56;
+  text-shadow: 0 2px 2px rgba(255, 255, 255, 0.86);
+  box-shadow:
+    0 4px 8px rgba(34, 43, 51, 0.18),
+    0 10px 20px rgba(82, 94, 106, 0.3),
+    inset 0 -2px 5px 1px rgba(82, 94, 106, 0.82),
+    inset 0 -1px 1px 3px rgba(244, 247, 250, 0.92);
+}
+
+.season-target-card.is-silver strong {
+  color: rgba(63, 75, 86, 0.78);
+}
+
+.season-target-card.is-bronze {
+  border-color: #8b4a27;
+  border-radius: 0.3em;
+  background-image: linear-gradient(160deg, #6f351c, #a85a2a, #f3c28b, #b87333, #6f351c);
+  color: #542b1c;
+  text-shadow: 0 2px 2px rgba(255, 218, 173, 0.9);
+  box-shadow:
+    0 4px 8px rgba(52, 27, 17, 0.2),
+    0 10px 20px rgba(124, 66, 34, 0.3),
+    inset 0 -2px 5px 1px rgba(111, 53, 28, 0.86),
+    inset 0 -1px 1px 3px rgba(243, 194, 139, 0.9);
+}
+
+.season-target-card.is-bronze strong {
+  color: rgba(84, 43, 28, 0.78);
+}
+
+/* 展示卡通过透明阴影进入，避免金属阴影在卡片出现时突然跳出。 */
+.hero-guidance-enter-from.season-target-card.is-golden {
+  box-shadow: 0 0 0 rgba(110, 80, 20, 0);
+}
+
+@keyframes golden-button-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+    box-shadow: 0 0 0 rgba(110, 80, 20, 0);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes silver-button-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+    box-shadow: 0 0 0 rgba(82, 94, 106, 0);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes bronze-button-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+    box-shadow: 0 0 0 rgba(124, 66, 34, 0);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.season-target-card.is-golden strong {
+  color: rgba(120, 50, 5, 0.78);
+}
+
 .season-target-card.is-checking {
   display: inline-flex;
   align-items: center;
@@ -1685,7 +1943,8 @@ export default {
 .hero-guidance-leave-active {
   transition:
     opacity 0.28s ease,
-    transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.28s ease;
 }
 
 .hero-guidance-enter-from {
@@ -2155,6 +2414,9 @@ export default {
   .signup-progress li.is-progressing-to-success:not(:last-child)::after,
   .level-progress-particle,
   .level-picker button.is-confirming,
+  .level-picker button.is-golden,
+  .level-picker button.is-silver,
+  .level-picker button.is-bronze,
   .level-picker button.is-selected,
   .level-picker button.is-selected::after,
   .activity-rule-scroll img,
