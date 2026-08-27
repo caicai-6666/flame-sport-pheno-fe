@@ -61,6 +61,8 @@ GET /proof/current
     "projectName": "健身",
     "reviewStatus": "pending",
     "reviewComment": "",
+    "preliminaryReviewComment": "",
+    "finalReviewComment": "",
     "note": "力量训练 45 分钟，包含深蹲、卧推和拉伸。",
     "imageName": "健身.webp",
     "imageUrl": "/flame/api/image/proof_record/18",
@@ -85,7 +87,9 @@ GET /proof/current
 | `seasonName`    | `seasonName`    | 赛季名称，对应 `season.name`                                                                    |
 | `projectName`   | `taskName`      | 项目名称，对应 `project.name`                                                                   |
 | `reviewStatus`  | `reviewStatus`  | 审核状态，取值见下方枚举                                                                        |
-| `reviewComment` | `reviewComment` | 审核意见；初审后可返回通过依据或失败原因，未填写时为空字符串；非空时单独展示，不能覆盖用户备注  |
+| `reviewComment` | `reviewComment` | 当前审核阶段意见的兼容字段；前端仅用于兼容尚未升级的后端                                      |
+| `preliminaryReviewComment` | `preliminaryReviewComment` | 大模型初审意见；非空时独立展示为“初审意见”                                      |
+| `finalReviewComment` | `finalReviewComment` | 管理员终审意见；非空时独立展示为“终审意见”                                            |
 | `note`          | `note`          | 用户上传备注，对应 `proof_record.note`；未填写时为空字符串                                      |
 | `imageName`     | `fileName`      | 凭证文件名，新上传记录为 `{上传文件主名}.webp`；历史 JPG 记录可继续返回原后缀，不含系统生成前缀 |
 | `imageUrl`      | `imageUrl`      | 受鉴权保护的凭证原图读取地址；点击记录后以 Blob 发起 GET 请求并在弹层展示                       |
@@ -117,7 +121,7 @@ rejected               = 终审失败
 已参与本赛季时：
 
 - 展示本赛季上传历史
-- `reviewComment` 非空时，在用户上传备注下方以“审核意见”单独展示
+- 初审或终审意见非空时，在用户上传备注下方分别以“初审意见”和“终审意见”展示；两者同时存在时按初审、终审顺序展示
 - 含 `imageUrl` 的记录整卡可点击（键盘 Enter / Space 同样可用）；点击后会从该地址提取 `/image/proof_record/{id}` 相对接口，再由当前环境的 API 前缀请求原图并在弹层展示。图片请求复用全局 `Authorization`、超时重试与 401 重登，关闭弹层会释放 Blob 对象 URL。
 - 原图弹层使用与上传面板一致的遮罩淡入、内容框从右侧滑入/滑出过渡。图片解码完成后，展示区域会按原图宽高比从加载占位高度平滑伸缩；长图扩展到弹层可视上限后改为区域内滚动。系统开启“减少动态效果”时不播放上述过渡。
 - 记录列表在卡片四周保留阴影绘制空间，卡片使用短距离双层阴影，避免滚动容器裁掉横向阴影后形成底部长条。可查看原图的记录卡仅在支持悬停的鼠标设备上轻微浮起；触摸设备不会残留 `:hover` 大阴影，按下时仍会短暂下沉。

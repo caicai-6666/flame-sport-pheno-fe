@@ -52,12 +52,41 @@ function getProofRecordId(record) {
   return pathMatch?.[1] || ''
 }
 
+function normalizeReviewComments(record, reviewStatus) {
+  const legacyComment = String(record.reviewComment || record.review_comment || '').trim()
+  const hasPreliminaryCommentField = Object.prototype.hasOwnProperty.call(record, 'preliminaryReviewComment')
+    || Object.prototype.hasOwnProperty.call(record, 'preliminary_review_comment')
+  const hasFinalCommentField = Object.prototype.hasOwnProperty.call(record, 'finalReviewComment')
+    || Object.prototype.hasOwnProperty.call(record, 'final_review_comment')
+  let preliminaryReviewComment = String(
+    record.preliminaryReviewComment || record.preliminary_review_comment || ''
+  ).trim()
+  let finalReviewComment = String(
+    record.finalReviewComment || record.final_review_comment || ''
+  ).trim()
+
+  // 新旧后端并行部署时，只有旧 reviewComment 的响应仍按审核阶段归入正确位置。
+  if (!hasPreliminaryCommentField && reviewStatus.startsWith('preliminary_')) {
+    preliminaryReviewComment = legacyComment
+  }
+  if (!hasFinalCommentField && ['approved', 'rejected'].includes(reviewStatus)) {
+    finalReviewComment = legacyComment
+  }
+
+  return {
+    reviewComment: legacyComment,
+    preliminaryReviewComment,
+    finalReviewComment
+  }
+}
+
 function normalizeCurrentSeasonRecord(record, index) {
   const project = record.project || {}
   const uploadConfig = record.upload_config || record.project_upload_config || {}
   // /proof/current 已升级为 camelCase 响应，旧字段仅用于兼容尚未同步的联调环境。
   const projectName = record.projectName || record.project_name || project.name || record.taskName || ''
   const createdAt = record.createdAt || record.created_at || record.uploadedAt || record.uploaded_at || ''
+  const reviewStatus = normalizeReviewStatus(record.reviewStatus || record.review_status)
 
   return {
     id: String(record.id || record.proof_record_id || `${projectName || record.project_id || index}-${createdAt || index}`),
@@ -68,8 +97,8 @@ function normalizeCurrentSeasonRecord(record, index) {
     imageUrl: String(record.imageUrl || record.image_url || '').trim(),
     note: record.note || '',
     recordType: record.record_type || uploadConfig.record_type || record.recordType || '',
-    reviewStatus: normalizeReviewStatus(record.reviewStatus || record.review_status),
-    reviewComment: String(record.reviewComment || record.review_comment || '').trim(),
+    reviewStatus,
+    ...normalizeReviewComments(record, reviewStatus),
     bmi: record.bmi || '',
     accent: record.accent || HISTORY_ACCENTS[index % HISTORY_ACCENTS.length],
     proofDate: record.proofDate || record.proof_date || '',
@@ -101,9 +130,9 @@ function normalizePastSeasonRecord(record, index) {
   // /proof/history 仅返回已归档赛季，采用与 /proof/current 一致的 camelCase 字段。
   const seasonName = record.seasonName || record.season_name || ''
   const projectName = record.projectName || record.project_name || record.taskName || ''
-  const reviewComment = String(record.reviewComment || record.review_comment || '').trim()
   const uploadedAt = record.createdAt || record.created_at || record.uploadedAt || record.uploaded_at || ''
   const proofRecordId = getProofRecordId(record)
+  const result = normalizePastSeasonResult(record)
 
   return {
     id: proofRecordId || `${seasonName || index}-${projectName || index}-${uploadedAt || index}`,
@@ -112,8 +141,9 @@ function normalizePastSeasonRecord(record, index) {
     taskName: projectName,
     fileName: record.imageName || record.image_name || getProofFileName(record),
     imageUrl: String(record.imageUrl || record.image_url || '').trim(),
-    note: reviewComment || record.note || '',
-    result: normalizePastSeasonResult(record),
+    note: String(record.note || '').trim(),
+    result,
+    ...normalizeReviewComments(record, result),
     accent: record.accent || HISTORY_ACCENTS[index % HISTORY_ACCENTS.length],
     proofDate: record.proofDate || record.proof_date || '',
     uploadedAt
@@ -123,7 +153,6 @@ function normalizePastSeasonRecord(record, index) {
 function normalizeSupplementRecord(record, index) {
   const normalizedRecord = normalizePastSeasonRecord(record, index)
   const proofRecordId = getProofRecordId(record)
-  const reviewComment = String(record.reviewComment || record.review_comment || '').trim()
 
   return {
     ...normalizedRecord,
@@ -132,8 +161,7 @@ function normalizeSupplementRecord(record, index) {
     seasonId: String(record.seasonId || record.season_id || ''),
     seasonUserId: String(record.seasonUserId || record.season_user_id || ''),
     projectId: String(record.projectId || record.project_id || ''),
-    note: String(record.note || '').trim(),
-    reviewComment
+    note: String(record.note || '').trim()
   }
 }
 

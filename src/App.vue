@@ -46,13 +46,6 @@
         </p>
       </Transition>
 
-      <UserHealthProfilePanel
-        v-if="shouldCollectHealthProfile"
-        :missing-fields="healthProfileMissingFields"
-        :is-saving="isHealthProfileSaving"
-        :save-error="healthProfileSaveError"
-        @submit="handleHealthProfileSubmit"
-      />
     </template>
 
     <section
@@ -70,29 +63,6 @@
         {{ isLoggingIn ? '登录中' : '重新尝试' }}
       </button>
     </section>
-
-    <span
-      v-for="burst in healthProfileConfettiBursts"
-      :key="burst.id"
-      class="profile-side-confetti"
-      :class="`is-${burst.side}`"
-      aria-hidden="true"
-    >
-      <span
-        v-for="particle in burst.particles"
-        :key="particle.id"
-        class="profile-side-confetti-piece"
-        :style="{
-          '--confetti-origin-y': `${particle.originY}vh`,
-          '--confetti-x': `${particle.x}px`,
-          '--confetti-y': `${particle.y}px`,
-          '--confetti-rotate': `${particle.rotate}deg`,
-          '--confetti-color': particle.color,
-          '--confetti-size': `${particle.size}px`,
-          '--delay': `${particle.delay}ms`
-        }"
-      ></span>
-    </span>
 
     <Transition name="launch-cover">
       <section
@@ -120,13 +90,10 @@
 import launchCoverSource from './assets/cover.webp'
 import HeaderBar from './components/HeaderBar.vue'
 import BottomNav from './components/BottomNav.vue'
-import UserHealthProfilePanel from './components/UserHealthProfilePanel.vue'
 import { closeDingTalkApplication } from './api/dingtalkNavigation'
-import { updateUserProfile } from './api/userProfile'
 import { getLoginCredentialSource } from './api/loginCredential'
 import { findTaskByName } from './state/appState'
 import { authState, initLogin } from './state/authState'
-import { saveUserHealthProfile, userHealthProfileState } from './state/userHealthProfileState'
 
 const navItems = [
   { key: 'project', label: '项目', icon: '◎', routeName: 'projects' },
@@ -143,8 +110,7 @@ export default {
   name: 'App',
   components: {
     HeaderBar,
-    BottomNav,
-    UserHealthProfilePanel
+    BottomNav
   },
   data() {
     return {
@@ -154,10 +120,6 @@ export default {
       isLaunchCoverImageReady: false,
       isLaunchCoverMinimumElapsed: false,
       launchCoverTimer: null,
-      isHealthProfileSaving: false,
-      healthProfileSaveError: null,
-      healthProfileConfettiBursts: [],
-      healthProfileConfettiTimers: [],
       pageTransitionName: 'route-crossfade',
       isApplicationExiting: false,
       applicationExitError: '',
@@ -185,12 +147,6 @@ export default {
     },
     isProjectDetail() {
       return this.$route.name === 'project-detail'
-    },
-    shouldCollectHealthProfile() {
-      return userHealthProfileState.shouldCollectProfile
-    },
-    healthProfileMissingFields() {
-      return userHealthProfileState.completion?.missingFields || []
     },
     loginError() {
       return authState.loginError
@@ -253,12 +209,6 @@ export default {
       this.pageTransitionName = toOrder > fromOrder
         ? 'route-slide-left'
         : 'route-slide-right'
-    },
-    shouldCollectHealthProfile: {
-      immediate: true,
-      handler(shouldLock) {
-        document.body.classList.toggle('is-profile-panel-open', shouldLock)
-      }
     },
     loginError: {
       immediate: true,
@@ -490,79 +440,11 @@ export default {
     },
     retryLogin() {
       initLogin()
-    },
-    async handleHealthProfileSubmit(profile) {
-      if (this.isHealthProfileSaving) {
-        return
-      }
-
-      this.isHealthProfileSaving = true
-      this.healthProfileSaveError = null
-      const savingStartedAt = Date.now()
-
-      try {
-        await updateUserProfile(profile)
-        await this.waitForMinHealthProfileSavingDuration(savingStartedAt)
-        this.launchHealthProfileConfetti()
-        saveUserHealthProfile(profile)
-      } catch (error) {
-        await this.waitForMinHealthProfileSavingDuration(savingStartedAt)
-        this.healthProfileSaveError = error
-      } finally {
-        this.isHealthProfileSaving = false
-      }
-    },
-    async waitForMinHealthProfileSavingDuration(startedAt) {
-      const minDuration = 900
-      const elapsed = Date.now() - startedAt
-      const remaining = minDuration - elapsed
-
-      if (remaining > 0) {
-        await new Promise(resolve => window.setTimeout(resolve, remaining))
-      }
-    },
-    launchHealthProfileConfetti() {
-      const colors = ['#ffffff', '#baf19d', '#72d84f', '#20c7b5', '#ffd166', '#ff9f45', '#ff7ed2']
-      const sides = [
-        {
-          name: 'left',
-          direction: 1
-        },
-        {
-          name: 'right',
-          direction: -1
-        }
-      ]
-      const bursts = sides.map(side => ({
-        id: `${side.name}-${Date.now()}`,
-        side: side.name,
-        particles: Array.from({ length: 58 }, (_, index) => ({
-          id: index,
-          originY: Math.round(Math.random() * 40),
-          x: side.direction * Math.round(68 + Math.random() * 280),
-          y: Math.round(-150 - Math.random() * 360),
-          rotate: Math.round(Math.random() * 720 - 180),
-          color: colors[index % colors.length],
-          size: Math.round(4 + Math.random() * 8),
-          delay: Math.round(Math.random() * 150)
-        }))
-      }))
-
-      this.healthProfileConfettiBursts = [...this.healthProfileConfettiBursts, ...bursts]
-
-      const timer = window.setTimeout(() => {
-        const burstIds = bursts.map(burst => burst.id)
-        this.healthProfileConfettiBursts = this.healthProfileConfettiBursts.filter(burst => !burstIds.includes(burst.id))
-        this.healthProfileConfettiTimers = this.healthProfileConfettiTimers.filter(item => item !== timer)
-      }, 1500)
-
-      this.healthProfileConfettiTimers = [...this.healthProfileConfettiTimers, timer]
     }
   },
   beforeUnmount() {
     this.viewportResizeObserver?.removeEventListener('resize', this.handleViewportResize)
     document.documentElement.classList.remove('is-apple-mobile')
-    document.body.classList.remove('is-profile-panel-open')
     document.body.classList.remove('is-auth-panel-open')
     this.edgeGestureTarget?.removeEventListener('touchstart', this.handleEdgeTouchStart, true)
     this.edgeGestureTarget?.removeEventListener('touchmove', this.handleEdgeTouchMove, true)
@@ -572,7 +454,6 @@ export default {
     window.clearTimeout(this.viewportResizeTimer)
     window.clearTimeout(this.launchCoverTimer)
     window.clearTimeout(this.applicationExitErrorTimer)
-    this.healthProfileConfettiTimers.forEach(timer => window.clearTimeout(timer))
   }
 }
 </script>
@@ -628,10 +509,6 @@ body {
     radial-gradient(circle at 90% 18%, rgba(32, 199, 181, 0.18), transparent 26%),
     linear-gradient(145deg, #eef7ed 0%, #f7f4ed 52%, #eef6f1 100%);
   color: var(--ink);
-}
-
-body.is-profile-panel-open {
-  overflow: hidden;
 }
 
 body.is-auth-panel-open {
@@ -933,70 +810,6 @@ button {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.8;
-}
-
-.profile-side-confetti {
-  position: fixed;
-  z-index: 70;
-  bottom: -18px;
-  width: 1px;
-  height: 1px;
-  pointer-events: none;
-}
-
-.profile-side-confetti.is-left {
-  left: -18px;
-}
-
-.profile-side-confetti.is-right {
-  right: -18px;
-}
-
-.profile-side-confetti-piece {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: var(--confetti-size);
-  height: calc(var(--confetti-size) * 0.62);
-  border-radius: 999px;
-  background: var(--confetti-color);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--confetti-color), transparent 45%);
-  opacity: 0;
-  transform: translate(-50%, calc(var(--confetti-origin-y) * -1)) scale(0.42) rotate(0deg);
-  animation: profile-side-confetti-pop 1280ms cubic-bezier(0.16, 0.9, 0.28, 1) forwards;
-  animation-delay: var(--delay);
-}
-
-.profile-side-confetti-piece:nth-child(3n) {
-  border-radius: 2px;
-}
-
-.profile-side-confetti-piece:nth-child(4n) {
-  width: calc(var(--confetti-size) * 0.62);
-  height: calc(var(--confetti-size) * 0.62);
-}
-
-@keyframes profile-side-confetti-pop {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, calc(var(--confetti-origin-y) * -1)) scale(0.36) rotate(0deg);
-  }
-
-  12% {
-    opacity: 1;
-  }
-
-  70% {
-    opacity: 1;
-  }
-
-  100% {
-    opacity: 0;
-    transform:
-      translate(calc(-50% + var(--confetti-x)), calc((var(--confetti-origin-y) * -1) + var(--confetti-y)))
-      scale(0.86)
-      rotate(var(--confetti-rotate));
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -40,6 +40,8 @@ GET /proof/history
     "projectName": "健身",
     "reviewStatus": "approved",
     "reviewComment": "审核通过：健身上传图片清晰，训练记录符合本项目打卡要求。",
+    "preliminaryReviewComment": "单次训练时长达标。",
+    "finalReviewComment": "审核通过：健身上传图片清晰，训练记录符合本项目打卡要求。",
     "imageName": "健身1.jpg",
     "imageUrl": "/flame/api/image/proof_record/18",
     "proofDate": "2026-06-01",
@@ -63,7 +65,9 @@ GET /proof/history
 | `seasonName`    | `seasonName` | 赛季名称                                                                     |
 | `projectName`   | `taskName`   | 项目名称                                                                     |
 | `reviewStatus`  | `result`     | 审核状态，取值见下方枚举                                                     |
-| `reviewComment` | `note`       | 审核意见；前端展示为记录说明                                                 |
+| `reviewComment` | `reviewComment` | 当前审核阶段意见的兼容字段；仅在旧后端未返回独立字段时参与归一化              |
+| `preliminaryReviewComment` | `preliminaryReviewComment` | 大模型初审意见，独立展示为“初审意见”                            |
+| `finalReviewComment` | `finalReviewComment` | 管理员终审意见，独立展示为“终审意见”                                      |
 | `imageName`     | `fileName`   | 凭证文件名，保留实际存储后缀；新记录为 `.webp`，历史 `.jpg` 记录仍可正常返回 |
 | `imageUrl`      | `imageUrl`   | 受鉴权保护的凭证原图读取地址；前端点击该条记录后以 Blob 发起 GET 请求        |
 | `proofDate`     | `proofDate`  | 实际运动日期，格式 `YYYY-MM-DD`                                              |
@@ -113,6 +117,8 @@ GET /supplement/records
     "projectName": "跑步",
     "reviewStatus": "rejected",
     "reviewComment": "凭证信息未达到终审要求。",
+    "preliminaryReviewComment": "本次距离和配速均达标。",
+    "finalReviewComment": "凭证信息未达到终审要求。",
     "note": "完成跑步5公里",
     "imageName": "跑步.webp",
     "imageUrl": "/flame/api/image/proof_record/295",
@@ -142,7 +148,9 @@ GET /supplement/records
 | `seasonName`    | `seasonName`    | 赛季名称                           |
 | `projectName`   | `taskName`      | 项目名称                           |
 | `reviewStatus`  | `result`        | 原凭证审核状态                     |
-| `reviewComment` | `reviewComment` | 原凭证审核意见，独立于用户备注展示 |
+| `reviewComment` | `reviewComment` | 当前审核阶段意见的兼容字段         |
+| `preliminaryReviewComment` | `preliminaryReviewComment` | 原凭证的大模型初审意见 |
+| `finalReviewComment` | `finalReviewComment` | 原凭证的管理员终审意见     |
 | `note`          | `note`          | 用户原凭证备注                     |
 | `imageName`     | `fileName`      | 原凭证文件名                       |
 | `imageUrl`      | `imageUrl`      | 受鉴权保护的原凭证图片地址         |
@@ -231,7 +239,9 @@ Content-Type: multipart/form-data
 
 前端会先展示 `/supplement/records` 返回的全部可补传记录，再展示普通过往记录。可补传部分保持接口排序；普通过往记录按 `proofDate`（缺失时回退 `uploadedAt`）降序排列。
 
-两组数据使用 `proofRecordId` 去重；历史接口未直接返回该字段时，API 适配层会从 `imageUrl` 的 `/proof_record/{id}` 路径中提取。重复凭证优先采用补传接口记录，以保留资格 ID、用户备注和审核意见。置顶记录使用与可补传入口一致的紫色、珊瑚色和浅金色渐变，并将 `note` 与 `reviewComment` 分区展示。
+两组数据使用 `proofRecordId` 去重；历史接口未直接返回该字段时，API 适配层会从 `imageUrl` 的 `/proof_record/{id}` 路径中提取。重复凭证优先采用补传接口记录，以保留资格 ID、用户备注及初审、终审意见。置顶记录使用与可补传入口一致的紫色、珊瑚色和浅金色渐变，并将 `note`、`preliminaryReviewComment` 和 `finalReviewComment` 分区展示。
+
+新旧后端并行部署时，如果响应只有兼容字段 `reviewComment`，API 适配层会根据 `reviewStatus` 将其归入初审或终审意见；独立字段存在时不使用兼容值覆盖，确保两个阶段的真实内容可以同时展示。
 
 可补传记录卡顶部展示“补传”按钮。点击后卡片以 3D 方式翻到背面，并根据表单高度平滑伸长；背面保留只读的赛季、项目和运动日期，只提供图片选择、拼接结果预览与备注输入。提交采用短时二次确认：第一次点击后，按钮文字以纵向滑动过渡切换为“再次点击确认补传”，同时变为橙色并播放轻微呼吸动画；有效期内再次点击才发起请求。系统开启“减少动态效果”时保留状态颜色变化，但不播放文字位移和呼吸动画。
 

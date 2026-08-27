@@ -70,9 +70,13 @@
             </div>
 
             <p v-if="record.note">{{ record.note }}</p>
-            <p v-if="record.reviewComment" class="review-comment">
-              <span>审核意见</span>
-              {{ record.reviewComment }}
+            <p v-if="record.preliminaryReviewComment" class="review-comment">
+              <span>初审意见</span>
+              {{ record.preliminaryReviewComment }}
+            </p>
+            <p v-if="record.finalReviewComment" class="review-comment">
+              <span>终审意见</span>
+              {{ record.finalReviewComment }}
             </p>
 
             <dl class="review-meta">

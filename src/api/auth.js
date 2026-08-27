@@ -46,17 +46,4 @@ export async function login({ onBeforeRequest } = {}) {
   return loginResult
 }
 
-export async function checkProfileComplete() {
-  const response = await request.get('/auth/profile_complete_check')
-  const missingFields = Array.isArray(response?.missing_fields)
-    ? response.missing_fields
-    : []
-
-  return {
-    isComplete: Boolean(response?.is_complete ?? response?.isComplete),
-    heightCmCompleted: Boolean(response?.height_cm_completed ?? response?.heightCmCompleted),
-    missingFields
-  }
-}
-
 export { DEFAULT_AUTH_CODE }

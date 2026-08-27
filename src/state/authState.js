@@ -1,7 +1,6 @@
 import { reactive } from 'vue'
-import { checkProfileComplete, login } from '../api/auth'
+import { login } from '../api/auth'
 import { getAuthCode, setAuthCode } from '../api/authCredential'
-import { setUserHealthProfileCompletion, setUserHealthProfileCompletionError } from './userHealthProfileState'
 
 export const authState = reactive({
   authCode: getAuthCode(),
@@ -27,13 +26,6 @@ export async function initLogin() {
     setAuthCode(loginResult.authCode)
     authState.authCode = loginResult.authCode
     authState.currentUser = loginResult.user
-
-    try {
-      const profileCompletion = await checkProfileComplete()
-      setUserHealthProfileCompletion(profileCompletion)
-    } catch (profileError) {
-      setUserHealthProfileCompletionError(profileError)
-    }
   } catch (error) {
     authState.loginError = error
   } finally {

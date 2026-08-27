@@ -125,8 +125,6 @@ main.js
       -> VUE_APP_MODE=production：dd.runtime.permission.requestAuthCode()
     -> POST /auth/login
     -> 保存后端返回的 auth_code 和 user
-    -> checkProfileComplete()
-      -> GET /auth/profile_complete_check
 ```
 
 页面会先挂载登录状态层，但在登录成功前不会创建路由页面或发起业务接口。这样钉钉 JSAPI、免登配置或网络导致免登码获取失败时，用户能看到具体错误并重试；若此阶段未取得登录凭证，`POST /auth/login` 不会发生，这是正常的调用顺序。
@@ -147,8 +145,6 @@ main.js
 2. 写入 `authState.currentUser`
 3. 将 `auth_code` 写入 `localStorage`
 4. 后续请求由 `request.js` 自动注入 `Authorization`
-5. 请求 `/auth/profile_complete_check` 检查健康基础信息是否完整
-6. 如果后端返回资料未完成且 `missing_fields` 非空，展示健康信息采集弹窗
 
 本地存储 key：
 
