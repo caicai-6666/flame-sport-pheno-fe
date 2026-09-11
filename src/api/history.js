@@ -214,7 +214,8 @@ export async function uploadSupplementProof({
   recordType,
   proofDate,
   note,
-  imageFile
+  imageFile,
+  imageSegments
 }) {
   const formData = new FormData()
 
@@ -228,6 +229,10 @@ export async function uploadSupplementProof({
   formData.append('proof_date', proofDate)
   formData.append('note', note || '')
   formData.append('image', imageFile, imageFile.name)
+  // multipart 文本字段承载 JSON，组件只传前端模型，协议字段名集中在 API 层。
+  if (imageSegments) {
+    formData.append('image_segments', JSON.stringify(imageSegments))
+  }
 
   const response = await request.post('/supplement/upload', formData)
 

@@ -312,6 +312,7 @@ export default {
       proofFileBaseName: '',
       selectedProofCount: 0,
       compressedProofBlob: null,
+      imageSegments: null,
       isProofProcessing: false,
       proofProcessError: null,
       isProofUploading: false,
@@ -434,6 +435,7 @@ export default {
         this.proofNote.trim() &&
         this.selectedUploadConfig.uploadConfigId &&
         this.compressedProofBlob &&
+        this.imageSegments &&
         sanitizeProofFileBaseName(this.proofFileBaseName)
       )
     },
@@ -628,6 +630,7 @@ export default {
       this.proofSelectionToken = selectionToken
       this.proofPreviewUrl = ''
       this.compressedProofBlob = null
+      this.imageSegments = null
       this.selectedProofCount = files.length
       this.proofFileBaseName = sanitizeProofFileBaseName(
         files.length > 1 ? `${getProofFileBaseName(firstFile.name)}-${files.length}张凭证` : getProofFileBaseName(firstFile.name)
@@ -638,7 +641,7 @@ export default {
       this.resetProofSubmitConfirm()
 
       try {
-        const compressedBlob = files.length === 1
+        const { blob: compressedBlob, imageSegments } = files.length === 1
           ? await compressImageToWebp(firstFile)
           : await composeProofImagesToWebp(files)
 
@@ -647,6 +650,7 @@ export default {
         }
 
         this.compressedProofBlob = compressedBlob
+        this.imageSegments = imageSegments
         this.proofPreviewUrl = URL.createObjectURL(compressedBlob)
       } catch (error) {
         if (selectionToken !== this.proofSelectionToken) {
@@ -657,6 +661,7 @@ export default {
         this.proofFileBaseName = ''
         this.selectedProofCount = 0
         this.compressedProofBlob = null
+        this.imageSegments = null
 
         if (this.$refs.proofFileInput) {
           this.$refs.proofFileInput.value = ''
@@ -700,7 +705,8 @@ export default {
           projectUploadConfigId: this.selectedUploadConfig.uploadConfigId,
           proofDate: this.proofDate,
           note: this.proofNote,
-          imageFile: proofFile
+          imageFile: proofFile,
+          imageSegments: this.imageSegments
         })
 
         await waitForMinProofUploadingDuration(uploadStartedAt)
@@ -791,6 +797,7 @@ export default {
       this.proofFileBaseName = ''
       this.selectedProofCount = 0
       this.compressedProofBlob = null
+      this.imageSegments = null
       this.isProofProcessing = false
       this.proofProcessError = null
       this.isProofUploading = false

@@ -51,7 +51,7 @@ Flame Winter Pheno 是一个面向企业员工健康挑战的移动端 Web 应�
 - 赛季参与状态由 `/season/participate_check` 表达：`200` 为已参与，`409` 为报名中，`403` 为报名已截止。
 - 项目锁定后才允许上传该项目的运动凭证。
 - 项目卡片从按下到抬起期间移动达到 `10px` 时视为滚动，不执行项目选择或打开上传面板，避免钉钉 WebView 在滚动结束后补发 `pointerup` 造成误触。
-- 上传表单由后端项目上传配置驱动；每次可选择 1 ～ 5 张图片，多图按选择顺序纵向等比完整拼为一张 WebP 长图，优先保留截图文字清晰度并压缩到 5 MB 以内提交。前端优先使用 Canvas 原生 WebP 编码；钉钉 WebView 仅能解码、不能编码 WebP 时，按需加载 libwebp WebAssembly 编码器兜底，并校验实际 WebP 文件头。处理完成后可在上传面板背面滚动查看完整长图，后端仍只接收单个 `image` 文件。
+- 上传表单由后端项目上传配置驱动；每次可选择 1 ～ 5 张图片，多图按选择顺序纵向等比完整拼为一张 WebP 长图，优先保留截图文字清晰度并压缩到 5 MB 以内提交。前端优先使用 Canvas 原生 WebP 编码；钉钉 WebView 仅能解码、不能编码 WebP 时，按需加载 libwebp WebAssembly 编码器兜底，并校验实际 WebP 文件头。处理完成后可在上传面板背面滚动查看完整长图，后端接收单个 `image` 文件，并通过 `image_segments` JSON 文本接收最终画布尺寸与各原图矩形区域；单图提交全图定位，多图排除边距和间隙，普通上传与补传共用生成逻辑。
 - 当前赛季历史只在用户已参与该赛季时查询和展示；过往赛季记录独立查询。
 - 可补传记录由 `/supplement/records` 返回的有效资格决定，前端不能依据审核状态自行推断。可补传记录按接口顺序置于过往上传最前方，并通过凭证 ID 与普通归档去重；用户可在记录卡背面选择图片、查看单图处理或多图拼接结果、填写备注并通过二次确认调用 `/supplement/upload`。赛季、项目和运动日期不可修改，成功后同时刷新归档记录与资格列表。
 - 当前赛季项目进度由 `/project/progress?season_id` 返回的 `completion_progress` 提供，后端以 0 ～ 1 的比例返回，前端展示为百分比。
@@ -104,7 +104,7 @@ src/main.js
 
 ## 接口约定
 
-- 生产构建的静态资源使用 `/flame/` 前缀；云服务器上的 `npm run serve` 使用 `/dev/flame/` 前缀并经宿主机 Nginx 转发到 `127.0.0.1:8080`。Vue Dev Server 通过 `devServer.allowedHosts` 仅接受 `pheno.szkl.com` 等明确配置的开发代理域名。`VUE_APP_API_BASE_URL` 统一填写普通 `/flame/api` 地址，开发模式由 `src/api/apiBaseUrl.js` 自动插入 `/dev`，再由 Nginx 去除该前缀并转发至本机 8000 端口；生产模式不改写。`src/api/request.js` 会自动添加 `Authorization: <auth_code>`，不使用 `Bearer` 前缀。
+- 生产构建的静态资源使用 `/flame/` 前缀；云服务器上的 `npm run serve` 使用 `/dev/flame/` 前缀并经宿主机 Nginx 转发到 `127.0.0.1:21080`。Vue Dev Server 通过 `devServer.allowedHosts` 仅接受 `pheno.szkl.com` 等明确配置的开发代理域名。`VUE_APP_API_BASE_URL` 统一填写普通 `/flame/api` 地址，开发模式由 `src/api/apiBaseUrl.js` 自动插入 `/dev`，再由 Nginx 去除该前缀并转发至本机 8000 端口；生产模式不改写。`src/api/request.js` 会自动添加 `Authorization: <auth_code>`，不使用 `Bearer` 前缀。
 - 非登录接口返回 401 时，前端重新登录并自动重试原请求一次。
 - 请求参数及推荐后端响应字段使用 snake_case。
 - `src/api/` 将后端数据归一化为组件使用的 camelCase 模型。

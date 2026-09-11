@@ -371,7 +371,7 @@ export async function getProjectUploadConfig(projectId) {
  * 前端会在提交前把用户选择的图片统一转换为 WebP 并压缩到 5MB 以内，
  * 再通过 multipart/form-data 提交赛季 ID、项目 ID、上传配置 ID、运动日期、备注和图片文件。
  */
-export async function uploadProjectProof({ seasonId, projectId, projectUploadConfigId, proofDate, note, imageFile }) {
+export async function uploadProjectProof({ seasonId, projectId, projectUploadConfigId, proofDate, note, imageFile, imageSegments }) {
   const formData = new FormData()
 
   formData.append('season_id', seasonId)
@@ -380,6 +380,10 @@ export async function uploadProjectProof({ seasonId, projectId, projectUploadCon
   formData.append('proof_date', proofDate)
   formData.append('note', note || '')
   formData.append('image', imageFile, imageFile.name)
+  // multipart 文本字段承载 JSON，组件只传前端模型，协议字段名集中在 API 层。
+  if (imageSegments) {
+    formData.append('image_segments', JSON.stringify(imageSegments))
+  }
 
   const response = await request.post('/proof/upload', formData)
 

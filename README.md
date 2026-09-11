@@ -91,7 +91,7 @@ cp .env.example .env.local
 npm run serve
 ```
 
-开发服务监听 `127.0.0.1:8080`，资源路径为 `/dev/flame/`。本机可访问 `http://127.0.0.1:8080/dev/flame/`；通过其他域名反向代理时，需要同步将域名加入 `vue.config.js` 的 `devServer.allowedHosts`。
+开发服务监听 `127.0.0.1:21080`，资源路径为 `/dev/flame/`。本机可访问 `http://127.0.0.1:21080/dev/flame/`；通过其他域名反向代理时，需要同步将域名加入 `vue.config.js` 的 `devServer.allowedHosts`。
 
 ### 6.1 环境变量
 

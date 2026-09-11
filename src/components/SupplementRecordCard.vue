@@ -219,6 +219,7 @@ export default {
       selectedImageCount: 0,
       fileBaseName: '',
       processedBlob: null,
+      imageSegments: null,
       previewUrl: '',
       selectionToken: 0,
       isProcessing: false,
@@ -278,6 +279,7 @@ export default {
         this.selectedUploadConfig?.uploadConfigId &&
         this.note.trim() &&
         this.processedBlob &&
+        this.imageSegments &&
         this.fileBaseName
       )
     },
@@ -396,6 +398,7 @@ export default {
       this.selectionToken = selectionToken
       this.clearPreviewUrl()
       this.processedBlob = null
+      this.imageSegments = null
       this.selectedImageCount = files.length
       this.fileBaseName = sanitizeProofFileBaseName(
         files.length > 1
@@ -408,7 +411,7 @@ export default {
       this.resetConfirmation()
 
       try {
-        const blob = files.length === 1
+        const { blob, imageSegments } = files.length === 1
           ? await compressImageToWebp(firstFile)
           : await composeProofImagesToWebp(files)
 
@@ -417,6 +420,7 @@ export default {
         }
 
         this.processedBlob = blob
+        this.imageSegments = imageSegments
         this.previewUrl = URL.createObjectURL(blob)
       } catch (error) {
         if (selectionToken !== this.selectionToken) {
@@ -427,6 +431,7 @@ export default {
         this.selectedImageCount = 0
         this.fileBaseName = ''
         this.processedBlob = null
+        this.imageSegments = null
         event.target.value = ''
       } finally {
         if (selectionToken === this.selectionToken) {
@@ -466,7 +471,8 @@ export default {
           recordType: this.selectedUploadConfig.recordType,
           proofDate: this.record.proofDate,
           note: this.note,
-          imageFile
+          imageFile,
+          imageSegments: this.imageSegments
         })
 
         this.isUploadSucceeded = true

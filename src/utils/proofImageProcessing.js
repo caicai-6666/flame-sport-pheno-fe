@@ -188,7 +188,15 @@ async function compressDrawableToWebp(drawable, sourceWidth, sourceHeight) {
       const blob = await canvasToWebpBlob(canvas, quality)
 
       if (blob.size <= MAX_PROOF_IMAGE_BYTES) {
-        return blob
+        return {
+          blob,
+          imageSegments: {
+            version: 1,
+            width: canvas.width,
+            height: canvas.height,
+            segments: [{ x: 0, y: 0, width: canvas.width, height: canvas.height }]
+          }
+        }
       }
     }
 
@@ -225,8 +233,8 @@ function createLongProofCanvas(images, canvasWidth) {
 
     return {
       image,
-      width: Math.round(imageWidth * scale),
-      height: Math.round(imageHeight * scale)
+      width: Math.max(1, Math.round(imageWidth * scale)),
+      height: Math.max(1, Math.round(imageHeight * scale))
     }
   })
   const contentHeight = layout.reduce((total, item) => total + item.height, 0) + LONG_PROOF_GAP * Math.max(layout.length - 1, 0)
@@ -242,14 +250,20 @@ function createLongProofCanvas(images, canvasWidth) {
   context.fillStyle = '#fff'
   context.fillRect(0, 0, canvas.width, canvas.height)
 
+  const segments = []
   let y = LONG_PROOF_PADDING
   for (const item of layout) {
     const x = Math.round((canvas.width - item.width) / 2)
     context.drawImage(item.image, x, y, item.width, item.height)
+    // 记录实际绘制的原图区域，排除白色边距与间隙，供后端逐段审核。
+    segments.push({ x, y, width: item.width, height: item.height })
     y += item.height + LONG_PROOF_GAP
   }
 
-  return canvas
+  return {
+    canvas,
+    imageSegments: { version: 1, width: canvas.width, height: canvas.height, segments }
+  }
 }
 
 export async function composeProofImagesToWebp(files) {
@@ -260,14 +274,16 @@ export async function composeProofImagesToWebp(files) {
   let canvasWidth = initialWidth
 
   while (canvasWidth >= minimumWidth) {
-    const canvas = createLongProofCanvas(images, canvasWidth)
+    const result = createLongProofCanvas(images, canvasWidth)
 
-    if (canvas) {
+    if (result) {
+      const { canvas, imageSegments } = result
       for (const quality of LONG_PROOF_WEBP_QUALITY_STEPS) {
         const blob = await canvasToWebpBlob(canvas, quality)
 
         if (blob.size <= MAX_PROOF_IMAGE_BYTES) {
-          return blob
+          // 每轮缩宽都重新生成定位，只返回最终通过大小校验的画布与对应坐标。
+          return { blob, imageSegments }
         }
       }
     }
