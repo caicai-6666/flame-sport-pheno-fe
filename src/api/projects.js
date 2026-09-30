@@ -1,4 +1,5 @@
 import request from './request'
+import { normalizeProofRecordType } from './proofRecordType'
 
 const PROJECT_ACCENTS = [
   '#68d65c',
@@ -157,7 +158,7 @@ function getChallengeRewardSortValue(challenge) {
 function normalizeUploadConfig(config) {
   return {
     uploadConfigId: String(config.uploadConfigId || config.upload_config_id || config.id || ''),
-    recordType: config.recordType || config.record_type || '',
+    recordType: normalizeProofRecordType(config.record_type || config.recordType),
     uploadHint: config.uploadHint || config.upload_hint || '',
     noteExample: config.noteExample || config.note_example || ''
   }

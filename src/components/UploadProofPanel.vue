@@ -97,7 +97,7 @@
               :key="config.recordType"
               type="button"
               :class="{ 'is-active': proofRecordType === config.recordType }"
-              :disabled="isWriteFrozen"
+              :disabled="isWriteFrozen || isProofUploading"
               @click="selectUploadConfig(config)"
             >
               <strong>{{ config.recordType }}</strong>
@@ -106,7 +106,7 @@
 
         </div>
 
-        <div v-if="!isWeightLossChallenge" class="proof-note">
+        <div v-if="!isMonthlyRecord" class="proof-note">
           <span>运动日期</span>
           <div class="proof-date-wheel-shell" :class="{ 'is-disabled': isProofUploading || !hasLegalProofDate }">
             <div class="proof-date-wheel-highlight" aria-hidden="true"></div>
@@ -338,8 +338,19 @@ export default {
   },
   mounted() {
     this.lockPageScroll()
-    if (!this.isWeightLossChallenge) {
+    if (!this.isMonthlyRecord) {
       this.$nextTick(() => this.scrollProofDateIntoView('auto'))
+    }
+  },
+  watch: {
+    isMonthlyRecord() {
+      // 配置异步加载或切换类型后重新应用日期规则，防止隐藏滚轮仍保留此前选中的日期。
+      if (this.proofDateWheelTimer) {
+        window.clearTimeout(this.proofDateWheelTimer)
+        this.proofDateWheelTimer = null
+      }
+      this.setDefaultProofDate()
+      this.resetProofSubmitConfirm()
     }
   },
   computed: {
@@ -386,8 +397,8 @@ export default {
 
       return `${year}年${Number(month)}月`
     },
-    isWeightLossChallenge() {
-      return this.task?.name === '减重挑战'
+    isMonthlyRecord() {
+      return ['月初记录', '月末记录'].includes(this.selectedUploadConfig.recordType)
     },
     selectedUploadConfig() {
       return this.uploadConfigs.find(config => config.recordType === this.proofRecordType) || this.uploadConfigs[0] || defaultUploadConfig
@@ -511,15 +522,15 @@ export default {
       }
 
       const today = getLocalDateString()
-      // 当前激活赛季内默认定位今天；仅在今天不属于可选范围时才退回最近有效日期。
-      this.proofDate = this.availableProofDates.includes(today) ? today : this.proofDateMax
+      // 月初/月末记录只能使用当天；当天不合法时阻止提交，其他类型可回退到最近有效日期。
+      this.proofDate = this.availableProofDates.includes(today) ? today : (this.isMonthlyRecord ? '' : this.proofDateMax)
 
-      if (!this.isWeightLossChallenge) {
+      if (!this.isMonthlyRecord) {
         this.$nextTick(() => this.scrollProofDateIntoView('auto'))
       }
     },
     selectProofDate(date) {
-      if (this.isProofUploading || !this.availableProofDates.includes(date)) {
+      if (this.isWriteFrozen || this.isProofUploading || this.isMonthlyRecord || !this.availableProofDates.includes(date)) {
         return
       }
 
@@ -528,7 +539,7 @@ export default {
       this.$nextTick(() => this.scrollProofDateIntoView())
     },
     handleProofDateWheelScroll() {
-      if (this.isProofUploading) {
+      if (this.isProofUploading || this.isMonthlyRecord) {
         return
       }
 
@@ -544,7 +555,7 @@ export default {
     syncProofDateWheel() {
       const wheel = this.$refs.proofDateWheel
 
-      if (!wheel || !this.availableProofDates.length) {
+      if (this.isMonthlyRecord || !wheel || !this.availableProofDates.length) {
         return
       }
 
@@ -587,6 +598,10 @@ export default {
       return `周${['日', '一', '二', '三', '四', '五', '六'][getLocalDateFromString(date).getDay()]}`
     },
     selectUploadConfig(config) {
+      if (this.isWriteFrozen || this.isProofUploading) {
+        return
+      }
+
       this.proofRecordType = config.recordType
       this.clearProofUploadFailure()
       this.resetProofSubmitConfirm()

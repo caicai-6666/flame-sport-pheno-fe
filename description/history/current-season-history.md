@@ -59,6 +59,7 @@ GET /proof/current
   {
     "seasonName": "2026年7月赛季",
     "projectName": "健身",
+    "record_type": "普通记录",
     "reviewStatus": "pending",
     "reviewComment": "",
     "preliminaryReviewComment": "",
@@ -86,6 +87,7 @@ GET /proof/current
 | --------------- | --------------- | ----------------------------------------------------------------------------------------------- |
 | `seasonName`    | `seasonName`    | 赛季名称，对应 `season.name`                                                                    |
 | `projectName`   | `taskName`      | 项目名称，对应 `project.name`                                                                   |
+| `record_type`  | `recordType`    | 凭证类型展示名称，如“普通记录”“月初记录”“月末记录”；兼容 `recordType` 及嵌套上传配置字段 |
 | `reviewStatus`  | `reviewStatus`  | 审核状态，取值见下方枚举                                                                        |
 | `reviewComment` | `reviewComment` | 当前审核阶段意见的兼容字段；前端仅用于兼容尚未升级的后端                                      |
 | `preliminaryReviewComment` | `preliminaryReviewComment` | 大模型初审意见；非空时独立展示为“初审意见”                                      |
@@ -109,6 +111,10 @@ rejected               = 终审失败
 未知状态会降级展示为“待初审”，避免接口枚举扩展时出现空标签。
 
 `proofDate` 表示实际运动日期，卡片日期与列表排序优先使用该字段；`createdAt` 表示实际上传时间，卡片右上角明确展示为 `YYYY.MM.DD HH:mm`。
+
+记录副标题直接展示归一化后的 `recordType`，不依赖项目名称，也不拼接 BMI。API 层将旧编码 `month-start`、`month-end` 分别转为“月初记录”“月末记录”，其余类型名称原样保留（去除首尾空格）。优先读取记录自身的类型，缺失时兼容 `upload_config` 或 `project_upload_config` 内的 `record_type` / `recordType`。全部缺失时展示“运动上传”，不能默认推断为月初或按日期推断类型。
+
+后端应根据凭证实际关联的上传配置返回 `record_type`；上传配置 ID 仍是写库依据。历史响应缺少类型时，前端无法恢复月初/月末信息，需要后端补齐该字段。
 
 ### 异常处理
 

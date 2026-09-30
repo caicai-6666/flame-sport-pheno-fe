@@ -438,12 +438,8 @@ export default {
       return `${date.getFullYear()}.${month}.${day} ${hour}:${minute}`
     },
     recordTitle(record) {
-      if (record.taskName !== '减重挑战') {
-        return '运动上传'
-      }
-
-      const typeText = record.recordType === 'month-end' ? '月末体重' : '月初体重'
-      return record.bmi ? `${typeText} · BMI ${record.bmi}` : typeText
+      // 类型缺失时不推断月初/月末，也不根据项目名称或 BMI 改写凭证类型。
+      return record.recordType || '运动上传'
     },
     reviewStatus(record) {
       return record.reviewStatus || 'pending'

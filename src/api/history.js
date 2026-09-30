@@ -1,4 +1,5 @@
 import request from './request'
+import { normalizeProofRecordType } from './proofRecordType'
 import { normalizeReviewStatus } from '../utils/proofReview'
 
 const HISTORY_ACCENTS = [
@@ -96,7 +97,7 @@ function normalizeCurrentSeasonRecord(record, index) {
     fileName: record.imageName || record.image_name || getProofFileName(record),
     imageUrl: String(record.imageUrl || record.image_url || '').trim(),
     note: record.note || '',
-    recordType: record.record_type || uploadConfig.record_type || record.recordType || '',
+    recordType: normalizeProofRecordType(record.record_type || record.recordType || uploadConfig.record_type || uploadConfig.recordType),
     reviewStatus,
     ...normalizeReviewComments(record, reviewStatus),
     bmi: record.bmi || '',
