@@ -31,7 +31,7 @@ VUE_APP_API_BASE_URL=/flame/api
 VUE_APP_MODE=development
 VUE_APP_DINGTALK_CORP_ID=<钉钉企业 CorpId>
 VUE_APP_DINGTALK_CLIENT_ID=<钉钉 H5 应用 ClientId>
-VUE_APP_DINGTALK_JSAPI_URL=https://g.alicdn.com/dingding/open-develop/1.9.0/dingtalk.js
+VUE_APP_DINGTALK_JSAPI_URL=https://g.alicdn.com/dingding/dingtalk-jsapi/3.1.0/dingtalk.open.js
 VUE_APP_AUTH_CODE=<开发环境用 auth_code>
 ```
 
@@ -135,7 +135,9 @@ main.js
 
 ## 钉钉 JSAPI 加载与超时
 
-`public/index.html` 会在 `app.js` 前同步加载钉钉官方 JSAPI（`https://g.alicdn.com/dingding/open-develop/1.9.0/dingtalk.js`），并提前注册 `dd.ready`。这是为了避免部分钉钉 Android 客户端在前端动态加载 SDK 前就发出 `runtimeready`，从而使 Native bridge 永远不初始化。SDK 地址在入口 HTML 中固定，确保 `npm run serve` 与生产构建得到同样的加载时序；`VUE_APP_DINGTALK_JSAPI_URL` 仅保留给运行时动态加载兜底。
+`public/index.html` 会在 `app.js` 前同步加载钉钉官方 JSAPI（`https://g.alicdn.com/dingding/dingtalk-jsapi/3.1.0/dingtalk.open.js`），并提前注册 `dd.ready`。统一 SDK 支持 Mac、Windows、iOS 和 Android，保留提前初始化的时序，避免移动端 bridge 事件早于应用加载。SDK 地址在入口 HTML 中固定，确保 `npm run serve` 与生产构建得到同样的加载时序；`VUE_APP_DINGTALK_JSAPI_URL` 仅保留给运行时动态加载兜底。
+
+旧版 `open-develop/1.9.0/dingtalk.js` 只有 iOS / Android bridge 初始化分支，在桌面端不会触发 `dd.ready` 回调，导致登录前的 8 秒超时。入口、运行时默认地址与环境配置统一使用上述 SDK，不应回退到该移动端旧版本。此故障发生在凭证获取阶段，尚未请求 `/auth/login`。
 
 `requestAuthCode` 会先等待 Native bridge 就绪，并同时兼容旧版 `onSuccess` / `onFail` 回调和新版 Promise 返回值；若 SDK 加载超过 8 秒、Native bridge 超过 8 秒未就绪、或授权码调用超过 10 秒仍无回调，页面会退出等待态并显示明确错误，而不会无限停在“正在获取钉钉免登授权码”。
 

@@ -1,4 +1,4 @@
-const DEFAULT_DINGTALK_JSAPI_URL = 'https://g.alicdn.com/dingding/open-develop/1.9.0/dingtalk.js'
+const DEFAULT_DINGTALK_JSAPI_URL = 'https://g.alicdn.com/dingding/dingtalk-jsapi/3.1.0/dingtalk.open.js'
 const DINGTALK_SCRIPT_ID = 'dingtalk-jsapi'
 const DINGTALK_SDK_LOAD_TIMEOUT = 8000
 const DINGTALK_BRIDGE_READY_TIMEOUT = 8000

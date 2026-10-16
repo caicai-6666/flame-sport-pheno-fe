@@ -107,7 +107,7 @@ npm run serve
 | `VUE_APP_PAGE_TITLE` | 浏览器页签和钉钉 WebView 显示的应用名称 |
 | `VUE_APP_DINGTALK_CORP_ID` | 钉钉企业 CorpId，生产免登使用 |
 | `VUE_APP_DINGTALK_CLIENT_ID` | 钉钉 H5 应用 ClientId，生产免登使用 |
-| `VUE_APP_DINGTALK_JSAPI_URL` | 钉钉 JSAPI 地址；未配置时使用项目内置的官方默认地址 |
+| `VUE_APP_DINGTALK_JSAPI_URL` | 运行时兜底的钉钉 JSAPI 地址，默认使用支持电脑端和移动端的 `dingtalk-jsapi/3.1.0/dingtalk.open.js`；入口 HTML 同步加载同版本 SDK |
 
 > **注意**
 >
