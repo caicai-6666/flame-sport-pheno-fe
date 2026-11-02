@@ -1,5 +1,10 @@
 const DEFAULT_SHOP_REDEEM_WINDOW_DAYS = 7
 
+// 只有显式开启才放行前端时间限制，避免字符串 false 被当作真值。
+export function isShopRedeemAlwaysOpen() {
+  return String(process.env.VUE_APP_SHOP_REDEEM_ALWAYS_OPEN || '').trim().toLowerCase() === 'true'
+}
+
 function parseLocalDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
 
@@ -44,9 +49,17 @@ export function getShopRedeemWindowDays() {
 }
 
 /**
- * 商城只在赛季开始后的前 N 个自然日开放兑换。日期使用本地零点比较，避免 YYYY-MM-DD 被按 UTC 解析后提前或延后一天。
+ * 未强制开放时，商城只在赛季开始后的前 N 个自然日开放。日期按本地零点比较，避免 UTC 解析偏移。
  */
 export function getShopRedeemAvailability(season, now = new Date()) {
+  if (isShopRedeemAlwaysOpen()) {
+    return {
+      isAvailable: true,
+      message: '兑换已开放',
+      nextChangeAt: null
+    }
+  }
+
   const seasonStartDate = parseLocalDate(season?.startDate)
   const seasonEndDate = parseLocalDate(season?.endDate)
 

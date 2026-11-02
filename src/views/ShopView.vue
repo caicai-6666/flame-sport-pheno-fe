@@ -33,7 +33,7 @@ import {
 import { getCurrentSeason, isNoActiveSeasonError } from '../api/season'
 import { appState, setCurrentSeason, setSeasonAvailability } from '../state/appState'
 import { groupProductsByTier } from '../utils/shopProductTiers'
-import { getShopRedeemAvailability } from '../utils/shopRedeemWindow'
+import { getShopRedeemAvailability, isShopRedeemAlwaysOpen } from '../utils/shopRedeemWindow'
 import { getSeasonWriteAvailability, getSeasonWriteUpdateDelay } from '../utils/seasonWriteAvailability'
 
 export default {
@@ -55,7 +55,7 @@ export default {
       isShopRouteActive: false,
       isProductPanelVisible: true,
       currentSeason: null,
-      redeemAvailability: {
+      redeemAvailability: isShopRedeemAlwaysOpen() ? getShopRedeemAvailability(null) : {
         isAvailable: false,
         message: '正在确认兑换时间',
         nextChangeAt: null
@@ -143,6 +143,12 @@ export default {
       }
     },
     async loadRedeemWindow() {
+      // 强制开放不依赖当前赛季接口，也不改写其他页面共用的赛季状态。
+      if (isShopRedeemAlwaysOpen()) {
+        this.updateRedeemAvailability()
+        return
+      }
+
       setSeasonAvailability('loading')
 
       try {
@@ -165,8 +171,16 @@ export default {
       }
     },
     updateRedeemAvailability() {
-      const seasonWriteAvailability = getSeasonWriteAvailability(this.currentSeason)
       const shopRedeemAvailability = getShopRedeemAvailability(this.currentSeason)
+
+      // 提交前复核与首屏使用同一开关，避免保护期或旧定时器重新关闭兑换。
+      if (isShopRedeemAlwaysOpen()) {
+        this.redeemAvailability = shopRedeemAvailability
+        this.clearRedeemWindowTimer()
+        return
+      }
+
+      const seasonWriteAvailability = getSeasonWriteAvailability(this.currentSeason)
 
       if (seasonWriteAvailability.isFrozen) {
         this.redeemAvailability = {

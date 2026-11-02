@@ -15,7 +15,7 @@
 5. 查看当前赛季进度、审核历史、可补传记录和打卡排行榜。
 6. 获取积分、查看积分流水，并在开放期内兑换商品。
 
-没有激活赛季时，项目规则、过往审核、商品和积分流水仍可浏览，赛季报名、锁定、上传、兑换和当前赛季排行会进入只读状态。赛季开始后的配置保护期同样会暂时关闭赛季写入入口，并提示距离正式开放的剩余时间；意见提交不受该保护期影响。
+没有激活赛季时，项目规则、过往审核、商品和积分流水仍可浏览，赛季报名、锁定、上传、兑换和当前赛季排行默认进入只读状态。赛季开始后的配置保护期同样会暂时关闭赛季写入入口，并提示距离正式开放的剩余时间；意见提交不受该保护期影响。商城可通过 `VUE_APP_SHOP_REDEEM_ALWAYS_OPEN=true` 强制开放前端兑换入口，服务端仍独立校验。
 
 ---
 
@@ -27,7 +27,7 @@
 - **运动凭证上传**：支持选择 1 ～ 5 张图片、WebP 压缩、多图纵向拼接、完整结果预览、备注填写和二次确认提交。
 - **历史与补传**：展示当前及过往赛季记录、审核状态、审核意见和受保护原图，并为具备资格的记录提供补传流程。
 - **打卡排行榜**：展示当前赛季通过初审的打卡次数、参与人数、个人排名和全员排行，并高亮当前用户。
-- **积分商城**：展示商品、可用积分和积分流水，在赛季兑换窗口内通过二次确认完成兑换。
+- **积分商城**：展示商品、可用积分和积分流水，在赛季兑换窗口内通过二次确认完成兑换；支持配置强制开放前端兑换窗口。
 - **全局交互**：提供意见提交、钉钉应用退出、屏幕边缘退出手势、路由滑动过渡和移动端安全区适配。
 
 ---
@@ -104,6 +104,7 @@ npm run serve
 | `VUE_APP_AUTH_CODE` | 开发模式提交给登录接口的授权码，仅用于本地或受控联调环境 |
 | `VUE_APP_ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS` | 赛季开始后的配置保护期小时数，必须与后端配置保持一致 |
 | `VUE_APP_SHOP_REDEEM_WINDOW_DAYS` | 从赛季开始日起允许兑换的自然日数，默认值为 `7` |
+| `VUE_APP_SHOP_REDEEM_ALWAYS_OPEN` | 默认 `false`；设为 `true` 时无条件开放前端兑换窗口，忽略赛季日期、无激活赛季和前端配置保护期 |
 | `VUE_APP_PAGE_TITLE` | 浏览器页签和钉钉 WebView 显示的应用名称 |
 | `VUE_APP_DINGTALK_CORP_ID` | 钉钉企业 CorpId，生产免登使用 |
 | `VUE_APP_DINGTALK_CLIENT_ID` | 钉钉 H5 应用 ClientId，生产免登使用 |
@@ -112,6 +113,8 @@ npm run serve
 > **注意**
 >
 > Vue CLI 在启动或构建时读取环境变量。修改配置后必须重启开发服务或重新构建镜像。前端的时间窗口提示只负责交互反馈，后端校验始终是写入权限的最终依据。
+
+需要临时开放兑换时，在本地环境或部署目录的 `.env` 设置 `VUE_APP_SHOP_REDEEM_ALWAYS_OPEN=true`。该配置只放行前端时间限制，积分不足、商品下架、登录鉴权以及后端配置保护期校验仍然生效。独立 Docker 构建通过同名 `--build-arg` 传入；Compose 部署修改后执行 `docker compose up -d --build frontend`。
 
 ### 6.2 常用命令
 
@@ -139,6 +142,7 @@ npm run build
 docker build \
   --build-arg VUE_APP_API_BASE_URL=/flame/api \
   --build-arg VUE_APP_SHOP_REDEEM_WINDOW_DAYS=7 \
+  --build-arg VUE_APP_SHOP_REDEEM_ALWAYS_OPEN=false \
   --build-arg VUE_APP_ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS=24 \
   --build-arg VUE_APP_PAGE_TITLE=<应用名称> \
   --build-arg VUE_APP_DINGTALK_CORP_ID=<钉钉企业 CorpId> \
